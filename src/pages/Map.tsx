@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { UserProfile, Business, Town } from '../types';
-import { collection, onSnapshot, query, where } from 'firebase/firestore';
-import { db } from '../firebase';
-import { MapPin, Store, Navigation, Loader2, Search, ExternalLink } from 'lucide-react';
+import { UserProfile, Business } from '../types';
+import { MapPin, Store, Navigation } from 'lucide-react';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -10,29 +8,13 @@ import { trackActivity } from '../services/activityService';
 
 interface MapProps {
   user: UserProfile;
+  businesses: Business[];
 }
 
-export const Map: React.FC<MapProps> = ({ user }) => {
-  const [businesses, setBusinesses] = useState<Business[]>([]);
-  const [towns, setTowns] = useState<Town[]>([]);
-  const [town, setTown] = useState('Yorktown');
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const unsubscribeTowns = onSnapshot(collection(db, 'towns'), (snapshot) => {
-      setTowns(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Town)));
-    });
-    return () => unsubscribeTowns();
-  }, []);
-
-  useEffect(() => {
-    const q = query(collection(db, 'businesses'), where('town', '==', town));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      setBusinesses(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Business)));
-      setLoading(false);
-    });
-    return () => unsubscribe();
-  }, [town]);
+export const Map: React.FC<MapProps> = ({ user, businesses }) => {
+  const towns = Array.from(new Set(businesses.map(b => b.town))).map(name => ({ id: name, name }));
+  const [town, setTown] = useState('');
+  const filteredBusinesses = town ? businesses.filter(b => b.town === town) : businesses;
 
   // Fix for Leaflet marker icons
   useEffect(() => {
@@ -55,8 +37,14 @@ export const Map: React.FC<MapProps> = ({ user }) => {
         </div>
         
         <div className="flex flex-wrap gap-3 w-full md:w-auto py-2">
+          <button
+            onClick={() => setTown('')}
+            className={`px-6 py-3 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all whitespace-nowrap shadow-sm hover:shadow-md ${town === '' ? 'bg-neutral-900 text-white shadow-lg scale-105' : 'bg-white border border-neutral-200 text-neutral-400 hover:border-neutral-900 hover:text-neutral-900'}`}
+          >
+            All
+          </button>
           {towns.map(t => (
-            <button 
+            <button
               key={t.id}
               onClick={() => setTown(t.name)}
               className={`px-6 py-3 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all whitespace-nowrap shadow-sm hover:shadow-md ${town === t.name ? 'bg-neutral-900 text-white shadow-lg scale-105' : 'bg-white border border-neutral-200 text-neutral-400 hover:border-neutral-900 hover:text-neutral-900'}`}
@@ -74,7 +62,7 @@ export const Map: React.FC<MapProps> = ({ user }) => {
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             />
-            {businesses.filter(b => b.lat && b.lng).map(biz => (
+            {filteredBusinesses.filter(b => b.lat && b.lng).map(biz => (
               <Marker key={biz.id} position={[biz.lat!, biz.lng!]}>
                 <Popup className="rounded-2xl overflow-hidden">
                   <div className="p-4 max-w-[200px]">
@@ -102,18 +90,14 @@ export const Map: React.FC<MapProps> = ({ user }) => {
         </div>
 
         <div className="space-y-4 max-h-[650px] overflow-y-auto pr-2">
-          <h3 className="font-bold uppercase tracking-widest text-xs text-neutral-400 mb-4 px-2">Businesses in {town}</h3>
-          {loading ? (
-            <div className="flex items-center justify-center py-20">
-              <Loader2 className="animate-spin text-neutral-200" size={32} />
-            </div>
-          ) : businesses.length === 0 ? (
+          <h3 className="font-bold uppercase tracking-widest text-xs text-neutral-400 mb-4 px-2">Businesses{town ? ` in ${town}` : ''}</h3>
+          {filteredBusinesses.length === 0 ? (
             <div className="text-center py-20 bg-white rounded-[2rem] border border-neutral-100">
               <Store className="mx-auto text-neutral-100 mb-4" size={48} />
               <p className="text-neutral-400 text-sm italic">No businesses listed yet.</p>
             </div>
           ) : (
-            businesses.map(biz => (
+            filteredBusinesses.map(biz => (
               <div key={biz.id} className="bg-white p-6 rounded-[2rem] border border-neutral-100 shadow-sm hover:shadow-md hover:border-neutral-900 transition-all group">
                 <div className="flex items-center gap-4 mb-4">
                   <div className="w-10 h-10 bg-neutral-50 rounded-xl flex items-center justify-center text-neutral-400 group-hover:text-neutral-900 transition-colors">

@@ -1,20 +1,21 @@
 import React from 'react';
-import { AppSettings } from '../../types';
+import { AppSettings, UserProfile } from '../../types';
 import { doc, setDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
-import { Settings, Gamepad2, Trophy, ToggleLeft, ToggleRight } from 'lucide-react';
+import { Gamepad2, Trophy, ToggleLeft, ToggleRight } from 'lucide-react';
 
 interface GameMasterProps {
   settings: AppSettings;
+  user: UserProfile;
 }
 
-export const GameMaster: React.FC<GameMasterProps> = ({ settings }) => {
+export const GameMaster: React.FC<GameMasterProps> = ({ settings, user }) => {
   const updateSettings = async (field: keyof AppSettings, value: any) => {
     await setDoc(doc(db, 'settings', 'global'), { [field]: value }, { merge: true });
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
       {/* Bingo Configuration */}
       <div className="bg-white border border-neutral-200 p-8 rounded-[2.5rem] shadow-sm">
         <div className="flex items-center gap-3 mb-8">
@@ -96,20 +97,22 @@ export const GameMaster: React.FC<GameMasterProps> = ({ settings }) => {
             </p>
           </div>
 
-          <div className="pt-6 border-t border-neutral-100">
-            <div className="flex items-center justify-between">
-              <div>
-                <label className="block text-[10px] text-neutral-400 uppercase tracking-widest mb-1 font-bold">Real-time Map for Chamber</label>
-                <p className="text-[10px] text-neutral-400 italic">Allow Chamber users to see the live player map in Analytics.</p>
+          {user.role === 'admin' && (
+            <div className="pt-6 border-t border-neutral-100">
+              <div className="flex items-center justify-between">
+                <div>
+                  <label className="block text-[10px] text-neutral-400 uppercase tracking-widest mb-1 font-bold">Real-time Map for Chamber</label>
+                  <p className="text-[10px] text-neutral-400 italic">Allow Chamber users to see the live player map in Analytics.</p>
+                </div>
+                <button
+                  onClick={() => updateSettings('showRealtimeMapToChamber', !settings.showRealtimeMapToChamber)}
+                  className={`flex items-center gap-2 transition-colors ${settings.showRealtimeMapToChamber ? 'text-neutral-900' : 'text-neutral-300'}`}
+                >
+                  {settings.showRealtimeMapToChamber ? <ToggleRight size={32} /> : <ToggleLeft size={32} />}
+                </button>
               </div>
-              <button 
-                onClick={() => updateSettings('showRealtimeMapToChamber', !settings.showRealtimeMapToChamber)}
-                className={`flex items-center gap-2 transition-colors ${settings.showRealtimeMapToChamber ? 'text-neutral-900' : 'text-neutral-300'}`}
-              >
-                {settings.showRealtimeMapToChamber ? <ToggleRight size={32} /> : <ToggleLeft size={32} />}
-              </button>
             </div>
-          </div>
+          )}
         </div>
       </div>
 

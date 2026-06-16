@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { UserProfile, Business, Completion, AppSettings, Town } from '../types';
-import { collection, onSnapshot, doc, query, where, addDoc, setDoc } from 'firebase/firestore';
+import { collection, onSnapshot, query, where, addDoc, setDoc, doc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { motion, AnimatePresence } from 'motion/react';
 import confetti from 'canvas-confetti';
@@ -14,20 +14,14 @@ import { Onboarding } from '../components/Onboarding';
 
 interface DashboardProps {
   user: UserProfile;
+  businesses: Business[];
+  towns: Town[];
+  settings: AppSettings | null;
 }
 
-export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
-  const [businesses, setBusinesses] = useState<Business[]>([]);
+export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, towns, settings }) => {
   const [completions, setCompletions] = useState<Completion[]>([]);
-  const [settings, setSettings] = useState<AppSettings | null>(null);
-  const [towns, setTowns] = useState<Town[]>([]);
   const [loading, setLoading] = useState(true);
-  const [dataLoaded, setDataLoaded] = useState({
-    businesses: false,
-    completions: false,
-    settings: false,
-    towns: false
-  });
   const [verifying, setVerifying] = useState(false);
   const [manualCode, setManualCode] = useState('');
   const [showManual, setShowManual] = useState(false);
@@ -89,41 +83,25 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
   }, [hasBingo, hasShownFanfare]);
 
   useEffect(() => {
-    const unsubscribeBiz = onSnapshot(collection(db, 'businesses'), (snapshot) => {
-      setBusinesses(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Business)));
-      setDataLoaded(prev => ({ ...prev, businesses: true }));
-    });
-    const unsubscribeCompletions = onSnapshot(query(collection(db, 'completions'), where('userId', '==', user.uid)), (snapshot) => {
-      setCompletions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Completion)));
-      setDataLoaded(prev => ({ ...prev, completions: true }));
-    });
-    const unsubscribeSettings = onSnapshot(doc(db, 'settings', 'global'), (doc) => {
-      if (doc.exists()) {
-        setSettings(doc.data() as AppSettings);
-        setDataLoaded(prev => ({ ...prev, settings: true }));
+    const unsubscribeCompletions = onSnapshot(
+      query(collection(db, 'completions'), where('userId', '==', user.uid)),
+      (snapshot) => {
+        setCompletions(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Completion)));
+        setLoading(false);
+      },
+      (err) => {
+        console.error('Completions snapshot error:', err);
+        setLoading(false);
       }
-    });
-    const unsubscribeTowns = onSnapshot(collection(db, 'towns'), (snapshot) => {
-      setTowns(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Town)));
-      setDataLoaded(prev => ({ ...prev, towns: true }));
-    });
+    );
 
     return () => {
-      unsubscribeBiz();
       unsubscribeCompletions();
-      unsubscribeSettings();
-      unsubscribeTowns();
       if (qrScannerRef.current) {
         qrScannerRef.current.stop().catch(console.error);
       }
     };
   }, [user.uid]);
-
-  useEffect(() => {
-    if (dataLoaded.businesses && dataLoaded.completions && dataLoaded.settings && dataLoaded.towns) {
-      setLoading(false);
-    }
-  }, [dataLoaded]);
 
   // Auto-generate board if missing
   useEffect(() => {

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { UserProfile, Business, Town, RaffleEntry, AppSettings, Completion, Winner } from '../types';
-import { collection, onSnapshot, doc, query } from 'firebase/firestore';
+import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
 import { UserIcon, ShieldCheck, Gamepad2, Settings as SettingsIcon, Loader2, BarChart3 } from 'lucide-react';
 import { AdminMenu } from '../components/admin/AdminMenu';
@@ -10,60 +10,47 @@ import { Analytics } from '../components/admin/Analytics';
 
 interface AdminProps {
   user: UserProfile;
+  businesses: Business[];
+  towns: Town[];
+  settings: AppSettings | null;
 }
 
-export const Admin: React.FC<AdminProps> = ({ user }) => {
+export const Admin: React.FC<AdminProps> = ({ user, businesses, towns, settings }) => {
   const [activeTab, setActiveTab] = useState<'admin' | 'master' | 'chamber' | 'analytics'>(user.role === 'admin' ? 'admin' : 'chamber');
-  const [businesses, setBusinesses] = useState<Business[]>([]);
   const [users, setUsers] = useState<UserProfile[]>([]);
-  const [towns, setTowns] = useState<Town[]>([]);
   const [raffleEntries, setRaffleEntries] = useState<RaffleEntry[]>([]);
   const [winners, setWinners] = useState<Winner[]>([]);
   const [completions, setCompletions] = useState<Completion[]>([]);
-  const [settings, setSettings] = useState<AppSettings | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!user || (user.role !== 'admin' && user.role !== 'chamber')) return;
 
-    const unsubscribeBiz = onSnapshot(collection(db, 'businesses'), (snapshot) => {
-      setBusinesses(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Business)));
-    });
-    
-    // Fetch all users for leaderboard and stats
     const unsubscribeUsers = onSnapshot(collection(db, 'users'), (snapshot) => {
-      setUsers(snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as UserProfile)));
-    });
-
-    const unsubscribeTowns = onSnapshot(collection(db, 'towns'), (snapshot) => {
-      setTowns(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Town)));
-    });
+      setUsers(snapshot.docs.map(d => ({ uid: d.id, ...d.data() } as UserProfile)));
+    }, (err) => console.error('Users snapshot error:', err));
 
     const unsubscribeRaffle = onSnapshot(collection(db, 'raffle_entries'), (snapshot) => {
-      setRaffleEntries(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as RaffleEntry)));
-    });
+      setRaffleEntries(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as RaffleEntry)));
+    }, (err) => console.error('Raffle entries snapshot error:', err));
 
     const unsubscribeWinners = onSnapshot(collection(db, 'winners'), (snapshot) => {
-      setWinners(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Winner)));
-    });
+      setWinners(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Winner)));
+    }, (err) => console.error('Winners snapshot error:', err));
 
     const unsubscribeCompletions = onSnapshot(collection(db, 'completions'), (snapshot) => {
-      setCompletions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Completion)));
-    });
-
-    const unsubscribeSettings = onSnapshot(doc(db, 'settings', 'global'), (doc) => {
-      if (doc.exists()) setSettings(doc.data() as AppSettings);
+      setCompletions(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Completion)));
+      setLoading(false);
+    }, (err) => {
+      console.error('Completions snapshot error:', err);
       setLoading(false);
     });
 
     return () => {
-      unsubscribeBiz();
       unsubscribeUsers();
-      unsubscribeTowns();
       unsubscribeRaffle();
       unsubscribeWinners();
       unsubscribeCompletions();
-      unsubscribeSettings();
     };
   }, [user]);
 
@@ -74,7 +61,7 @@ export const Admin: React.FC<AdminProps> = ({ user }) => {
   );
 
   return (
-    <div className="max-w-6xl mx-auto p-6">
+    <div className="max-w-6xl mx-auto p-6 pb-32 md:pb-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-12">
         <div>
           <h2 className="font-serif italic text-5xl mb-2">Admin Panel</h2>
@@ -113,8 +100,8 @@ export const Admin: React.FC<AdminProps> = ({ user }) => {
 
       <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
         {activeTab === 'admin' && user.role === 'admin' && <AdminMenu users={users} businesses={businesses} />}
-        {activeTab === 'master' && settings && <GameMaster settings={settings} />}
-        {activeTab === 'chamber' && <ChamberManager businesses={businesses} towns={towns} raffleEntries={raffleEntries} winners={winners} />}
+        {activeTab === 'master' && settings && <GameMaster settings={settings} user={user} />}
+        {activeTab === 'chamber' && settings && <ChamberManager businesses={businesses} towns={towns} raffleEntries={raffleEntries} winners={winners} settings={settings} />}
         {activeTab === 'analytics' && settings && (
           <Analytics 
             users={users} 

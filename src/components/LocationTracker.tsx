@@ -1,61 +1,63 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { UserProfile } from '../types';
+import { calculateDistance } from '../lib/utils';
 
 interface LocationTrackerProps {
   user: UserProfile | null;
 }
 
+const MIN_WRITE_INTERVAL_MS = 60_000; // at most one write per minute
+const MIN_DISTANCE_M = 30;            // only write if moved more than 30 meters
+
 export const LocationTracker: React.FC<LocationTrackerProps> = ({ user }) => {
+  const lastWriteRef = useRef<number>(0);
+  const lastPositionRef = useRef<{ lat: number; lng: number } | null>(null);
+
   useEffect(() => {
     if (!user) return;
 
-    let watchId: number;
+    const writeLocation = async (lat: number, lng: number) => {
+      const now = Date.now();
+      const last = lastPositionRef.current;
 
-    const updateLocation = async (position: GeolocationPosition) => {
+      // Skip if not enough time has passed
+      if (now - lastWriteRef.current < MIN_WRITE_INTERVAL_MS) return;
+
+      // Skip if position hasn't changed enough
+      if (last) {
+        const moved = calculateDistance(last.lat, last.lng, lat, lng);
+        if (moved < MIN_DISTANCE_M && lastWriteRef.current > 0) return;
+      }
+
+      lastWriteRef.current = now;
+      lastPositionRef.current = { lat, lng };
+
       try {
-        const userRef = doc(db, 'users', user.uid);
-        await updateDoc(userRef, {
+        await updateDoc(doc(db, 'users', user.uid), {
+          currentLocation: { lat, lng },
           lastActive: new Date().toISOString(),
-          currentLocation: {
-            lat: position.coords.latitude,
-            lng: position.coords.longitude
-          }
         });
-      } catch (error) {
-        console.error('Error updating location:', error);
+      } catch (err) {
+        console.error('Error updating location:', err);
       }
     };
 
-    if ('geolocation' in navigator) {
-      // Update once immediately
-      navigator.geolocation.getCurrentPosition(updateLocation);
-      
-      // Then watch for changes
-      watchId = navigator.geolocation.watchPosition(
-        updateLocation,
-        (error) => console.error('Geolocation error:', error),
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
-      );
-    }
+    if (!('geolocation' in navigator)) return;
 
-    // Also update lastActive on a timer if location doesn't change
-    const intervalId = setInterval(async () => {
-      try {
-        const userRef = doc(db, 'users', user.uid);
-        await updateDoc(userRef, {
-          lastActive: new Date().toISOString()
-        });
-      } catch (error) {
-        console.error('Error updating activity:', error);
-      }
-    }, 60000); // Every minute
+    navigator.geolocation.getCurrentPosition(
+      (pos) => writeLocation(pos.coords.latitude, pos.coords.longitude),
+      (err) => console.error('Geolocation error:', err)
+    );
 
-    return () => {
-      if (watchId) navigator.geolocation.clearWatch(watchId);
-      clearInterval(intervalId);
-    };
+    const watchId = navigator.geolocation.watchPosition(
+      (pos) => writeLocation(pos.coords.latitude, pos.coords.longitude),
+      (err) => console.error('Geolocation error:', err),
+      { enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 }
+    );
+
+    return () => navigator.geolocation.clearWatch(watchId);
   }, [user?.uid]);
 
   return null;

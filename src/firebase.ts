@@ -1,6 +1,7 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
+import { getStorage } from 'firebase/storage';
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -16,6 +17,7 @@ const databaseId = import.meta.env.VITE_FIREBASE_DATABASE_ID;
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app, databaseId);
 export const auth = getAuth();
+export const storage = getStorage(app);
 
 export enum OperationType {
   CREATE = 'create',

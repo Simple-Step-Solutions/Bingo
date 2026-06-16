@@ -1,8 +1,12 @@
-import React, { useState, useMemo } from 'react';
-import { Business, Town, RaffleEntry, Winner } from '../../types';
+import React, { useState, useMemo, useRef } from 'react';
+import { Business, Town, RaffleEntry, Winner, AppSettings } from '../../types';
 import { doc, setDoc, deleteDoc, addDoc, collection } from 'firebase/firestore';
-import { db } from '../../firebase';
-import { Store, Trash2, Plus, Nfc, QrCode, MapPin, Search, Download, Users, Ticket, Pencil, Trophy, Sparkles, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { db, storage } from '../../firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { Store, Trash2, Plus, Nfc, QrCode, MapPin, Search, Users, Ticket, Pencil, Trophy, Sparkles, Loader2, ChevronLeft, ChevronRight, Palette, ImagePlus } from 'lucide-react';
+
+const DEFAULT_PRIMARY = '#1695B2';
+const DEFAULT_ACCENT = '#CC5500';
 
 const BIZ_PAGE_SIZE = 20;
 import { CSVImport } from '../CSVImport';
@@ -15,9 +19,10 @@ interface ChamberManagerProps {
   towns: Town[];
   raffleEntries: RaffleEntry[];
   winners: Winner[];
+  settings: AppSettings;
 }
 
-export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, towns, raffleEntries, winners }) => {
+export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, towns, raffleEntries, winners, settings }) => {
   const [newBiz, setNewBiz] = useState({ 
     name: '', 
     town: 'Yorktown', 
@@ -40,6 +45,8 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
   const [isGeocoding, setIsGeocoding] = useState(false);
   const [bizSearch, setBizSearch] = useState('');
   const [bizPage, setBizPage] = useState(0);
+  const [logoUploading, setLogoUploading] = useState(false);
+  const logoInputRef = useRef<HTMLInputElement>(null);
 
   const filteredBusinesses = useMemo(() => {
     const q = bizSearch.toLowerCase().trim();
@@ -179,8 +186,138 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
     await deleteDoc(doc(db, 'raffle_entries', id));
   };
 
+  const updateSettings = async (field: keyof AppSettings, value: any) => {
+    await setDoc(doc(db, 'settings', 'global'), { [field]: value }, { merge: true });
+  };
+
+  const handleLogoUpload = async (file: File) => {
+    setLogoUploading(true);
+    try {
+      const storageRef = ref(storage, 'branding/chamber-logo');
+      await uploadBytes(storageRef, file);
+      const url = await getDownloadURL(storageRef);
+      await updateSettings('chamberLogoUrl', url);
+    } catch (err) {
+      console.error('Logo upload failed:', err);
+    } finally {
+      setLogoUploading(false);
+    }
+  };
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      {/* Branding */}
+      <div className="lg:col-span-3 bg-white border border-neutral-200 p-8 rounded-[2.5rem] shadow-sm">
+        <div className="flex items-center gap-3 mb-8">
+          <div className="bg-neutral-100 p-2 rounded-xl">
+            <Palette className="text-neutral-900" size={20} />
+          </div>
+          <h3 className="font-bold uppercase tracking-widest text-xs text-neutral-400">Branding</h3>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          {/* Logo */}
+          <div className="flex flex-col gap-3">
+            <label className="block text-[10px] text-neutral-400 uppercase tracking-widest font-bold">Chamber Logo</label>
+            <div
+              onClick={() => logoInputRef.current?.click()}
+              className="relative flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-neutral-200 p-6 cursor-pointer hover:border-neutral-400 transition-all bg-neutral-50"
+            >
+              {logoUploading ? (
+                <Loader2 className="animate-spin text-neutral-400" size={24} />
+              ) : settings.chamberLogoUrl ? (
+                <img src={settings.chamberLogoUrl} alt="Chamber Logo" className="h-12 w-auto object-contain" />
+              ) : (
+                <ImagePlus className="text-neutral-300" size={24} />
+              )}
+              <span className="text-[10px] font-bold uppercase tracking-widest text-neutral-400">
+                {settings.chamberLogoUrl ? 'Replace' : 'Upload Logo'}
+              </span>
+            </div>
+            <input
+              ref={logoInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={e => {
+                const file = e.target.files?.[0];
+                if (file) handleLogoUpload(file);
+              }}
+            />
+          </div>
+
+          {/* Chamber Name */}
+          <div className="md:col-span-1">
+            <label className="block text-[10px] text-neutral-400 uppercase tracking-widest mb-2 font-bold">Chamber Name</label>
+            <input
+              value={settings.chamberName || ''}
+              onChange={e => updateSettings('chamberName', e.target.value)}
+              placeholder="Hudson Valley Gateway Chamber of Commerce"
+              className="w-full p-4 bg-neutral-50 border border-neutral-100 rounded-2xl text-sm font-medium focus:ring-2 focus:ring-neutral-900 transition-all outline-none"
+            />
+            <p className="text-[10px] text-neutral-400 mt-2 italic">Displayed in the app footer and onboarding.</p>
+          </div>
+
+          {/* Primary Color */}
+          <div>
+            <label className="block text-[10px] text-neutral-400 uppercase tracking-widest mb-2 font-bold">Primary Color</label>
+            <div className="flex items-center gap-3">
+              <input
+                type="color"
+                value={settings.primaryColor || DEFAULT_PRIMARY}
+                onChange={e => updateSettings('primaryColor', e.target.value)}
+                className="w-14 h-14 rounded-2xl border border-neutral-100 cursor-pointer bg-neutral-50 p-1"
+              />
+              <div className="flex-1">
+                <input
+                  type="text"
+                  value={settings.primaryColor || DEFAULT_PRIMARY}
+                  onChange={e => {
+                    if (/^#[0-9A-Fa-f]{0,6}$/.test(e.target.value)) updateSettings('primaryColor', e.target.value);
+                  }}
+                  className="w-full p-3 bg-neutral-50 border border-neutral-100 rounded-xl text-sm font-mono font-medium focus:ring-2 focus:ring-neutral-900 transition-all outline-none uppercase"
+                  maxLength={7}
+                />
+                <p className="text-[10px] text-neutral-400 mt-1 font-bold uppercase tracking-widest">Buttons, accents, links</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Accent Color */}
+          <div>
+            <label className="block text-[10px] text-neutral-400 uppercase tracking-widest mb-2 font-bold">Accent Color</label>
+            <div className="flex items-center gap-3">
+              <input
+                type="color"
+                value={settings.accentColor || DEFAULT_ACCENT}
+                onChange={e => updateSettings('accentColor', e.target.value)}
+                className="w-14 h-14 rounded-2xl border border-neutral-100 cursor-pointer bg-neutral-50 p-1"
+              />
+              <div className="flex-1">
+                <input
+                  type="text"
+                  value={settings.accentColor || DEFAULT_ACCENT}
+                  onChange={e => {
+                    if (/^#[0-9A-Fa-f]{0,6}$/.test(e.target.value)) updateSettings('accentColor', e.target.value);
+                  }}
+                  className="w-full p-3 bg-neutral-50 border border-neutral-100 rounded-xl text-sm font-mono font-medium focus:ring-2 focus:ring-neutral-900 transition-all outline-none uppercase"
+                  maxLength={7}
+                />
+                <p className="text-[10px] text-neutral-400 mt-1 font-bold uppercase tracking-widest">CTAs, free space, prizes</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-6 flex items-center gap-4 p-4 bg-neutral-50 rounded-2xl border border-neutral-100">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-xl" style={{ backgroundColor: settings.primaryColor || DEFAULT_PRIMARY }} />
+            <div className="w-8 h-8 rounded-xl" style={{ backgroundColor: settings.accentColor || DEFAULT_ACCENT }} />
+          </div>
+          <p className="text-[10px] text-neutral-400 font-bold uppercase tracking-widest">Color changes apply instantly for all users.</p>
+        </div>
+      </div>
+
       {/* Business Management */}
       <div className="lg:col-span-2 space-y-8">
         <div className="bg-white border border-neutral-200 p-8 rounded-[2.5rem] shadow-sm">

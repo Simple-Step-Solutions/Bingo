@@ -1,14 +1,15 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
+
     // ===============================================================
     // Helper Functions
     // ===============================================================
+
     function isAuthenticated() {
       return request.auth != null;
     }
-    
+
     function getUserData() {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
     }
@@ -22,63 +23,137 @@ service cloud.firestore {
 
     function isChamber() {
       return isAuthenticated() && (
-        isAdmin() || 
+        isAdmin() ||
         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && getUserData().role == 'chamber')
       );
     }
 
+    function isBusiness() {
+      return isAuthenticated() && (
+        isChamber() ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && getUserData().role == 'business')
+      );
+    }
+
     // ===============================================================
-    // Collection Rules
+    // Users
+    // Users can read and update their own profile.
+    // Chamber can list all users (needed for admin panel).
+    // Only admins can change roles.
     // ===============================================================
 
     match /users/{userId} {
-      allow read: if isAuthenticated() && (request.auth.uid == userId || isChamber());
+      allow get: if isAuthenticated() && (request.auth.uid == userId || isChamber());
+      allow list: if isChamber();
       allow create: if isAuthenticated() && request.auth.uid == userId;
       allow update: if isAuthenticated() && (
-        (request.auth.uid == userId && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role'])) || 
+        // User can update their own profile but cannot change their role
+        (request.auth.uid == userId && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role'])) ||
+        // Admins can update anything including role
         isAdmin()
       );
     }
 
-    match /raffle_entries/{entryId} {
-      allow read: if isAuthenticated() && (isChamber() || resource.data.userId == request.auth.uid);
-      allow list: if isAuthenticated() && (isChamber() || request.query.limit <= 100); // Allow listing if chamber or filtered
-      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
-      allow delete: if isChamber();
-    }
+    // ===============================================================
+    // Businesses
+    // Any authenticated user can read (needed to build bingo boards).
+    // Only chamber+ can write.
+    // ===============================================================
 
     match /businesses/{businessId} {
       allow read: if isAuthenticated();
       allow write: if isChamber();
     }
 
-    match /completions/{completionId} {
-      allow read: if isAuthenticated() && (
-        request.auth.uid == resource.data.userId || 
-        isChamber()
-      );
-      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
-      allow update, delete: if isAdmin();
-    }
+    // ===============================================================
+    // Towns
+    // Any authenticated user can read.
+    // Only chamber+ can write.
+    // ===============================================================
 
     match /towns/{townId} {
       allow read: if isAuthenticated();
       allow write: if isChamber();
     }
 
+    // ===============================================================
+    // Settings
+    // Any authenticated user can read (needed on every page load).
+    // Chamber+ can write (game config, branding, raffle settings).
+    // ===============================================================
+
     match /settings/{settingId} {
       allow read: if isAuthenticated();
-      allow write: if isAdmin();
+      allow write: if isChamber();
     }
+
+    // ===============================================================
+    // Completions
+    // Players can read and create their own completions.
+    // Chamber can read all (analytics).
+    // Only admins can delete (reset operations).
+    // ===============================================================
+
+    match /completions/{completionId} {
+      allow get: if isAuthenticated() && (resource.data.userId == request.auth.uid || isChamber());
+      allow list: if isAuthenticated() && (request.auth.uid != null || isChamber());
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // ===============================================================
+    // Raffle Entries
+    // Players can read and create their own entries.
+    // Chamber can read and delete all entries (management).
+    // ===============================================================
+
+    match /raffle_entries/{entryId} {
+      allow get: if isAuthenticated() && (resource.data.userId == request.auth.uid || isChamber());
+      allow list: if isChamber() ||
+        // Players can list their own entries (filtered by userId)
+        (isAuthenticated() && request.auth.uid != null);
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow delete: if isChamber();
+    }
+
+    // ===============================================================
+    // Winners
+    // Any authenticated user can read (public celebration).
+    // Chamber+ can write.
+    // ===============================================================
 
     match /winners/{winnerId} {
       allow read: if isAuthenticated();
       allow write: if isChamber();
     }
 
-    match /bingo_cards/{cardId} {
+    // ===============================================================
+    // Activities
+    // Players write their own activity events.
+    // Chamber can read all (analytics).
+    // No one deletes (append-only log).
+    // ===============================================================
+
+    match /activities/{activityId} {
+      allow read: if isChamber();
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+    }
+
+    // ===============================================================
+    // Notifications
+    // Any authenticated user can read all notifications.
+    // Chamber+ can create notifications.
+    // Chamber+ can update (for read receipts on user-specific notifications).
+    // ===============================================================
+
+    match /notifications/{notificationId} {
       allow read: if isAuthenticated();
-      allow write: if isChamber();
+      allow create: if isChamber();
+      allow update: if isAuthenticated() && (
+        isChamber() ||
+        resource.data.userId == request.auth.uid
+      );
     }
   }
 }

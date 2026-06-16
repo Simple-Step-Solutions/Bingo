@@ -58,17 +58,17 @@ export const Onboarding: React.FC<OnboardingProps> = ({ user, towns, businesses,
             transition={{ duration: 0.3 }}
             className="bg-white w-full max-w-md rounded-[3rem] overflow-hidden shadow-2xl my-auto"
           >
-            <div className="h-3 bg-[#1695B2]" />
+            <div className="h-3 bg-[var(--color-primary)]" />
             <div className="p-10 text-center">
-              <div className="w-20 h-20 bg-[#1695B2]/10 rounded-3xl flex items-center justify-center mx-auto mb-8">
+              <div className="w-20 h-20 bg-[var(--color-primary)]/10 rounded-3xl flex items-center justify-center mx-auto mb-8">
                 <div className="grid grid-cols-2 gap-1.5">
                   {[...Array(4)].map((_, i) => (
-                    <div key={i} className={`w-6 h-6 rounded-md ${i === 3 ? 'bg-[#CC5500]' : 'bg-[#1695B2]'}`} />
+                    <div key={i} className={`w-6 h-6 rounded-md ${i === 3 ? 'bg-[var(--color-accent)]' : 'bg-[var(--color-primary)]'}`} />
                   ))}
                 </div>
               </div>
 
-              <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-[#1695B2] mb-3">
+              <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-[var(--color-primary)] mb-3">
                 Hudson Valley Gateway Chamber of Commerce
               </p>
               <h2 className="font-serif italic text-4xl mb-4 text-neutral-900">Welcome to Chamber Bingo</h2>
@@ -99,7 +99,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ user, towns, businesses,
 
               <button
                 onClick={advance}
-                className="w-full bg-[#1695B2] text-white py-5 rounded-2xl font-bold text-sm hover:bg-[#1282a0] transition-all shadow-lg flex items-center justify-center gap-3 active:scale-95"
+                className="w-full bg-[var(--color-primary)] text-white py-5 rounded-2xl font-bold text-sm hover:bg-[var(--color-primary)] transition-all shadow-lg flex items-center justify-center gap-3 active:scale-95"
               >
                 Get Started <ChevronRight size={18} />
               </button>
@@ -116,14 +116,14 @@ export const Onboarding: React.FC<OnboardingProps> = ({ user, towns, businesses,
             transition={{ duration: 0.3 }}
             className="bg-white w-full max-w-md rounded-[3rem] overflow-hidden shadow-2xl my-auto"
           >
-            <div className="h-3 bg-[#1695B2]" />
+            <div className="h-3 bg-[var(--color-primary)]" />
             <div className="p-10">
-              <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-[#1695B2] mb-3 text-center">How It Works</p>
+              <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-[var(--color-primary)] mb-3 text-center">How It Works</p>
               <h2 className="font-serif italic text-4xl mb-8 text-neutral-900 text-center">Three simple steps</h2>
 
               <div className="space-y-4 mb-10">
                 <div className="flex items-start gap-5 p-5 bg-neutral-50 rounded-3xl border border-neutral-100">
-                  <div className="w-10 h-10 bg-[#1695B2] text-white rounded-2xl flex items-center justify-center font-black text-sm shrink-0">1</div>
+                  <div className="w-10 h-10 bg-[var(--color-primary)] text-white rounded-2xl flex items-center justify-center font-black text-sm shrink-0">1</div>
                   <div>
                     <p className="font-bold text-sm mb-1">Visit a business on your board</p>
                     <p className="text-xs text-neutral-500 leading-relaxed">Each square is a local business with a specific task. Tap any square to see the details, get directions, and learn what to do when you arrive.</p>
@@ -131,7 +131,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ user, towns, businesses,
                 </div>
 
                 <div className="flex items-start gap-5 p-5 bg-neutral-50 rounded-3xl border border-neutral-100">
-                  <div className="w-10 h-10 bg-[#1695B2] text-white rounded-2xl flex items-center justify-center font-black text-sm shrink-0">2</div>
+                  <div className="w-10 h-10 bg-[var(--color-primary)] text-white rounded-2xl flex items-center justify-center font-black text-sm shrink-0">2</div>
                   <div>
                     <p className="font-bold text-sm mb-1">Complete the task and scan in</p>
                     <p className="text-xs text-neutral-500 leading-relaxed">Once you've completed the task, scan the business's QR code, tap their NFC tag, or enter the code they give you. You need to be at the location to verify.</p>
@@ -139,7 +139,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ user, towns, businesses,
                 </div>
 
                 <div className="flex items-start gap-5 p-5 bg-neutral-50 rounded-3xl border border-neutral-100">
-                  <div className="w-10 h-10 bg-[#CC5500] text-white rounded-2xl flex items-center justify-center font-black text-sm shrink-0">3</div>
+                  <div className="w-10 h-10 bg-[var(--color-accent)] text-white rounded-2xl flex items-center justify-center font-black text-sm shrink-0">3</div>
                   <div>
                     <p className="font-bold text-sm mb-1">Complete a line to win</p>
                     <p className="text-xs text-neutral-500 leading-relaxed">Get a full row, column, or diagonal on your board and you've got bingo. Show your completed board to claim your prize from the Chamber.</p>
@@ -149,7 +149,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ user, towns, businesses,
 
               <button
                 onClick={advance}
-                className="w-full bg-[#1695B2] text-white py-5 rounded-2xl font-bold text-sm hover:bg-[#1282a0] transition-all shadow-lg flex items-center justify-center gap-3 active:scale-95"
+                className="w-full bg-[var(--color-primary)] text-white py-5 rounded-2xl font-bold text-sm hover:bg-[var(--color-primary)] transition-all shadow-lg flex items-center justify-center gap-3 active:scale-95"
               >
                 Choose My Town <ChevronRight size={18} />
               </button>
@@ -166,12 +166,12 @@ export const Onboarding: React.FC<OnboardingProps> = ({ user, towns, businesses,
             transition={{ duration: 0.3 }}
             className="bg-white w-full max-w-md rounded-[3rem] overflow-hidden shadow-2xl my-auto"
           >
-            <div className="h-3 bg-[#1695B2]" />
+            <div className="h-3 bg-[var(--color-primary)]" />
             <div className="p-10">
-              <div className="w-16 h-16 bg-[#1695B2]/10 rounded-3xl flex items-center justify-center mx-auto mb-6">
-                <MapPin className="text-[#1695B2]" size={32} />
+              <div className="w-16 h-16 bg-[var(--color-primary)]/10 rounded-3xl flex items-center justify-center mx-auto mb-6">
+                <MapPin className="text-[var(--color-primary)]" size={32} />
               </div>
-              <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-[#1695B2] mb-3 text-center">Last Step</p>
+              <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-[var(--color-primary)] mb-3 text-center">Last Step</p>
               <h2 className="font-serif italic text-4xl mb-3 text-neutral-900 text-center">Pick your area</h2>
               <p className="text-neutral-500 text-sm leading-relaxed mb-8 text-center">
                 Your bingo board is built from businesses in your town. Choose the area you'd like to explore.
@@ -183,10 +183,10 @@ export const Onboarding: React.FC<OnboardingProps> = ({ user, towns, businesses,
                     key={town.id}
                     onClick={() => selectTown(town.name)}
                     disabled={saving}
-                    className="w-full p-5 rounded-2xl border-2 border-neutral-100 hover:border-[#1695B2] hover:bg-[#1695B2]/5 transition-all font-bold text-sm flex items-center justify-between group disabled:opacity-50"
+                    className="w-full p-5 rounded-2xl border-2 border-neutral-100 hover:border-[var(--color-primary)] hover:bg-[var(--color-primary)]/5 transition-all font-bold text-sm flex items-center justify-between group disabled:opacity-50"
                   >
                     <span>{town.name}</span>
-                    <ChevronRight size={16} className="text-neutral-300 group-hover:text-[#1695B2] transition-colors" />
+                    <ChevronRight size={16} className="text-neutral-300 group-hover:text-[var(--color-primary)] transition-colors" />
                   </button>
                 )) : (
                   <div className="p-8 bg-neutral-50 rounded-2xl border border-dashed border-neutral-200 text-center">

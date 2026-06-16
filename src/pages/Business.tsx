@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { UserProfile, Business, Completion } from '../types';
 import { collection, onSnapshot, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
-import { Store, Users, CheckCircle2, Loader2, QrCode, Download, MapPin, ExternalLink } from 'lucide-react';
-import { QRModal } from '../components/QRModal';
+import { Store, Users, CheckCircle2, Loader2, QrCode, Download, MapPin, Printer, Hash } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 
 interface BusinessDashboardProps {
   user: UserProfile;
@@ -13,7 +13,51 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ user }) =>
   const [completions, setCompletions] = useState<Completion[]>([]);
   const [business, setBusiness] = useState<Business | null>(null);
   const [loading, setLoading] = useState(true);
-  const [showQR, setShowQR] = useState(false);
+  const printQR = () => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow || !business) return;
+    const svg = document.getElementById('business-qr-svg');
+    if (!svg) return;
+    const svgData = new XMLSerializer().serializeToString(svg);
+    printWindow.document.write(`
+      <html><head><title>${business.name} - QR Code</title>
+      <style>
+        body { margin: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; font-family: sans-serif; }
+        h1 { font-size: 24px; margin-bottom: 8px; text-align: center; }
+        p { font-size: 12px; color: #666; text-transform: uppercase; letter-spacing: 0.15em; margin-bottom: 24px; text-align: center; }
+        .code { font-size: 18px; font-weight: bold; letter-spacing: 0.2em; margin-top: 16px; color: #333; }
+        img { width: 280px; height: 280px; }
+      </style></head>
+      <body>
+        <h1>${business.name}</h1>
+        <p>Scan to verify your visit</p>
+        <img src="data:image/svg+xml;base64,${btoa(svgData)}" />
+        <p class="code">Manual code: ${business.qrCode}</p>
+      </body></html>
+    `);
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
+  };
+
+  const downloadQR = () => {
+    const svg = document.getElementById('business-qr-svg');
+    if (!svg || !business) return;
+    const svgData = new XMLSerializer().serializeToString(svg);
+    const canvas = document.createElement('canvas');
+    canvas.width = 400;
+    canvas.height = 400;
+    const ctx = canvas.getContext('2d');
+    const img = new Image();
+    img.onload = () => {
+      ctx?.drawImage(img, 0, 0, 400, 400);
+      const link = document.createElement('a');
+      link.download = `${business.name.replace(/\s+/g, '_')}_QR.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    };
+    img.src = 'data:image/svg+xml;base64,' + btoa(svgData);
+  };
 
   useEffect(() => {
     const fetchBusiness = async () => {
@@ -146,40 +190,49 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ user }) =>
 
         <div className="space-y-8">
           <div className="bg-white rounded-[2.5rem] p-10 shadow-sm border border-neutral-100 text-center">
-            <h3 className="font-bold uppercase tracking-widest text-xs text-neutral-400 mb-8">Your QR Code</h3>
-            <div className="bg-neutral-50 p-6 rounded-3xl border border-neutral-100 inline-block mb-8 shadow-inner">
-              <QrCode size={120} className="text-neutral-900" />
-            </div>
-            <button 
-              onClick={() => setShowQR(true)}
-              className="w-full bg-neutral-900 text-white py-5 rounded-2xl font-bold text-sm hover:bg-neutral-800 transition-all shadow-lg flex items-center justify-center gap-2"
-            >
-              <QrCode size={18} />
-              Show Full QR
-            </button>
-            <p className="text-[10px] text-neutral-400 mt-6 italic leading-relaxed">
-              Display this QR code at your checkout for players to scan and verify their visit.
-            </p>
-          </div>
+            <h3 className="font-bold uppercase tracking-widest text-xs text-neutral-400 mb-6">Your QR Code</h3>
 
-          <div className="bg-neutral-50 rounded-[2.5rem] p-10 border border-neutral-100 text-center">
-            <h3 className="font-bold uppercase tracking-widest text-xs text-neutral-400 mb-6">Need Help?</h3>
-            <p className="text-sm text-neutral-600 mb-8 leading-relaxed">
-              Having trouble with NFC or QR verification? Contact the Chamber support team.
+            <div className="flex justify-center mb-4">
+              <div className="bg-white border-2 border-neutral-200 rounded-2xl p-3">
+                <QRCodeSVG
+                  id="business-qr-svg"
+                  value={business.qrCode}
+                  size={180}
+                  level="H"
+                  includeMargin={false}
+                />
+              </div>
+            </div>
+
+            <p className="text-[10px] text-neutral-400 mb-6 italic leading-relaxed">
+              Display this at your checkout. Players scan it to verify their visit.
             </p>
-            <button className="w-full bg-white border border-neutral-200 py-4 rounded-2xl font-bold text-xs uppercase tracking-widest hover:border-neutral-900 transition-all flex items-center justify-center gap-2">
-              <ExternalLink size={14} /> Contact Support
-            </button>
+
+            <div className="flex gap-3">
+              <button
+                onClick={printQR}
+                className="flex-1 bg-neutral-900 text-white py-4 rounded-2xl font-bold text-xs uppercase tracking-widest hover:bg-neutral-800 transition-all shadow-lg flex items-center justify-center gap-2"
+              >
+                <Printer size={15} /> Print
+              </button>
+              <button
+                onClick={downloadQR}
+                className="flex-1 bg-white border border-neutral-200 py-4 rounded-2xl font-bold text-xs uppercase tracking-widest hover:border-neutral-900 transition-all flex items-center justify-center gap-2"
+              >
+                <Download size={15} /> Save
+              </button>
+            </div>
+
+            <div className="mt-6 flex items-center gap-3 bg-neutral-50 border border-neutral-100 rounded-2xl px-4 py-3 overflow-hidden">
+              <Hash size={14} className="text-neutral-400 shrink-0" />
+              <div className="text-left min-w-0">
+                <p className="text-[9px] text-neutral-400 font-bold uppercase tracking-widest">Manual code</p>
+                <p className="text-sm font-mono font-bold text-neutral-900 tracking-widest truncate">{business.qrCode}</p>
+              </div>
+            </div>
           </div>
         </div>
       </div>
-
-      <QRModal
-        isOpen={showQR}
-        onClose={() => setShowQR(false)}
-        value={business.qrCode}
-        title={business.name}
-      />
     </div>
   );
 };

@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
-import { 
-  signInWithPopup, 
-  GoogleAuthProvider, 
-  OAuthProvider, 
-  signInWithEmailAndPassword, 
+import {
+  signInWithPopup,
+  GoogleAuthProvider,
+  OAuthProvider,
+  signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
-  updateProfile
+  updateProfile,
+  sendPasswordResetEmail
 } from 'firebase/auth';
-import { auth, db } from '../firebase';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { auth } from '../firebase';
 import { ShieldCheck, Gamepad2, Store, LayoutGrid, Loader2, Mail, Lock, User, ChevronRight, ArrowLeft } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -19,28 +19,17 @@ interface AuthProps {
 export const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [authMode, setAuthMode] = useState<'social' | 'email-signin' | 'email-signup'>('social');
+  const [authMode, setAuthMode] = useState<'social' | 'email-signin' | 'email-signup' | 'forgot-password'>('social');
+  const [resetSent, setResetSent] = useState(false);
   
   // Email/Password state
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
 
-  const handleAuthResult = async (user: any) => {
-    // Check if user exists in Firestore
-    const userRef = doc(db, 'users', user.uid);
-    const userSnap = await getDoc(userRef);
-
-    if (!userSnap.exists()) {
-      // Create new user profile
-      await setDoc(userRef, {
-        uid: user.uid,
-        email: user.email,
-        displayName: user.displayName || displayName,
-        role: 'player',
-        town: '' // Let them select town on first login
-      });
-    }
+  const handleAuthResult = () => {
+    // Profile creation is handled by App.tsx's onSnapshot.
+    // Nothing to do here -- onAuthStateChanged fires automatically.
     onAuthSuccess();
   };
 
@@ -50,7 +39,7 @@ export const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
     try {
       const provider = new GoogleAuthProvider();
       const result = await signInWithPopup(auth, provider);
-      await handleAuthResult(result.user);
+      handleAuthResult();
     } catch (err: any) {
       console.error('Google Auth error:', err);
       setError(err.message || 'Failed to sign in with Google.');
@@ -64,11 +53,8 @@ export const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
     setError(null);
     try {
       const provider = new OAuthProvider('microsoft.com');
-      // Optional: Add scopes for M365
-      provider.addScope('mail.read');
-      provider.addScope('calendars.read');
       const result = await signInWithPopup(auth, provider);
-      await handleAuthResult(result.user);
+      handleAuthResult();
     } catch (err: any) {
       console.error('Microsoft Auth error:', err);
       setError(err.message || 'Failed to sign in with Microsoft.');
@@ -83,10 +69,28 @@ export const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
     setError(null);
     try {
       const result = await signInWithEmailAndPassword(auth, email, password);
-      await handleAuthResult(result.user);
+      handleAuthResult();
     } catch (err: any) {
       console.error('Email sign in error:', err);
       setError('Invalid email or password.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePasswordReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email) {
+      setError('Please enter your email address.');
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      await sendPasswordResetEmail(auth, email);
+      setResetSent(true);
+    } catch (err: any) {
+      setError(err.message || 'Failed to send reset email.');
     } finally {
       setLoading(false);
     }
@@ -103,7 +107,7 @@ export const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
     try {
       const result = await createUserWithEmailAndPassword(auth, email, password);
       await updateProfile(result.user, { displayName });
-      await handleAuthResult(result.user);
+      handleAuthResult();
     } catch (err: any) {
       console.error('Email sign up error:', err);
       setError(err.message || 'Failed to create account.');
@@ -116,17 +120,67 @@ export const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
     <div className="min-h-screen flex items-center justify-center p-6 bg-[#F5F5F0]">
       <div className="max-w-md w-full">
         <div className="text-center mb-12">
-          <div className="inline-block bg-[#1695B2] p-4 rounded-3xl mb-6 shadow-2xl">
+          <div className="inline-block bg-[var(--color-primary)] p-4 rounded-3xl mb-6 shadow-2xl">
             <LayoutGrid className="text-white" size={48} />
           </div>
           <h1 className="font-serif italic text-6xl mb-3">Chamber Bingo</h1>
-          <p className="text-[#1695B2] uppercase tracking-[0.2em] font-bold text-[10px] mb-1">Hudson Valley Gateway</p>
+          <p className="text-[var(--color-primary)] uppercase tracking-[0.2em] font-bold text-[10px] mb-1">Hudson Valley Gateway</p>
           <p className="text-neutral-400 uppercase tracking-[0.3em] font-bold text-[10px]">Chamber of Commerce</p>
         </div>
 
         <div className="bg-white rounded-[3rem] p-10 shadow-xl border border-neutral-100">
           <AnimatePresence mode="wait">
-            {authMode === 'social' ? (
+            {authMode === 'forgot-password' ? (
+              <motion.div
+                key="forgot"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+              >
+                <button
+                  onClick={() => { setAuthMode('email-signin'); setError(null); setResetSent(false); }}
+                  className="flex items-center gap-2 text-neutral-400 hover:text-neutral-900 transition-colors mb-8 group"
+                >
+                  <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
+                  <span className="text-[10px] font-bold uppercase tracking-widest">Back</span>
+                </button>
+
+                <h2 className="font-serif italic text-3xl mb-2">Reset Password</h2>
+                <p className="text-neutral-500 mb-8 text-sm">Enter your email and we'll send you a reset link.</p>
+
+                {error && (
+                  <div className="bg-red-50 text-red-600 p-4 rounded-2xl text-[10px] font-bold uppercase tracking-widest mb-6">{error}</div>
+                )}
+
+                {resetSent ? (
+                  <div className="bg-green-50 text-green-700 p-6 rounded-2xl text-center">
+                    <p className="font-bold text-sm mb-1">Check your inbox</p>
+                    <p className="text-[10px] uppercase tracking-widest font-bold">A reset link has been sent to {email}</p>
+                  </div>
+                ) : (
+                  <form onSubmit={handlePasswordReset} className="space-y-4">
+                    <div className="relative">
+                      <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-300" size={18} />
+                      <input
+                        type="email"
+                        placeholder="Email Address"
+                        required
+                        value={email}
+                        onChange={e => setEmail(e.target.value)}
+                        className="w-full pl-12 pr-4 py-4 bg-neutral-50 border border-neutral-100 rounded-2xl text-sm font-medium focus:ring-2 focus:ring-neutral-900 transition-all outline-none"
+                      />
+                    </div>
+                    <button
+                      type="submit"
+                      disabled={loading}
+                      className="w-full bg-[var(--color-primary)] text-white py-5 rounded-2xl font-bold text-sm transition-all shadow-lg flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50"
+                    >
+                      {loading ? <Loader2 className="animate-spin" size={20} /> : 'Send Reset Link'}
+                    </button>
+                  </form>
+                )}
+              </motion.div>
+            ) : authMode === 'social' ? (
               <motion.div
                 key="social"
                 initial={{ opacity: 0, x: -20 }}
@@ -175,7 +229,7 @@ export const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
 
                   <button
                     onClick={() => setAuthMode('email-signin')}
-                    className="w-full bg-[#1695B2] text-white py-5 rounded-2xl font-bold text-sm hover:bg-[#1282a0] transition-all shadow-lg flex items-center justify-center gap-3 active:scale-95"
+                    className="w-full bg-[var(--color-primary)] text-white py-5 rounded-2xl font-bold text-sm hover:bg-[var(--color-primary)] transition-all shadow-lg flex items-center justify-center gap-3 active:scale-95"
                   >
                     <Mail size={18} />
                     Continue with Email
@@ -253,7 +307,7 @@ export const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
                   <button
                     type="submit"
                     disabled={loading}
-                    className="w-full bg-[#1695B2] text-white py-5 rounded-2xl font-bold text-sm hover:bg-[#1282a0] transition-all shadow-lg flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50"
+                    className="w-full bg-[var(--color-primary)] text-white py-5 rounded-2xl font-bold text-sm hover:bg-[var(--color-primary)] transition-all shadow-lg flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50"
                   >
                     {loading ? <Loader2 className="animate-spin" size={20} /> : (
                       <>
@@ -264,15 +318,25 @@ export const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
                   </button>
                 </form>
 
-                <button 
-                  onClick={() => {
-                    setAuthMode(authMode === 'email-signin' ? 'email-signup' : 'email-signin');
-                    setError(null);
-                  }}
-                  className="w-full mt-6 text-[10px] font-bold text-neutral-400 uppercase tracking-widest hover:text-neutral-900 transition-colors"
-                >
-                  {authMode === 'email-signin' ? "Don't have an account? Sign Up" : "Already have an account? Sign In"}
-                </button>
+                <div className="mt-6 flex flex-col gap-3">
+                  <button
+                    onClick={() => {
+                      setAuthMode(authMode === 'email-signin' ? 'email-signup' : 'email-signin');
+                      setError(null);
+                    }}
+                    className="w-full text-[10px] font-bold text-neutral-400 uppercase tracking-widest hover:text-neutral-900 transition-colors"
+                  >
+                    {authMode === 'email-signin' ? "Don't have an account? Sign Up" : "Already have an account? Sign In"}
+                  </button>
+                  {authMode === 'email-signin' && (
+                    <button
+                      onClick={() => { setAuthMode('forgot-password'); setError(null); setResetSent(false); }}
+                      className="w-full text-[10px] font-bold text-neutral-300 uppercase tracking-widest hover:text-neutral-600 transition-colors"
+                    >
+                      Forgot Password?
+                    </button>
+                  )}
+                </div>
               </motion.div>
             )}
           </AnimatePresence>
@@ -299,9 +363,16 @@ export const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
           </div>
         </div>
 
-        <p className="text-center mt-12 text-[10px] text-neutral-400 uppercase tracking-[0.2em] font-bold">
-          A Hudson Valley Gateway Chamber Initiative
-        </p>
+        <a
+          href="https://www.simplestepsolutions.com"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center justify-center gap-2 mt-12 group"
+        >
+          <span className="text-[10px] text-neutral-400 uppercase tracking-[0.2em] font-bold group-hover:text-neutral-600 transition-colors">Powered by</span>
+          <img src="/sss-logo.png" alt="Simple Step Solutions" className="h-5 w-auto opacity-60 group-hover:opacity-100 transition-opacity" />
+          <span className="text-[10px] font-bold uppercase tracking-[0.2em] group-hover:text-neutral-600 transition-colors" style={{ color: '#1695B2' }}>Simple Step Solutions</span>
+        </a>
       </div>
     </div>
   );

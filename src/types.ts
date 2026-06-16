@@ -44,9 +44,23 @@ export interface AppSettings {
   difficulty: number;
   raffleEnabled?: boolean;
   raffleDescription?: string;
-  raffleRequirement?: number; // e.g., number of completions
+  raffleRequirement?: number;
   bingoPrize?: string;
   showRealtimeMapToChamber?: boolean;
+  primaryColor?: string;
+  accentColor?: string;
+  chamberName?: string;
+  chamberLogoUrl?: string;
+}
+
+export interface Notification {
+  id: string;
+  userId: string | 'all';
+  message: string;
+  type: 'info' | 'win' | 'raffle' | 'game';
+  read?: boolean;
+  timestamp: string;
+  createdBy?: string;
 }
 
 export interface Completion {
