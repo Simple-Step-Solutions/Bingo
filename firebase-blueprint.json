@@ -1,0 +1,129 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "Stores user profile information and role.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "role": { "type": "string", "enum": ["player", "chamber", "admin"] },
+        "town": { "type": "string" },
+        "displayName": { "type": "string" },
+        "bingoBoard": { "type": "array", "items": { "type": "string" } },
+        "boardSize": { "type": "number" },
+        "lastActive": { "type": "string", "format": "date-time" },
+        "currentLocation": {
+          "type": "object",
+          "properties": {
+            "lat": { "type": "number" },
+            "lng": { "type": "number" }
+          }
+        },
+        "metadata": { "type": "object" }
+      },
+      "required": ["uid", "email", "role"]
+    },
+    "Business": {
+      "title": "Participating Business",
+      "description": "A business participating in the bingo event.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "town": { "type": "string" },
+        "task": { "type": "string" },
+        "category": { "type": "string" },
+        "qrCode": { "type": "string" },
+        "nfcId": { "type": "string" },
+        "address": { "type": "string" },
+        "lat": { "type": "number" },
+        "lng": { "type": "number" }
+      },
+      "required": ["id", "name", "town", "task", "qrCode", "address"]
+    },
+    "Completion": {
+      "title": "Task Completion",
+      "description": "Records when a player completes a business task.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "businessId": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "town": { "type": "string" }
+      },
+      "required": ["userId", "businessId", "timestamp", "town"]
+    },
+    "Town": {
+      "title": "Town",
+      "description": "Participating municipality",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" }
+      },
+      "required": ["id", "name"]
+    },
+    "Settings": {
+      "title": "Global Settings",
+      "description": "App-wide configuration",
+      "type": "object",
+      "properties": {
+        "freeSpaceName": { "type": "string" },
+        "freeSpaceTask": { "type": "string" },
+        "boardSize": { "type": "number" },
+        "difficulty": { "type": "number" },
+        "showRealtimeMapToChamber": { "type": "boolean" }
+      }
+    },
+    "Activity": {
+      "title": "User Activity",
+      "description": "Granular user actions for analytics",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "type": { "type": "string", "enum": ["view_business", "open_app", "click_directions"] },
+        "targetId": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "metadata": { "type": "object" }
+      },
+      "required": ["userId", "type", "timestamp"]
+    },
+    "RaffleEntry": {
+      "title": "Raffle Entry",
+      "description": "A user's entry into the raffle",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "userName": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "completionsCount": { "type": "number" }
+      },
+      "required": ["userId", "userEmail", "timestamp"]
+    },
+    "Winner": {
+      "title": "Raffle Winner",
+      "description": "A user who has won the raffle",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "userName": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "prize": { "type": "string" }
+      },
+      "required": ["userId", "userEmail", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": { "schema": "User", "description": "User profiles" },
+    "/businesses/{businessId}": { "schema": "Business", "description": "Participating businesses" },
+    "/completions/{completionId}": { "schema": "Completion", "description": "Player task completions" },
+    "/towns/{townId}": { "schema": "Town", "description": "List of participating towns" },
+    "/settings/{settingId}": { "schema": "Settings", "description": "Global app settings" },
+    "/raffle_entries/{entryId}": { "schema": "RaffleEntry", "description": "Raffle entries" },
+    "/winners/{winnerId}": { "schema": "Winner", "description": "Raffle winners" },
+    "/activities/{activityId}": { "schema": "Activity", "description": "User activity logs" }
+  }
+}

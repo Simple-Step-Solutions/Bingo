@@ -1,0 +1,84 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && (
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && getUserData().role == 'admin') ||
+        (request.auth.token.email == "logan@simplestepsolutions.com" && request.auth.token.email_verified == true)
+      );
+    }
+
+    function isChamber() {
+      return isAuthenticated() && (
+        isAdmin() || 
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && getUserData().role == 'chamber')
+      );
+    }
+
+    // ===============================================================
+    // Collection Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isAuthenticated() && (request.auth.uid == userId || isChamber());
+      allow create: if isAuthenticated() && request.auth.uid == userId;
+      allow update: if isAuthenticated() && (
+        (request.auth.uid == userId && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role'])) || 
+        isAdmin()
+      );
+    }
+
+    match /raffle_entries/{entryId} {
+      allow read: if isAuthenticated() && (isChamber() || resource.data.userId == request.auth.uid);
+      allow list: if isAuthenticated() && (isChamber() || request.query.limit <= 100); // Allow listing if chamber or filtered
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow delete: if isChamber();
+    }
+
+    match /businesses/{businessId} {
+      allow read: if isAuthenticated();
+      allow write: if isChamber();
+    }
+
+    match /completions/{completionId} {
+      allow read: if isAuthenticated() && (
+        request.auth.uid == resource.data.userId || 
+        isChamber()
+      );
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAdmin();
+    }
+
+    match /towns/{townId} {
+      allow read: if isAuthenticated();
+      allow write: if isChamber();
+    }
+
+    match /settings/{settingId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /winners/{winnerId} {
+      allow read: if isAuthenticated();
+      allow write: if isChamber();
+    }
+
+    match /bingo_cards/{cardId} {
+      allow read: if isAuthenticated();
+      allow write: if isChamber();
+    }
+  }
+}

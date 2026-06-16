@@ -1,0 +1,5 @@
+{
+  "name": "Chamber Bingo",
+  "description": "A modernized digital bingo app for Chamber of Commerce events, connecting local businesses with community shoppers.",
+  "requestFramePermissions": ["camera", "microphone", "geolocation"]
+}
