@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Trophy, Ticket, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { collection, query, where, onSnapshot, addDoc, getDocs } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, addDoc, getDocs, doc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { UserProfile, AppSettings, RaffleEntry, Completion } from '../types';
 
@@ -215,4 +215,3 @@ export const Raffle: React.FC<RaffleProps> = ({ user }) => {
   );
 };
 
-import { doc } from 'firebase/firestore';

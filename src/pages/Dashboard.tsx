@@ -129,10 +129,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
   useEffect(() => {
     if (!loading && settings && businesses.length > 0 && user.town && (!user.bingoBoard || user.bingoBoard.length === 0)) {
       const newBoard = generateBingoBoard(businesses, settings, user.town);
-      setDoc(doc(db, 'users', user.uid), { 
+      setDoc(doc(db, 'users', user.uid), {
         bingoBoard: newBoard,
-        boardSize: settings.boardSize || 3 
-      }, { merge: true });
+        boardSize: settings.boardSize || 3
+      }, { merge: true }).catch(err => {
+        console.error('Failed to save bingo board:', err);
+        setError('Could not generate your board. Please refresh the page.');
+      });
     }
   }, [loading, settings, businesses, user.bingoBoard, user.uid, user.town]);
 
@@ -143,25 +146,23 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
     try {
       const biz = businesses.find(b => b.qrCode === code || b.nfcId === code);
       if (!biz) {
-        console.warn("Business not found for code:", code);
         setError("Invalid code. Please try again.");
+        stopScanning();
         return;
       }
 
-      console.log("Found business:", biz.name);
-
       const alreadyDone = completions.some(c => c.businessId === biz.id);
       if (alreadyDone) {
-        setError("You've already completed this task!");
+        setError(`You already completed ${biz.name}!`);
+        stopScanning();
         return;
       }
 
       // GPS Check
       if (biz.lat && biz.lng) {
-        console.log("Business has coordinates:", biz.lat, biz.lng);
         if (!user.currentLocation) {
-          console.warn("User location missing");
-          setError("Location required to verify. Please enable GPS and wait a moment.");
+          setError("Location required to verify. Enable GPS and wait a moment, then try again.");
+          stopScanning();
           return;
         }
 
@@ -172,14 +173,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
           biz.lng
         );
 
-        console.log("Distance to business:", distance, "meters");
-
-        if (distance > 500) { // 500 meters allowance
-          setError(`You must be closer to ${biz.name} to verify! (Current distance: ${Math.round(distance)}m)`);
+        if (distance > 500) {
+          setError(`You need to be at ${biz.name} to verify. You are ${Math.round(distance)}m away.`);
+          stopScanning();
           return;
         }
-      } else {
-        console.log("Business has no coordinates, skipping GPS check.");
       }
 
       console.log("Adding completion for:", biz.id);
@@ -418,12 +416,20 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
               );
             }
             
+            if (bizId === 'EMPTY') {
+              return (
+                <div key={idx} className="aspect-square rounded-2xl md:rounded-3xl bg-neutral-50 border border-dashed border-neutral-200 flex items-center justify-center">
+                  <span className="text-[8px] text-neutral-300 font-bold uppercase tracking-widest">TBD</span>
+                </div>
+              );
+            }
+
             const biz = businesses.find(b => b.id === bizId);
             const isDone = completions.some(c => c.businessId === bizId);
-            
+
             return (
-              <div 
-                key={idx} 
+              <div
+                key={idx}
                 onClick={() => {
                   if (biz) {
                     setSelectedBusiness(biz);
@@ -431,8 +437,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
                   }
                 }}
                 className={`aspect-square rounded-2xl md:rounded-3xl p-1.5 md:p-3 flex flex-col items-center justify-center text-center transition-all relative overflow-hidden group cursor-pointer ${
-                  isDone 
-                    ? 'bg-neutral-900 text-white shadow-xl scale-[0.98]' 
+                  isDone
+                    ? 'bg-neutral-900 text-white shadow-xl scale-[0.98]'
                     : 'bg-white border border-neutral-200 text-neutral-900 hover:border-neutral-900 hover:shadow-md'
                 }`}
               >
@@ -444,7 +450,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
                 ) : (
                   <>
                     <Store className="text-neutral-200 mb-1 md:mb-2 group-hover:text-neutral-400 transition-colors w-3.5 h-3.5 md:w-5 md:h-5" />
-                    <p className="text-[8px] md:text-[10px] font-bold uppercase tracking-tighter leading-tight line-clamp-2">{biz?.name || 'Loading...'}</p>
+                    <p className="text-[8px] md:text-[10px] font-bold uppercase tracking-tighter leading-tight line-clamp-2">{biz?.name || '...'}</p>
                     <p className="text-[6px] md:text-[8px] text-neutral-400 font-medium uppercase tracking-widest mt-0.5 md:mt-1">{biz?.town}</p>
                   </>
                 )}
