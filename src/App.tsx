@@ -32,6 +32,9 @@ function App() {
   const [businesses, setBusinesses] = useState<Business[]>([]);
   const [towns, setTowns] = useState<Town[]>([]);
   const [loading, setLoading] = useState(true);
+  const [redirectPending, setRedirectPending] = useState(
+    () => !!sessionStorage.getItem('authRedirectPending')
+  );
 
   useEffect(() => {
     const primary = settings?.primaryColor || DEFAULT_PRIMARY;
@@ -40,15 +43,19 @@ function App() {
     document.documentElement.style.setProperty('--color-accent', accent);
   }, [settings?.primaryColor, settings?.accentColor]);
 
-  // Process Google/Microsoft redirect result before onAuthStateChanged settles.
-  // Must run once on mount -- keeps loading=true until resolved so Auth screen
-  // never flashes during the redirect return.
+  // Process Google/Microsoft redirect result on mount.
+  // While pending, the loading screen is shown so Auth never races with the redirect.
   useEffect(() => {
-    getRedirectResult(auth).catch((err) => {
-      if (err?.code !== 'auth/no-current-user') {
-        console.error('Redirect result error:', err);
-      }
-    });
+    getRedirectResult(auth)
+      .catch((err) => {
+        if (err?.code !== 'auth/no-current-user') {
+          console.error('Redirect result error:', err);
+        }
+      })
+      .finally(() => {
+        sessionStorage.removeItem('authRedirectPending');
+        setRedirectPending(false);
+      });
   }, []);
 
   useEffect(() => {
@@ -141,7 +148,7 @@ function App() {
     };
   }, []);
 
-  if (loading) return <LoadingScreen />;
+  if (loading || redirectPending) return <LoadingScreen />;
 
   if (!user) return <Auth onAuthSuccess={() => {}} />;
 

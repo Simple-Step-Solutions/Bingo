@@ -33,10 +33,11 @@ export const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
     setError(null);
     try {
       const provider = new GoogleAuthProvider();
+      sessionStorage.setItem('authRedirectPending', '1');
       await signInWithRedirect(auth, provider);
-      // Page will navigate away -- no code runs after this
     } catch (err: any) {
       console.error('Google Auth error:', err);
+      sessionStorage.removeItem('authRedirectPending');
       setError(err.message || 'Failed to sign in with Google.');
       setLoading(false);
     }
@@ -47,10 +48,11 @@ export const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
     setError(null);
     try {
       const provider = new OAuthProvider('microsoft.com');
+      sessionStorage.setItem('authRedirectPending', '1');
       await signInWithRedirect(auth, provider);
-      // Page will navigate away -- no code runs after this
     } catch (err: any) {
       console.error('Microsoft Auth error:', err);
+      sessionStorage.removeItem('authRedirectPending');
       setError(err.message || 'Failed to sign in with Microsoft.');
       setLoading(false);
     }
