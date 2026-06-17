@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { defineConfig, loadEnv } from 'vite';
+import { VitePWA } from 'vite-plugin-pwa';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -11,7 +12,45 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, '.', '');
   return {
     base: './',
-    plugins: [react(), tailwindcss()],
+    plugins: [
+      react(),
+      tailwindcss(),
+      VitePWA({
+        registerType: 'autoUpdate',
+        includeAssets: ['sss-logo.png'],
+        manifest: {
+          name: 'Chamber Bingo',
+          short_name: 'Bingo',
+          description: 'Hudson Valley Gateway Chamber of Commerce Bingo',
+          theme_color: '#1695B2',
+          background_color: '#F5F5F0',
+          display: 'standalone',
+          orientation: 'portrait',
+          scope: '/',
+          start_url: '/',
+          icons: [
+            { src: '/sss-logo.png', sizes: '192x192', type: 'image/png' },
+            { src: '/sss-logo.png', sizes: '512x512', type: 'image/png' },
+            { src: '/sss-logo.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' },
+          ],
+        },
+        workbox: {
+          globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+          runtimeCaching: [
+            {
+              urlPattern: /^https:\/\/firestore\.googleapis\.com\/.*/i,
+              handler: 'NetworkFirst',
+              options: { cacheName: 'firestore-cache' },
+            },
+            {
+              urlPattern: /^https:\/\/.*\.tile\.openstreetmap\.org\/.*/i,
+              handler: 'CacheFirst',
+              options: { cacheName: 'map-tiles', expiration: { maxEntries: 200, maxAgeSeconds: 7 * 24 * 60 * 60 } },
+            },
+          ],
+        },
+      }),
+    ],
     define: {
       'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
     },

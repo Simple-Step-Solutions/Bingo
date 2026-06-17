@@ -8,6 +8,7 @@ export interface UserProfile {
   boardSize?: number;
   businessId?: string;
   lastActive?: string;
+  lastReadAt?: string;
   onboardingComplete?: boolean;
   currentLocation?: {
     lat: number;

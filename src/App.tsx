@@ -12,6 +12,7 @@ import { Raffle } from './pages/Raffle';
 import { Map } from './pages/Map';
 import { BusinessDashboard } from './pages/Business';
 import { Auth } from './pages/Auth';
+import { Profile } from './pages/Profile';
 
 // Components
 import { Navbar } from './components/layout/Navbar';
@@ -19,6 +20,7 @@ import { LoadingScreen } from './components/layout/LoadingScreen';
 import { LocationTracker } from './components/LocationTracker';
 import { trackActivity } from './services/activityService';
 import { SetupWizard, SetupPending } from './components/SetupWizard';
+import { InstallPrompt } from './components/InstallPrompt';
 
 const DEFAULT_PRIMARY = '#1695B2';
 const DEFAULT_ACCENT = '#CC5500';
@@ -162,6 +164,8 @@ function App() {
               <Route path="/business" element={<BusinessDashboard user={user} />} />
             )}
             
+            <Route path="/profile" element={<Profile user={user} towns={towns} />} />
+
             {/* Fallback */}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
@@ -189,6 +193,7 @@ function App() {
             </a>
           </div>
         </footer>
+        <InstallPrompt />
       </div>
     </Router>
   );

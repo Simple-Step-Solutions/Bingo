@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { collection, query, where, onSnapshot, orderBy, limit, doc, writeBatch, addDoc } from 'firebase/firestore';
+import { collection, query, limit, onSnapshot, addDoc, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { Notification, UserProfile } from '../types';
 import { Bell, X, Info, Trophy, Ticket, Gamepad2, Plus, Loader2 } from 'lucide-react';
@@ -25,6 +25,8 @@ const TYPE_COLOR: Record<string, string> = {
 
 export const NotificationBell: React.FC<NotificationBellProps> = ({ user }) => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  // lastReadAt comes from the user profile (passed as prop, updated by App.tsx snapshot)
+  const lastReadAt = user.lastReadAt || '1970-01-01T00:00:00.000Z';
   const [open, setOpen] = useState(false);
   const [composing, setComposing] = useState(false);
   const [newMsg, setNewMsg] = useState('');
@@ -35,15 +37,15 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({ user }) => {
   const canCompose = user.role === 'admin' || user.role === 'chamber';
 
   useEffect(() => {
-    // Listen for notifications addressed to 'all' or this user
-    const q = query(
-      collection(db, 'notifications'),
-      orderBy('timestamp', 'desc'),
-      limit(50)
-    );
+    // No orderBy -- sort client-side to avoid needing a Firestore index
+    const q = query(collection(db, 'notifications'), limit(100));
     const unsub = onSnapshot(q, snap => {
-      const all = snap.docs.map(d => ({ id: d.id, ...d.data() } as Notification));
-      setNotifications(all.filter(n => n.userId === 'all' || n.userId === user.uid));
+      const all = snap.docs
+        .map(d => ({ id: d.id, ...d.data() } as Notification))
+        .filter(n => n.userId === 'all' || n.userId === user.uid)
+        .sort((a, b) => b.timestamp.localeCompare(a.timestamp))
+        .slice(0, 50);
+      setNotifications(all);
     }, err => console.error('Notification snapshot error:', err));
     return unsub;
   }, [user.uid]);
@@ -60,14 +62,11 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({ user }) => {
     return () => document.removeEventListener('mousedown', handler);
   }, [open]);
 
-  const unread = notifications.filter(n => !n.read).length;
+  const unread = notifications.filter(n => n.timestamp > lastReadAt).length;
 
-  const markAllRead = async () => {
-    const unreadNotifs = notifications.filter(n => !n.read && (n.userId === user.uid));
-    if (!unreadNotifs.length) return;
-    const batch = writeBatch(db);
-    unreadNotifs.forEach(n => batch.update(doc(db, 'notifications', n.id), { read: true }));
-    await batch.commit();
+  const markAllRead = () => {
+    const now = new Date().toISOString();
+    updateDoc(doc(db, 'users', user.uid), { lastReadAt: now }).catch(console.error);
   };
 
   const sendNotification = async () => {
@@ -78,7 +77,6 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({ user }) => {
         userId: 'all',
         message: newMsg.trim(),
         type: newType,
-        read: false,
         timestamp: new Date().toISOString(),
         createdBy: user.uid,
       });
@@ -95,8 +93,10 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({ user }) => {
     <div className="relative" ref={panelRef}>
       <button
         onClick={() => {
-          setOpen(o => !o);
-          if (!open) markAllRead();
+          setOpen(o => {
+            if (!o) markAllRead();
+            return !o;
+          });
         }}
         className="relative p-2 rounded-xl text-neutral-400 hover:text-neutral-900 hover:bg-neutral-100 transition-all"
         title="Notifications"
@@ -183,19 +183,28 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({ user }) => {
                   <p className="text-xs text-neutral-400 italic">No notifications yet</p>
                 </div>
               ) : (
-                notifications.map(n => (
-                  <div key={n.id} className={`flex items-start gap-3 px-5 py-4 transition-colors ${n.read || n.userId === 'all' ? 'bg-white' : 'bg-blue-50/40'}`}>
-                    <div className={`shrink-0 p-2 rounded-xl mt-0.5 ${TYPE_COLOR[n.type] || TYPE_COLOR.info}`}>
-                      {TYPE_ICON[n.type] || TYPE_ICON.info}
+                notifications.map(n => {
+                  const isRead = n.timestamp <= lastReadAt;
+                  return (
+                    <div
+                      key={n.id}
+                      className={`flex items-start gap-3 px-5 py-4 transition-colors ${isRead ? 'bg-white' : 'bg-blue-50/40'}`}
+                    >
+                      <div className={`shrink-0 p-2 rounded-xl mt-0.5 ${TYPE_COLOR[n.type] || TYPE_COLOR.info}`}>
+                        {TYPE_ICON[n.type] || TYPE_ICON.info}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium leading-snug text-neutral-900">{n.message}</p>
+                        <p className="text-[10px] text-neutral-400 mt-1 font-bold uppercase tracking-widest">
+                          {new Date(n.timestamp).toLocaleString()}
+                        </p>
+                      </div>
+                      {!isRead && (
+                        <div className="shrink-0 w-2 h-2 rounded-full bg-[var(--color-accent,#CC5500)] mt-2" />
+                      )}
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium leading-snug text-neutral-900">{n.message}</p>
-                      <p className="text-[10px] text-neutral-400 mt-1 font-bold uppercase tracking-widest">
-                        {new Date(n.timestamp).toLocaleString()}
-                      </p>
-                    </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
           </motion.div>

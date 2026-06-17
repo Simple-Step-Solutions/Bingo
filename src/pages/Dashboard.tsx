@@ -627,16 +627,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, towns, s
       )}
 
       <footer className="mt-20 pt-12 border-t border-neutral-200">
-        <div className="flex flex-col md:flex-row justify-between items-center gap-8">
-          <div className="flex items-center gap-6">
-            <img src="https://picsum.photos/seed/chamber/100/100" alt="Chamber Logo" className="w-12 h-12 grayscale opacity-50" referrerPolicy="no-referrer" />
-            <div className="h-8 w-px bg-neutral-200" />
-            <img src="https://picsum.photos/seed/town/100/100" alt="Town Logo" className="w-12 h-12 grayscale opacity-50" referrerPolicy="no-referrer" />
-          </div>
-          <p className="text-[10px] text-neutral-400 uppercase tracking-[0.3em] font-bold">
-            A Collaborative Initiative for Local Growth
-          </p>
-        </div>
+        <p className="text-center text-[10px] text-neutral-300 uppercase tracking-[0.3em] font-bold">
+          {settings?.chamberName || 'Hudson Valley Gateway Chamber of Commerce'}
+        </p>
       </footer>
     </div>
   );

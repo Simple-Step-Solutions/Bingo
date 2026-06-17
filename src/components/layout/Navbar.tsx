@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutGrid, MapPin, Store, Settings as SettingsIcon, LogOut, Ticket } from 'lucide-react';
+import { LayoutGrid, MapPin, Store, Settings as SettingsIcon, LogOut, Ticket, UserCircle } from 'lucide-react';
 import { UserProfile, AppSettings } from '../../types';
 import { signOut } from 'firebase/auth';
 import { auth } from '../../firebase';
@@ -67,7 +67,7 @@ export const Navbar: React.FC<NavbarProps> = ({ user, settings }) => {
 
       <div className="hidden md:flex items-center gap-4 ml-8">
         <NotificationBell user={user} />
-        <div className="flex items-center gap-3 px-4 py-2 bg-neutral-50 rounded-2xl border border-neutral-100">
+        <Link to="/profile" className="flex items-center gap-3 px-4 py-2 bg-neutral-50 hover:bg-neutral-100 rounded-2xl border border-neutral-100 transition-colors">
           <div className="w-8 h-8 bg-neutral-900 rounded-full flex items-center justify-center text-white text-[10px] font-bold">
             {user.displayName?.charAt(0) || user.email.charAt(0).toUpperCase()}
           </div>
@@ -75,7 +75,7 @@ export const Navbar: React.FC<NavbarProps> = ({ user, settings }) => {
             <span className="text-[10px] font-bold text-neutral-900 leading-none">{user.displayName || user.email.split('@')[0]}</span>
             <span className="text-[8px] font-bold text-neutral-400 uppercase tracking-widest mt-1">{user.role}</span>
           </div>
-        </div>
+        </Link>
         <button
           onClick={() => signOut(auth)}
           className="p-3 text-neutral-400 hover:text-red-600 hover:bg-red-50 rounded-2xl transition-all"
@@ -85,17 +85,22 @@ export const Navbar: React.FC<NavbarProps> = ({ user, settings }) => {
         </button>
       </div>
 
-      {/* Mobile: notification bell + sign out */}
+      {/* Mobile: notification bell + profile */}
       <div className="md:hidden flex items-center gap-1">
         <NotificationBell user={user} />
-        <button
-          onClick={() => signOut(auth)}
-          className="flex flex-col items-center gap-1 text-neutral-400 hover:text-red-600 transition-colors"
+        <Link
+          to="/profile"
+          className={`flex flex-col items-center gap-1 transition-all duration-300 ${
+            location.pathname === '/profile' ? 'text-neutral-900 scale-110' : 'text-neutral-400 hover:text-neutral-600'
+          }`}
         >
-          <div className="p-2">
-            <LogOut size={20} />
+          <div className={`p-2 rounded-xl transition-all ${location.pathname === '/profile' ? 'bg-neutral-100' : 'bg-transparent'}`}>
+            <UserCircle size={20} />
           </div>
-        </button>
+          <span className={`text-[8px] font-black uppercase tracking-[0.2em] ${location.pathname === '/profile' ? 'opacity-100' : 'opacity-0'}`}>
+            Profile
+          </span>
+        </Link>
       </div>
     </nav>
   );

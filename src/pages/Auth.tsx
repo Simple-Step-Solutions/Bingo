@@ -6,7 +6,8 @@ import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   updateProfile,
-  sendPasswordResetEmail
+  sendPasswordResetEmail,
+  sendEmailVerification
 } from 'firebase/auth';
 import { auth } from '../firebase';
 import { ShieldCheck, Gamepad2, Store, LayoutGrid, Loader2, Mail, Lock, User, ChevronRight, ArrowLeft } from 'lucide-react';
@@ -19,7 +20,7 @@ interface AuthProps {
 export const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [authMode, setAuthMode] = useState<'social' | 'email-signin' | 'email-signup' | 'forgot-password'>('social');
+  const [authMode, setAuthMode] = useState<'social' | 'email-signin' | 'email-signup' | 'forgot-password' | 'verify-email'>('social');
   const [resetSent, setResetSent] = useState(false);
   
   // Email/Password state
@@ -107,7 +108,8 @@ export const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
     try {
       const result = await createUserWithEmailAndPassword(auth, email, password);
       await updateProfile(result.user, { displayName });
-      handleAuthResult();
+      await sendEmailVerification(result.user);
+      setAuthMode('verify-email');
     } catch (err: any) {
       console.error('Email sign up error:', err);
       setError(err.message || 'Failed to create account.');
@@ -130,7 +132,52 @@ export const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
 
         <div className="bg-white rounded-[3rem] p-10 shadow-xl border border-neutral-100">
           <AnimatePresence mode="wait">
-            {authMode === 'forgot-password' ? (
+            {authMode === 'verify-email' ? (
+              <motion.div
+                key="verify-email"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                className="text-center"
+              >
+                <div className="inline-block bg-[var(--color-primary)] p-4 rounded-3xl mb-6">
+                  <Mail className="text-white" size={32} />
+                </div>
+
+                <h2 className="font-serif italic text-3xl mb-3">Check your inbox</h2>
+                <p className="text-neutral-500 mb-8 text-sm leading-relaxed">
+                  We sent a verification link to <span className="font-semibold text-neutral-700">{email}</span>. Click the link then come back and sign in.
+                </p>
+
+                {error && (
+                  <div className="bg-red-50 text-red-600 p-4 rounded-2xl text-[10px] font-bold uppercase tracking-widest mb-6">{error}</div>
+                )}
+
+                <div className="space-y-4">
+                  <button
+                    onClick={async () => {
+                      setError(null);
+                      try {
+                        const currentUser = auth.currentUser;
+                        if (currentUser) await sendEmailVerification(currentUser);
+                      } catch (err: any) {
+                        setError(err.message || 'Failed to resend verification email.');
+                      }
+                    }}
+                    className="w-full bg-[var(--color-primary)] text-white py-5 rounded-2xl font-bold text-sm transition-all shadow-lg flex items-center justify-center gap-3 active:scale-95"
+                  >
+                    Resend Email
+                  </button>
+
+                  <button
+                    onClick={() => { setAuthMode('email-signin'); setError(null); }}
+                    className="w-full text-[10px] font-bold text-neutral-400 uppercase tracking-widest hover:text-neutral-900 transition-colors"
+                  >
+                    Back to Sign In
+                  </button>
+                </div>
+              </motion.div>
+            ) : authMode === 'forgot-password' ? (
               <motion.div
                 key="forgot"
                 initial={{ opacity: 0, x: 20 }}
