@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { onAuthStateChanged, getRedirectResult } from 'firebase/auth';
+import { onAuthStateChanged, getRedirectResult, browserPopupRedirectResolver } from 'firebase/auth';
 import { doc, collection, onSnapshot, setDoc } from 'firebase/firestore';
 import { auth, db } from './firebase';
 import { UserProfile, AppSettings, Business, Town } from './types';
@@ -58,17 +58,34 @@ function App() {
 
   // Process Google/Microsoft redirect result on mount.
   // While pending, the loading screen is shown so Auth never races with the redirect.
+  // A 10s timeout guards against getRedirectResult hanging (observed on desktop Chrome).
   useEffect(() => {
-    getRedirectResult(auth)
+    const clear = () => {
+      sessionStorage.removeItem('authRedirectPending');
+      setRedirectPending(false);
+    };
+    const timeout = setTimeout(() => {
+      console.warn('[Auth] getRedirectResult timed out after 10s');
+      clear();
+    }, 10000);
+
+    // Pass resolver explicitly -- initializeAuth resolver isn't always picked up automatically.
+    getRedirectResult(auth, browserPopupRedirectResolver)
+      .then((result) => {
+        if (result) console.log('[Auth] getRedirectResult resolved with user:', result.user.uid);
+        else console.log('[Auth] getRedirectResult resolved with null (no pending redirect)');
+      })
       .catch((err) => {
         if (err?.code !== 'auth/no-current-user') {
           console.error('[Auth] getRedirectResult error:', err?.code, err?.message);
         }
       })
       .finally(() => {
-        sessionStorage.removeItem('authRedirectPending');
-        setRedirectPending(false);
+        clearTimeout(timeout);
+        clear();
       });
+
+    return () => clearTimeout(timeout);
   }, []);
 
   useEffect(() => {
