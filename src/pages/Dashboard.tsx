@@ -197,6 +197,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, towns, s
 
   // Verify panel content -- shared between mobile sheet and desktop overlay
   const VerifyContent = () => (
+    <div className="flex flex-col gap-6">
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-2xl px-4 py-3">
+          <p className="text-red-600 text-xs font-bold uppercase tracking-widest">{error}</p>
+        </div>
+      )}
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
       <div>
         <h3 className="font-bold uppercase tracking-widest text-[10px] md:text-xs mb-4 flex items-center justify-between">
@@ -249,13 +255,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, towns, s
             The business code is shown on the QR printout. Ask staff if you need help.
           </p>
         </div>
-        {error && <p className="text-red-500 text-[10px] mt-3 font-bold uppercase tracking-widest">{error}</p>}
       </div>
+    </div>
     </div>
   );
 
   return (
-    <div className="flex flex-col max-w-4xl mx-auto" style={{ minHeight: 'calc(100dvh - 9rem)' }}>
+    <div className="flex flex-col max-w-4xl mx-auto" style={{ height: 'calc(100dvh - 6rem)', overflow: 'hidden', marginTop: '-2rem' }}>
 
       {/* Header */}
       <div className="flex justify-between items-center gap-3 mb-4 md:mb-10 shrink-0">
@@ -290,8 +296,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, towns, s
           style={{
             gridTemplateColumns: `repeat(${size}, 1fr)`,
             gridAutoRows: '1fr',
-            width: 'min(calc(100vw - 2rem), calc(100dvh - 13rem))',
-            height: 'min(calc(100vw - 2rem), calc(100dvh - 13rem))',
+            width: 'min(calc(100vw - 2rem), calc(100dvh - 10rem))',
+            height: 'min(calc(100vw - 2rem), calc(100dvh - 10rem))',
           }}
         >
           {board.map((bizId, idx) => {
