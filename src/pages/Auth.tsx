@@ -1,7 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   signInWithRedirect,
-  getRedirectResult,
   GoogleAuthProvider,
   OAuthProvider,
   signInWithEmailAndPassword,
@@ -28,16 +27,6 @@ export const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
-
-  // Handle redirect result on mount (fires after Google/Microsoft redirect back)
-  useEffect(() => {
-    getRedirectResult(auth).catch((err) => {
-      if (err?.code !== 'auth/no-current-user') {
-        console.error('Redirect auth error:', err);
-        setError('Sign in failed. Please try again.');
-      }
-    });
-  }, []);
 
   const signInWithGoogle = async () => {
     setLoading(true);

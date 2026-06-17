@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { onAuthStateChanged } from 'firebase/auth';
+import { onAuthStateChanged, getRedirectResult } from 'firebase/auth';
 import { doc, collection, onSnapshot, setDoc } from 'firebase/firestore';
 import { auth, db } from './firebase';
 import { UserProfile, AppSettings, Business, Town } from './types';
@@ -39,6 +39,17 @@ function App() {
     document.documentElement.style.setProperty('--color-primary', primary);
     document.documentElement.style.setProperty('--color-accent', accent);
   }, [settings?.primaryColor, settings?.accentColor]);
+
+  // Process Google/Microsoft redirect result before onAuthStateChanged settles.
+  // Must run once on mount -- keeps loading=true until resolved so Auth screen
+  // never flashes during the redirect return.
+  useEffect(() => {
+    getRedirectResult(auth).catch((err) => {
+      if (err?.code !== 'auth/no-current-user') {
+        console.error('Redirect result error:', err);
+      }
+    });
+  }, []);
 
   useEffect(() => {
     let unsubscribeProfile: (() => void) | null = null;
