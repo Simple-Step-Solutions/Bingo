@@ -207,7 +207,7 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
       {/* Branding */}
-      <div className="lg:col-span-3 bg-white border border-neutral-200 p-8 rounded-[2.5rem] shadow-sm">
+      <div className="lg:col-span-3 bg-white border border-neutral-200 p-8 rounded-3xl shadow-sm">
         <div className="flex items-center gap-3 mb-8">
           <div className="bg-neutral-100 p-2 rounded-xl">
             <Palette className="text-neutral-900" size={20} />
@@ -320,7 +320,7 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
 
       {/* Business Management */}
       <div className="lg:col-span-2 space-y-8">
-        <div className="bg-white border border-neutral-200 p-8 rounded-[2.5rem] shadow-sm">
+        <div className="bg-white border border-neutral-200 p-6 rounded-3xl shadow-sm">
           <div className="flex justify-between items-center mb-8">
             <div className="flex items-center gap-3">
               <div className="bg-neutral-100 p-2 rounded-xl">
@@ -436,7 +436,7 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
           )}
         </div>
 
-        <div className="bg-white border border-neutral-200 p-8 rounded-[2.5rem] shadow-sm">
+        <div className="bg-white border border-neutral-200 p-6 rounded-3xl shadow-sm">
           <div className="flex items-center justify-between mb-8">
             <div className="flex items-center gap-3">
               <div className="bg-yellow-50 p-2 rounded-xl">
@@ -538,7 +538,7 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
           </div>
         </div>
 
-        <div className="bg-white border border-neutral-200 p-8 rounded-[2.5rem] shadow-sm">
+        <div className="bg-white border border-neutral-200 p-6 rounded-3xl shadow-sm">
           <div className="flex items-center gap-3 mb-8">
             <div className="bg-neutral-900 p-2 rounded-xl">
               <Trophy className="text-white" size={20} />
@@ -582,7 +582,7 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
 
       {/* Add Business & Towns */}
       <div className="space-y-8">
-        <div className="bg-neutral-900 text-white p-10 rounded-[2.5rem] shadow-2xl">
+        <div className="bg-neutral-900 text-white p-8 rounded-3xl shadow-2xl">
           <div className="flex justify-between items-center mb-8">
             <h3 className="font-bold uppercase tracking-widest text-xs text-neutral-400">
               {editingId ? 'Edit Business' : 'Quick Add Business'}
@@ -710,7 +710,7 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
           </div>
         </div>
 
-        <div className="bg-white border border-neutral-200 p-8 rounded-[2.5rem] shadow-sm">
+        <div className="bg-white border border-neutral-200 p-6 rounded-3xl shadow-sm">
           <h3 className="font-bold uppercase tracking-widest text-xs mb-8 text-neutral-400">Manage Towns</h3>
           <div className="flex gap-3 mb-8">
             <input 

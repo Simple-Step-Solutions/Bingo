@@ -121,7 +121,7 @@ export const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
           <p className="text-neutral-400 uppercase tracking-[0.3em] font-bold text-[10px]">Chamber of Commerce</p>
         </div>
 
-        <div className="bg-white rounded-[3rem] p-10 shadow-xl border border-neutral-100">
+        <div className="bg-white rounded-[3rem] p-8 shadow-xl border border-neutral-100">
           <AnimatePresence mode="wait">
             {authMode === 'verify-email' ? (
               <motion.div
@@ -379,24 +379,35 @@ export const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
             )}
           </AnimatePresence>
 
-          <div className="mt-12 grid grid-cols-3 gap-4">
-            <div className="flex flex-col items-center gap-2">
-              <div className="bg-neutral-50 p-3 rounded-2xl text-neutral-400">
-                <Gamepad2 size={20} />
+          <div className="mt-8 pt-8 border-t border-neutral-100">
+            <div className="grid grid-cols-3 gap-3">
+              <div className="flex flex-col items-center gap-2 text-center">
+                <div className="w-10 h-10 bg-neutral-900 rounded-2xl flex items-center justify-center">
+                  <Gamepad2 className="text-white" size={16} />
+                </div>
+                <div>
+                  <p className="text-[9px] font-black uppercase tracking-widest text-neutral-900">Play</p>
+                  <p className="text-[8px] text-neutral-400 leading-tight mt-0.5">Fill your board</p>
+                </div>
               </div>
-              <span className="text-[8px] font-bold uppercase tracking-widest text-neutral-400">Play</span>
-            </div>
-            <div className="flex flex-col items-center gap-2">
-              <div className="bg-neutral-50 p-3 rounded-2xl text-neutral-400">
-                <Store size={20} />
+              <div className="flex flex-col items-center gap-2 text-center">
+                <div className="w-10 h-10 rounded-2xl flex items-center justify-center" style={{ background: 'var(--color-primary)' }}>
+                  <Store className="text-white" size={16} />
+                </div>
+                <div>
+                  <p className="text-[9px] font-black uppercase tracking-widest text-neutral-900">Visit</p>
+                  <p className="text-[8px] text-neutral-400 leading-tight mt-0.5">Local shops</p>
+                </div>
               </div>
-              <span className="text-[8px] font-bold uppercase tracking-widest text-neutral-400">Visit</span>
-            </div>
-            <div className="flex flex-col items-center gap-2">
-              <div className="bg-neutral-50 p-3 rounded-2xl text-neutral-400">
-                <ShieldCheck size={20} />
+              <div className="flex flex-col items-center gap-2 text-center">
+                <div className="w-10 h-10 rounded-2xl flex items-center justify-center" style={{ background: 'var(--color-accent)' }}>
+                  <ShieldCheck className="text-white" size={16} />
+                </div>
+                <div>
+                  <p className="text-[9px] font-black uppercase tracking-widest text-neutral-900">Win</p>
+                  <p className="text-[8px] text-neutral-400 leading-tight mt-0.5">Chamber prizes</p>
+                </div>
               </div>
-              <span className="text-[8px] font-bold uppercase tracking-widest text-neutral-400">Win</span>
             </div>
           </div>
         </div>

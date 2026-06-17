@@ -127,13 +127,13 @@ export const Profile: React.FC<ProfileProps> = ({ user }) => {
   };
 
   return (
-    <div className="max-w-2xl mx-auto p-6 space-y-6 pb-16">
+    <div className="max-w-2xl mx-auto space-y-5 pb-16">
 
       {/* Header card */}
       <motion.div
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
-        className="bg-neutral-900 text-white rounded-[2.5rem] p-10 relative overflow-hidden shadow-2xl"
+        className="bg-neutral-900 text-white rounded-3xl p-8 relative overflow-hidden shadow-2xl"
       >
         <div className="absolute top-0 right-0 w-64 h-64 rounded-full opacity-5 bg-white translate-x-16 -translate-y-16" />
 
@@ -162,7 +162,7 @@ export const Profile: React.FC<ProfileProps> = ({ user }) => {
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.05 }}
-        className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-neutral-100"
+        className="bg-white rounded-3xl p-8 shadow-sm border border-neutral-100"
       >
         <h2 className="font-serif italic text-2xl mb-6">Your Progress</h2>
 
@@ -203,7 +203,7 @@ export const Profile: React.FC<ProfileProps> = ({ user }) => {
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
-        className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-neutral-100"
+        className="bg-white rounded-3xl p-8 shadow-sm border border-neutral-100"
       >
         <h2 className="font-serif italic text-2xl mb-6">Account</h2>
 
@@ -302,7 +302,7 @@ export const Profile: React.FC<ProfileProps> = ({ user }) => {
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.15 }}
-          className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-red-100"
+          className="bg-white rounded-3xl p-8 shadow-sm border border-red-100"
         >
           <h2 className="font-serif italic text-2xl mb-2 text-red-600">Danger Zone</h2>
           <p className="text-xs text-neutral-400 mb-6">

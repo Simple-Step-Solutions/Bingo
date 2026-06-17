@@ -77,7 +77,7 @@ export const Raffle: React.FC<RaffleProps> = ({ user }) => {
   );
 
   if (!settings?.raffleEnabled) return (
-    <div className="max-w-2xl mx-auto p-6 text-center py-20">
+    <div className="max-w-2xl mx-auto text-center py-20">
       <div className="bg-white rounded-3xl p-12 shadow-sm border border-neutral-100">
         <Trophy className="mx-auto text-neutral-200 mb-6" size={64} />
         <h2 className="font-serif italic text-3xl mb-4">Raffle is Closed</h2>
@@ -91,8 +91,8 @@ export const Raffle: React.FC<RaffleProps> = ({ user }) => {
   const canEnter = completions.length >= requirement && !hasAlreadyEntered;
 
   return (
-    <div className="max-w-2xl mx-auto p-6">
-      <div className="bg-neutral-900 text-white p-10 rounded-[2.5rem] mb-8 relative overflow-hidden shadow-2xl">
+    <div className="max-w-2xl mx-auto">
+      <div className="bg-neutral-900 text-white p-8 rounded-3xl mb-6 relative overflow-hidden shadow-2xl">
         <div className="absolute top-0 right-0 p-8 opacity-10">
           <Trophy size={120} />
         </div>

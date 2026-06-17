@@ -112,7 +112,7 @@ export const AdminMenu: React.FC<AdminMenuProps> = ({ users, businesses }) => {
 
   return (
     <div className="space-y-6">
-      <div className="bg-white border border-neutral-200 p-8 rounded-[2.5rem] shadow-sm">
+      <div className="bg-white border border-neutral-200 p-8 rounded-3xl shadow-sm">
         <div className="flex justify-between items-center mb-6">
           <h3 className="font-bold uppercase tracking-widest text-xs text-neutral-400">User Management</h3>
           <button

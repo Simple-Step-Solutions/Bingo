@@ -29,8 +29,8 @@ export const Map: React.FC<MapProps> = ({ user, businesses }) => {
   const center: [number, number] = [41.2723, -73.8055];
 
   return (
-    <div className="max-w-6xl mx-auto p-6">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-12">
+    <div className="max-w-6xl mx-auto">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
         <div>
           <h2 className="font-serif italic text-5xl mb-2">Business Map</h2>
           <p className="text-xs text-neutral-400 uppercase tracking-[0.2em] font-bold">Discover Local Partners</p>
@@ -56,7 +56,7 @@ export const Map: React.FC<MapProps> = ({ user, businesses }) => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 h-[650px] bg-neutral-100 rounded-[3rem] overflow-hidden border border-neutral-200 shadow-2xl relative z-0">
+        <div className="lg:col-span-2 h-[350px] lg:h-[650px] bg-neutral-100 rounded-3xl overflow-hidden border border-neutral-200 shadow-2xl relative z-0">
           <MapContainer center={center} zoom={11} style={{ height: '100%', width: '100%' }}>
             <TileLayer
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
@@ -89,7 +89,7 @@ export const Map: React.FC<MapProps> = ({ user, businesses }) => {
           </MapContainer>
         </div>
 
-        <div className="space-y-4 max-h-[650px] overflow-y-auto pr-2">
+        <div className="space-y-3 max-h-[400px] lg:max-h-[650px] overflow-y-auto pr-2">
           <h3 className="font-bold uppercase tracking-widest text-xs text-neutral-400 mb-4 px-2">Businesses{town ? ` in ${town}` : ''}</h3>
           {filteredBusinesses.length === 0 ? (
             <div className="text-center py-20 bg-white rounded-[2rem] border border-neutral-100">
@@ -98,7 +98,7 @@ export const Map: React.FC<MapProps> = ({ user, businesses }) => {
             </div>
           ) : (
             filteredBusinesses.map(biz => (
-              <div key={biz.id} className="bg-white p-6 rounded-[2rem] border border-neutral-100 shadow-sm hover:shadow-md hover:border-neutral-900 transition-all group">
+              <div key={biz.id} className="bg-white p-5 rounded-2xl border border-neutral-100 shadow-sm hover:shadow-md hover:border-neutral-300 transition-all group">
                 <div className="flex items-center gap-4 mb-4">
                   <div className="w-10 h-10 bg-neutral-50 rounded-xl flex items-center justify-center text-neutral-400 group-hover:text-neutral-900 transition-colors">
                     <Store size={20} />

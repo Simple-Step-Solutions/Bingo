@@ -105,7 +105,7 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ user }) =>
   );
 
   if (!business) return (
-    <div className="max-w-2xl mx-auto p-6 text-center py-20">
+    <div className="max-w-2xl mx-auto text-center py-20">
       <div className="bg-white rounded-3xl p-12 shadow-sm border border-neutral-100">
         <Store className="mx-auto text-neutral-200 mb-6" size={64} />
         <h2 className="font-serif italic text-3xl mb-4">No Business Profile</h2>
@@ -118,8 +118,8 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ user }) =>
   const todayCompletions = completions.filter(c => new Date(c.timestamp).toDateString() === new Date().toDateString());
 
   return (
-    <div className="max-w-4xl mx-auto p-6">
-      <div className="bg-neutral-900 text-white p-12 rounded-[3rem] mb-12 relative overflow-hidden shadow-2xl">
+    <div className="max-w-4xl mx-auto">
+      <div className="bg-neutral-900 text-white p-8 md:p-12 rounded-3xl mb-8 relative overflow-hidden shadow-2xl">
         <div className="absolute top-0 right-0 p-12 opacity-10">
           <Store size={160} />
         </div>
@@ -132,7 +132,7 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ user }) =>
             <span className="text-xs font-bold uppercase tracking-widest text-neutral-400">Store Dashboard</span>
           </div>
           
-          <h2 className="font-serif italic text-6xl mb-4">{business.name}</h2>
+          <h2 className="font-serif italic text-4xl md:text-6xl mb-4">{business.name}</h2>
           <div className="flex flex-wrap gap-4 items-center mb-10">
             <div className="bg-white/10 px-4 py-2 rounded-full backdrop-blur-sm border border-white/10 flex items-center gap-2">
               <MapPin size={14} className="text-neutral-400" />
@@ -145,11 +145,11 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ user }) =>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 border-t border-white/10 pt-10">
             <div>
-              <p className="text-5xl font-bold mb-2">{completions.length}</p>
+              <p className="text-4xl font-bold mb-1">{completions.length}</p>
               <p className="text-xs text-neutral-500 uppercase tracking-widest font-bold">Total Visitors</p>
             </div>
             <div>
-              <p className="text-5xl font-bold mb-2">{todayCompletions.length}</p>
+              <p className="text-4xl font-bold mb-1">{todayCompletions.length}</p>
               <p className="text-xs text-neutral-500 uppercase tracking-widest font-bold">Visitors Today</p>
             </div>
           </div>
@@ -157,8 +157,8 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ user }) =>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-        <div className="md:col-span-2 bg-white rounded-[2.5rem] p-10 shadow-sm border border-neutral-100">
-          <h3 className="font-serif italic text-3xl mb-8">Recent Activity</h3>
+        <div className="md:col-span-2 bg-white rounded-3xl p-8 shadow-sm border border-neutral-100">
+          <h3 className="font-serif italic text-2xl mb-6">Recent Activity</h3>
           <div className="space-y-6">
             {completions.length === 0 ? (
               <div className="text-center py-12">
@@ -189,7 +189,7 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ user }) =>
         </div>
 
         <div className="space-y-8">
-          <div className="bg-white rounded-[2.5rem] p-10 shadow-sm border border-neutral-100 text-center">
+          <div className="bg-white rounded-3xl p-6 shadow-sm border border-neutral-100 text-center">
             <h3 className="font-bold uppercase tracking-widest text-xs text-neutral-400 mb-6">Your QR Code</h3>
 
             <div className="flex justify-center mb-4">

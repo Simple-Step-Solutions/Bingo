@@ -15,7 +15,7 @@ export const LoadingScreen: React.FC = () => {
           <LayoutGrid className="text-white" size={48} />
         </motion.div>
         <h2 className="font-serif italic text-3xl mb-1">Chamber Bingo</h2>
-        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--color-primary,#1695B2)] mb-4">Hudson Valley Gateway</p>
+        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--color-primary,#1695B2)] mb-4">Chamber Bingo</p>
         <div className="flex items-center justify-center gap-3 mb-8">
           <Loader2 className="animate-spin text-neutral-400" size={20} />
           <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-neutral-400">Loading...</span>

@@ -56,7 +56,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ user, towns, businesses,
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -24 }}
             transition={{ duration: 0.3 }}
-            className="bg-white w-full max-w-md rounded-[3rem] overflow-hidden shadow-2xl my-auto"
+            className="bg-white w-full max-w-md rounded-3xl overflow-hidden shadow-2xl my-auto"
           >
             <div className="h-3 bg-[var(--color-primary)]" />
             <div className="p-10 text-center">
@@ -69,7 +69,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ user, towns, businesses,
               </div>
 
               <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-[var(--color-primary)] mb-3">
-                Hudson Valley Gateway Chamber of Commerce
+                {settings.chamberName || 'Hudson Valley Gateway Chamber of Commerce'}
               </p>
               <h2 className="font-serif italic text-4xl mb-4 text-neutral-900">Welcome to Chamber Bingo</h2>
               <p className="text-neutral-500 leading-relaxed mb-10">
@@ -78,22 +78,22 @@ export const Onboarding: React.FC<OnboardingProps> = ({ user, towns, businesses,
 
               <div className="grid grid-cols-3 gap-4 mb-10">
                 <div className="flex flex-col items-center gap-3">
-                  <div className="w-12 h-12 bg-neutral-50 rounded-2xl flex items-center justify-center">
-                    <Store size={22} className="text-neutral-400" />
+                  <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: 'var(--color-primary)' }}>
+                    <Store size={20} className="text-white" />
                   </div>
-                  <span className="text-[9px] font-bold uppercase tracking-widest text-neutral-400 leading-tight text-center">Visit local<br/>businesses</span>
+                  <span className="text-[9px] font-bold uppercase tracking-widest text-neutral-500 leading-tight text-center">Visit local<br/>businesses</span>
                 </div>
                 <div className="flex flex-col items-center gap-3">
-                  <div className="w-12 h-12 bg-neutral-50 rounded-2xl flex items-center justify-center">
-                    <QrCode size={22} className="text-neutral-400" />
+                  <div className="w-12 h-12 bg-neutral-900 rounded-2xl flex items-center justify-center">
+                    <QrCode size={20} className="text-white" />
                   </div>
-                  <span className="text-[9px] font-bold uppercase tracking-widest text-neutral-400 leading-tight text-center">Scan to<br/>verify</span>
+                  <span className="text-[9px] font-bold uppercase tracking-widest text-neutral-500 leading-tight text-center">Scan to<br/>verify</span>
                 </div>
                 <div className="flex flex-col items-center gap-3">
-                  <div className="w-12 h-12 bg-neutral-50 rounded-2xl flex items-center justify-center">
-                    <Trophy size={22} className="text-neutral-400" />
+                  <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: 'var(--color-accent)' }}>
+                    <Trophy size={20} className="text-white" />
                   </div>
-                  <span className="text-[9px] font-bold uppercase tracking-widest text-neutral-400 leading-tight text-center">Get bingo,<br/>win prizes</span>
+                  <span className="text-[9px] font-bold uppercase tracking-widest text-neutral-500 leading-tight text-center">Get bingo,<br/>win prizes</span>
                 </div>
               </div>
 
@@ -114,7 +114,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ user, towns, businesses,
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -24 }}
             transition={{ duration: 0.3 }}
-            className="bg-white w-full max-w-md rounded-[3rem] overflow-hidden shadow-2xl my-auto"
+            className="bg-white w-full max-w-md rounded-3xl overflow-hidden shadow-2xl my-auto"
           >
             <div className="h-3 bg-[var(--color-primary)]" />
             <div className="p-10">
@@ -164,7 +164,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ user, towns, businesses,
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -24 }}
             transition={{ duration: 0.3 }}
-            className="bg-white w-full max-w-md rounded-[3rem] overflow-hidden shadow-2xl my-auto"
+            className="bg-white w-full max-w-md rounded-3xl overflow-hidden shadow-2xl my-auto"
           >
             <div className="h-3 bg-[var(--color-primary)]" />
             <div className="p-10">

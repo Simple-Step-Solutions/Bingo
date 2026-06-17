@@ -17,7 +17,7 @@ export const GameMaster: React.FC<GameMasterProps> = ({ settings, user }) => {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
       {/* Bingo Configuration */}
-      <div className="bg-white border border-neutral-200 p-8 rounded-[2.5rem] shadow-sm">
+      <div className="bg-white border border-neutral-200 p-8 rounded-3xl shadow-sm">
         <div className="flex items-center gap-3 mb-8">
           <div className="bg-neutral-100 p-2 rounded-xl">
             <Gamepad2 className="text-neutral-900" size={20} />
@@ -117,7 +117,7 @@ export const GameMaster: React.FC<GameMasterProps> = ({ settings, user }) => {
       </div>
 
       {/* Raffle Configuration */}
-      <div className="bg-white border border-neutral-200 p-8 rounded-[2.5rem] shadow-sm">
+      <div className="bg-white border border-neutral-200 p-8 rounded-3xl shadow-sm">
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-3">
             <div className="bg-yellow-50 p-2 rounded-xl">

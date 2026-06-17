@@ -152,51 +152,51 @@ export const Analytics: React.FC<AnalyticsProps> = ({ users, completions, busine
   return (
     <div className="space-y-8">
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="bg-white border border-neutral-200 p-8 rounded-[2.5rem] shadow-sm">
-          <div className="flex items-center gap-4 mb-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="bg-white border border-neutral-200 p-5 rounded-3xl shadow-sm">
+          <div className="flex items-center gap-3">
             <div className="bg-blue-50 p-3 rounded-2xl">
-              <Users className="text-blue-600" size={24} />
+              <Users className="text-blue-600" size={20} />
             </div>
             <div>
-              <p className="text-3xl font-bold text-neutral-900">{players.length}</p>
+              <p className="text-2xl font-bold text-neutral-900 leading-none">{players.length}</p>
               <p className="text-[10px] text-neutral-400 uppercase tracking-widest font-bold">Total Players</p>
             </div>
           </div>
         </div>
 
-        <div className="bg-white border border-neutral-200 p-8 rounded-[2.5rem] shadow-sm">
-          <div className="flex items-center gap-4 mb-4">
+        <div className="bg-white border border-neutral-200 p-5 rounded-3xl shadow-sm">
+          <div className="flex items-center gap-3">
             <div className="bg-green-50 p-3 rounded-2xl">
-              <CheckCircle2 className="text-green-600" size={24} />
+              <CheckCircle2 className="text-green-600" size={20} />
             </div>
             <div>
-              <p className="text-3xl font-bold text-neutral-900">{completions.length}</p>
+              <p className="text-2xl font-bold text-neutral-900 leading-none">{completions.length}</p>
               <p className="text-[10px] text-neutral-400 uppercase tracking-widest font-bold">Total Visits</p>
             </div>
           </div>
         </div>
 
-        <div className="bg-white border border-neutral-200 p-8 rounded-[2.5rem] shadow-sm">
-          <div className="flex items-center gap-4 mb-4">
+        <div className="bg-white border border-neutral-200 p-5 rounded-3xl shadow-sm">
+          <div className="flex items-center gap-3">
             <div className="bg-orange-50 p-3 rounded-2xl">
-              <Trophy className="text-orange-600" size={24} />
+              <Trophy className="text-orange-600" size={20} />
             </div>
             <div>
-              <p className="text-3xl font-bold text-neutral-900">{bingoFinishers.length}</p>
+              <p className="text-2xl font-bold text-neutral-900 leading-none">{bingoFinishers.length}</p>
               <p className="text-[10px] text-neutral-400 uppercase tracking-widest font-bold">Bingo Finishers</p>
             </div>
           </div>
         </div>
 
         {isAdmin && (
-          <div className="bg-white border border-neutral-200 p-8 rounded-[2.5rem] shadow-sm">
-            <div className="flex items-center gap-4 mb-4">
+          <div className="bg-white border border-neutral-200 p-5 rounded-3xl shadow-sm">
+            <div className="flex items-center gap-3">
               <div className="bg-purple-50 p-3 rounded-2xl">
-                <ActivityIcon className="text-purple-600" size={24} />
+                <ActivityIcon className="text-purple-600" size={20} />
               </div>
               <div>
-                <p className="text-3xl font-bold text-neutral-900">{activePlayers.length}</p>
+                <p className="text-2xl font-bold text-neutral-900 leading-none">{activePlayers.length}</p>
                 <p className="text-[10px] text-neutral-400 uppercase tracking-widest font-bold">Active Now</p>
               </div>
             </div>
@@ -206,7 +206,7 @@ export const Analytics: React.FC<AnalyticsProps> = ({ users, completions, busine
 
       {/* Real-time Map */}
       {canSeeMap && (
-        <div className="bg-white border border-neutral-200 p-8 rounded-[2.5rem] shadow-sm overflow-hidden">
+        <div className="bg-white border border-neutral-200 p-8 rounded-3xl shadow-sm overflow-hidden">
           <div className="flex items-center justify-between mb-8">
             <div className="flex items-center gap-3">
               <div className="bg-neutral-100 p-2 rounded-xl">
@@ -269,7 +269,7 @@ export const Analytics: React.FC<AnalyticsProps> = ({ users, completions, busine
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Leaderboard */}
-        <div className="bg-white border border-neutral-200 p-8 rounded-[2.5rem] shadow-sm">
+        <div className="bg-white border border-neutral-200 p-5 rounded-3xl shadow-sm">
           <div className="flex items-center gap-3 mb-8">
             <div className="bg-neutral-100 p-2 rounded-xl">
               <TrendingUp className="text-neutral-900" size={20} />
@@ -308,7 +308,7 @@ export const Analytics: React.FC<AnalyticsProps> = ({ users, completions, busine
 
         {/* Category Insights */}
         {isAdmin && (
-          <div className="bg-white border border-neutral-200 p-8 rounded-[2.5rem] shadow-sm">
+          <div className="bg-white border border-neutral-200 p-5 rounded-3xl shadow-sm">
             <div className="flex items-center gap-3 mb-8">
               <div className="bg-neutral-100 p-2 rounded-xl">
                 <ShoppingBag className="text-neutral-900" size={20} />
@@ -336,7 +336,7 @@ export const Analytics: React.FC<AnalyticsProps> = ({ users, completions, busine
         )}
 
         {/* Top Businesses */}
-        <div className="bg-white border border-neutral-200 p-8 rounded-[2.5rem] shadow-sm">
+        <div className="bg-white border border-neutral-200 p-5 rounded-3xl shadow-sm">
           <div className="flex items-center gap-3 mb-8">
             <div className="bg-neutral-100 p-2 rounded-xl">
               <Eye className="text-neutral-900" size={20} />
@@ -368,7 +368,7 @@ export const Analytics: React.FC<AnalyticsProps> = ({ users, completions, busine
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Town Distribution */}
-        <div className="bg-white border border-neutral-200 p-8 rounded-[2.5rem] shadow-sm">
+        <div className="bg-white border border-neutral-200 p-5 rounded-3xl shadow-sm">
           <div className="flex items-center gap-3 mb-8">
             <div className="bg-neutral-100 p-2 rounded-xl">
               <MapPin className="text-neutral-900" size={20} />
@@ -396,7 +396,7 @@ export const Analytics: React.FC<AnalyticsProps> = ({ users, completions, busine
 
         {/* User Behavior Insights */}
         {isAdmin && (
-          <div className="bg-neutral-900 text-white p-8 rounded-[2.5rem] shadow-xl">
+          <div className="bg-neutral-900 text-white p-8 rounded-3xl shadow-xl">
             <div className="flex items-center gap-3 mb-8">
               <div className="bg-white/10 p-2 rounded-xl">
                 <Clock className="text-white" size={20} />

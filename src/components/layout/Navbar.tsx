@@ -194,11 +194,19 @@ export const Navbar: React.FC<NavbarProps> = ({ user, settings }) => {
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-xl border-t border-neutral-200 px-6 py-4 flex justify-around items-center z-50 md:top-0 md:bottom-auto md:border-t-0 md:border-b shadow-2xl md:shadow-sm">
-      <div className="hidden md:flex items-center gap-4 mr-8">
-        <div className="bg-neutral-900 p-2 rounded-xl">
-          <LayoutGrid className="text-white" size={18} />
-        </div>
-        <span className="font-serif italic text-xl">Chamber Bingo</span>
+      <div className="hidden md:flex items-center gap-3 mr-8">
+        {settings?.chamberLogoUrl ? (
+          <img src={settings.chamberLogoUrl} alt="Chamber" className="h-8 w-auto" />
+        ) : (
+          <div className="bg-neutral-900 p-2 rounded-xl">
+            <LayoutGrid className="text-white" size={18} />
+          </div>
+        )}
+        <span className="font-serif italic text-xl leading-tight">
+          {settings?.chamberName
+            ? settings.chamberName.replace(/chamber of commerce/i, '').replace(/chamber/i, '').trim() || 'Chamber Bingo'
+            : 'Chamber Bingo'}
+        </span>
       </div>
 
       <div className="flex flex-1 justify-around md:justify-start md:gap-8 items-center">

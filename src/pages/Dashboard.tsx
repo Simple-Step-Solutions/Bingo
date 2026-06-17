@@ -266,9 +266,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, towns, s
       {/* Header */}
       <div className="flex justify-between items-center gap-3 mb-2 md:mb-10 shrink-0">
         <div>
-          <h2 className="font-serif italic text-2xl md:text-5xl leading-none mb-0.5">Your Board</h2>
-          <p className="text-[9px] md:text-xs text-neutral-400 uppercase tracking-[0.2em] font-bold flex items-center gap-1">
+          <h2 className="font-serif italic text-3xl md:text-5xl leading-none mb-0.5">Your Board</h2>
+          <p className="text-[9px] md:text-xs text-neutral-400 uppercase tracking-[0.2em] font-bold flex items-center gap-2">
             <MapPin size={10} /> {user.town || 'Global'} Edition
+            {completions.length > 0 && (
+              <span className="bg-neutral-100 text-neutral-600 px-2 py-0.5 rounded-full text-[8px] font-black normal-case tracking-normal">{completions.length} done</span>
+            )}
           </p>
         </div>
         <div className="flex gap-2 shrink-0">
@@ -330,7 +333,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, towns, s
                   if (biz) { setSelectedBusiness(biz); trackActivity(user.uid, 'view_business', { businessId: biz.id, businessName: biz.name }); }
                 }}
                 className={`rounded-xl md:rounded-3xl flex flex-col items-center justify-center text-center transition-all relative overflow-hidden group cursor-pointer p-1 md:p-3 ${
-                  isDone ? 'bg-neutral-900 text-white shadow-xl' : 'bg-white border border-neutral-200 text-neutral-900 hover:border-neutral-900 hover:shadow-md'
+                  isDone ? 'bg-neutral-900 text-white shadow-lg' : 'bg-white border border-neutral-100 text-neutral-900 hover:border-neutral-300 hover:shadow-sm shadow-sm'
                 }`}
               >
                 {isDone ? (
@@ -534,7 +537,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, towns, s
       {hasBingo && settings.raffleEnabled && (
         <motion.div
           initial={{ y: 100, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
-          className="fixed bottom-24 inset-x-4 md:inset-x-auto md:bottom-8 md:right-8 md:left-auto md:w-80 bg-orange-500 text-white p-5 rounded-[2rem] text-center shadow-2xl z-30 relative overflow-hidden"
+          className="fixed bottom-24 inset-x-4 md:inset-x-auto md:bottom-8 md:right-8 md:left-auto md:w-80 bg-orange-500 text-white p-5 rounded-[2rem] text-center shadow-2xl z-30 overflow-hidden"
         >
           <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_50%_-20%,rgba(255,255,255,0.3),transparent)]" />
           <Trophy className="mx-auto mb-2 text-white drop-shadow-lg relative z-10" size={32} />
