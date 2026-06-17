@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
-  signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   GoogleAuthProvider,
   OAuthProvider,
   signInWithEmailAndPassword,
@@ -28,23 +29,26 @@ export const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
 
-  const handleAuthResult = () => {
-    // Profile creation is handled by App.tsx's onSnapshot.
-    // Nothing to do here -- onAuthStateChanged fires automatically.
-    onAuthSuccess();
-  };
+  // Handle redirect result on mount (fires after Google/Microsoft redirect back)
+  useEffect(() => {
+    getRedirectResult(auth).catch((err) => {
+      if (err?.code !== 'auth/no-current-user') {
+        console.error('Redirect auth error:', err);
+        setError('Sign in failed. Please try again.');
+      }
+    });
+  }, []);
 
   const signInWithGoogle = async () => {
     setLoading(true);
     setError(null);
     try {
       const provider = new GoogleAuthProvider();
-      const result = await signInWithPopup(auth, provider);
-      handleAuthResult();
+      await signInWithRedirect(auth, provider);
+      // Page will navigate away -- no code runs after this
     } catch (err: any) {
       console.error('Google Auth error:', err);
       setError(err.message || 'Failed to sign in with Google.');
-    } finally {
       setLoading(false);
     }
   };
@@ -54,12 +58,11 @@ export const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
     setError(null);
     try {
       const provider = new OAuthProvider('microsoft.com');
-      const result = await signInWithPopup(auth, provider);
-      handleAuthResult();
+      await signInWithRedirect(auth, provider);
+      // Page will navigate away -- no code runs after this
     } catch (err: any) {
       console.error('Microsoft Auth error:', err);
       setError(err.message || 'Failed to sign in with Microsoft.');
-    } finally {
       setLoading(false);
     }
   };
@@ -69,8 +72,8 @@ export const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
     setLoading(true);
     setError(null);
     try {
-      const result = await signInWithEmailAndPassword(auth, email, password);
-      handleAuthResult();
+      await signInWithEmailAndPassword(auth, email, password);
+      // onAuthStateChanged in App.tsx handles navigation
     } catch (err: any) {
       console.error('Email sign in error:', err);
       setError('Invalid email or password.');
