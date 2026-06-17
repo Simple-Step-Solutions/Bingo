@@ -261,7 +261,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, towns, s
   );
 
   return (
-    <div className="flex flex-col max-w-4xl mx-auto" style={{ height: 'calc(100dvh - 6rem)', overflow: 'hidden', marginTop: '-1rem' }}>
+    <div className="flex flex-col max-w-4xl mx-auto" style={{ height: 'calc(100dvh - 6rem)', overflow: 'hidden', marginTop: '-2rem', marginBottom: '-2rem' }}>
 
       {/* Header */}
       <div className="flex justify-between items-center gap-3 mb-2 md:mb-10 shrink-0">
@@ -530,18 +530,19 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, towns, s
         <Onboarding user={user} towns={towns} businesses={businesses} settings={settings} onComplete={() => {}} />
       )}
 
+      {/* Bingo raffle banner -- fixed so it never pushes layout */}
       {hasBingo && settings.raffleEnabled && (
         <motion.div
-          initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
-          className="bg-orange-500 text-white p-8 rounded-[3rem] text-center shadow-2xl relative overflow-hidden mt-6"
+          initial={{ y: 100, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
+          className="fixed bottom-24 inset-x-4 md:inset-x-auto md:bottom-8 md:right-8 md:left-auto md:w-80 bg-orange-500 text-white p-5 rounded-[2rem] text-center shadow-2xl z-30 relative overflow-hidden"
         >
           <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_50%_-20%,rgba(255,255,255,0.3),transparent)]" />
-          <Trophy className="mx-auto mb-4 text-white drop-shadow-lg" size={48} />
-          <h3 className="font-serif italic text-4xl mb-3">BINGO!</h3>
-          <p className="text-orange-100 mb-6 max-w-md mx-auto">You're eligible for the Chamber Raffle.</p>
+          <Trophy className="mx-auto mb-2 text-white drop-shadow-lg relative z-10" size={32} />
+          <h3 className="font-serif italic text-2xl mb-1 relative z-10">BINGO!</h3>
+          <p className="text-orange-100 mb-4 text-sm relative z-10">You're eligible for the raffle!</p>
           <Link to="/raffle"
-            className="inline-flex items-center gap-2 bg-white text-orange-600 px-8 py-4 rounded-2xl font-bold text-sm hover:bg-neutral-100 transition-all shadow-xl">
-            <Ticket size={18} /> Enter Raffle
+            className="inline-flex items-center gap-2 bg-white text-orange-600 px-6 py-3 rounded-xl font-bold text-xs hover:bg-neutral-100 transition-all shadow-lg relative z-10">
+            <Ticket size={16} /> Enter Raffle
           </Link>
         </motion.div>
       )}
