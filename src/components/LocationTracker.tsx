@@ -44,6 +44,9 @@ export const LocationTracker: React.FC<LocationTrackerProps> = ({ user }) => {
       }
     };
 
+    // GPS is only relevant for on-site verification -- skip on desktop
+    if (!/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) return;
+
     if (!('geolocation' in navigator)) return;
 
     navigator.geolocation.getCurrentPosition(
