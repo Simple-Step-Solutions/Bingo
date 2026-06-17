@@ -36,6 +36,10 @@ export default defineConfig(({ mode }) => {
         },
         workbox: {
           globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+          // Exclude Firebase's reserved /__/ paths from the SW navigation fallback.
+          // Without this, the SW intercepts /__/auth/handler and serves our app
+          // instead of Firebase's auth handler, breaking OAuth popups.
+          navigateFallbackDenylist: [/^\/__\//],
           runtimeCaching: [
             {
               urlPattern: /^https:\/\/firestore\.googleapis\.com\/.*/i,
