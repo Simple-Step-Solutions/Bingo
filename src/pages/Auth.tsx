@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import {
   signInWithPopup,
-  signInWithRedirect,
   GoogleAuthProvider,
   OAuthProvider,
   signInWithEmailAndPassword,
@@ -29,25 +28,15 @@ export const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
 
-  // Mobile browsers handle popups poorly; desktop Chrome has storage-partitioning
-  // issues with signInWithRedirect. Use popup on mobile, redirect on desktop.
-  const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-
   const signInWithGoogle = async () => {
     setLoading(true);
     setError(null);
     try {
       const provider = new GoogleAuthProvider();
-      if (isMobile) {
-        await signInWithPopup(auth, provider);
-        // onAuthStateChanged in App.tsx handles the rest
-      } else {
-        sessionStorage.setItem('authRedirectPending', '1');
-        await signInWithRedirect(auth, provider);
-      }
+      await signInWithPopup(auth, provider);
+      // onAuthStateChanged in App.tsx handles navigation
     } catch (err: any) {
       console.error('Google Auth error:', err);
-      sessionStorage.removeItem('authRedirectPending');
       setError(err.message || 'Failed to sign in with Google.');
       setLoading(false);
     }
@@ -58,15 +47,9 @@ export const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
     setError(null);
     try {
       const provider = new OAuthProvider('microsoft.com');
-      if (isMobile) {
-        await signInWithPopup(auth, provider);
-      } else {
-        sessionStorage.setItem('authRedirectPending', '1');
-        await signInWithRedirect(auth, provider);
-      }
+      await signInWithPopup(auth, provider);
     } catch (err: any) {
       console.error('Microsoft Auth error:', err);
-      sessionStorage.removeItem('authRedirectPending');
       setError(err.message || 'Failed to sign in with Microsoft.');
       setLoading(false);
     }
