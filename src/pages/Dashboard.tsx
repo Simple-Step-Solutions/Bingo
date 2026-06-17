@@ -261,7 +261,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, towns, s
   );
 
   return (
-    <div className="flex flex-col max-w-4xl mx-auto" style={{ height: 'calc(100dvh - 6rem)', overflow: 'hidden', marginTop: '-2rem', marginBottom: '-2rem' }}>
+    <div className="flex flex-col max-w-4xl mx-auto" style={{ height: 'calc(100dvh - 6rem)', overflow: 'hidden', marginTop: '-2rem', marginBottom: '-2rem', paddingTop: '0.75rem' }}>
 
       {/* Header */}
       <div className="flex justify-between items-center gap-3 mb-2 md:mb-10 shrink-0">
@@ -290,7 +290,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, towns, s
       </div>
 
       {/* Board */}
-      <div className="flex-1 flex items-center justify-center relative">
+      <div className="flex-1 flex items-start justify-center relative pt-2">
         <div
           className="grid gap-1.5 md:gap-3"
           style={{
