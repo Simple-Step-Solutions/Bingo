@@ -17,10 +17,6 @@
       {
         "source": "registerSW.js",
         "headers": [{ "key": "Cache-Control", "value": "no-cache" }]
-      },
-      {
-        "source": "**",
-        "headers": [{ "key": "Cross-Origin-Opener-Policy", "value": "same-origin-allow-popups" }]
       }
     ]
   },
