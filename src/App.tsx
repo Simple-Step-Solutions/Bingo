@@ -43,19 +43,29 @@ function App() {
     document.documentElement.style.setProperty('--color-accent', accent);
   }, [settings?.primaryColor, settings?.accentColor]);
 
+  // When Chrome restores this page from bfcache after a Google/Microsoft redirect,
+  // React state is frozen (auth screen mid-redirect) and getRedirectResult never runs.
+  // Force a real reload so the redirect result gets processed fresh.
+  useEffect(() => {
+    const handlePageShow = (e: PageTransitionEvent) => {
+      if (e.persisted && sessionStorage.getItem('authRedirectPending')) {
+        window.location.reload();
+      }
+    };
+    window.addEventListener('pageshow', handlePageShow);
+    return () => window.removeEventListener('pageshow', handlePageShow);
+  }, []);
+
   // Process Google/Microsoft redirect result on mount.
   // While pending, the loading screen is shown so Auth never races with the redirect.
   useEffect(() => {
-    console.debug('[Auth] getRedirectResult starting, redirectPending=', !!sessionStorage.getItem('authRedirectPending'));
     getRedirectResult(auth)
-      .then((result) => {
-        console.debug('[Auth] getRedirectResult resolved, user=', result?.user?.email ?? 'null');
-      })
       .catch((err) => {
-        console.error('[Auth] getRedirectResult error:', err?.code, err?.message);
+        if (err?.code !== 'auth/no-current-user') {
+          console.error('[Auth] getRedirectResult error:', err?.code, err?.message);
+        }
       })
       .finally(() => {
-        console.debug('[Auth] getRedirectResult done, clearing redirectPending');
         sessionStorage.removeItem('authRedirectPending');
         setRedirectPending(false);
       });
@@ -75,7 +85,6 @@ function App() {
     };
 
     const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser) => {
-      console.debug('[Auth] onAuthStateChanged fired, user=', firebaseUser?.email ?? 'null');
       cleanupListeners();
 
       if (firebaseUser) {
