@@ -46,13 +46,16 @@ function App() {
   // Process Google/Microsoft redirect result on mount.
   // While pending, the loading screen is shown so Auth never races with the redirect.
   useEffect(() => {
+    console.debug('[Auth] getRedirectResult starting, redirectPending=', !!sessionStorage.getItem('authRedirectPending'));
     getRedirectResult(auth)
+      .then((result) => {
+        console.debug('[Auth] getRedirectResult resolved, user=', result?.user?.email ?? 'null');
+      })
       .catch((err) => {
-        if (err?.code !== 'auth/no-current-user') {
-          console.error('Redirect result error:', err);
-        }
+        console.error('[Auth] getRedirectResult error:', err?.code, err?.message);
       })
       .finally(() => {
+        console.debug('[Auth] getRedirectResult done, clearing redirectPending');
         sessionStorage.removeItem('authRedirectPending');
         setRedirectPending(false);
       });
@@ -72,11 +75,10 @@ function App() {
     };
 
     const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser) => {
-      // Always clean up previous listeners on auth change
+      console.debug('[Auth] onAuthStateChanged fired, user=', firebaseUser?.email ?? 'null');
       cleanupListeners();
 
       if (firebaseUser) {
-        // Show loading screen immediately while snapshots resolve
         setLoading(true);
         trackActivity(firebaseUser.uid, 'open_app');
 

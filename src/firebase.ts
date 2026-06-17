@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
+import { initializeAuth, browserLocalPersistence, browserPopupRedirectResolver } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 
@@ -16,7 +16,10 @@ const databaseId = import.meta.env.VITE_FIREBASE_DATABASE_ID;
 
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app, databaseId);
-export const auth = getAuth();
+export const auth = initializeAuth(app, {
+  persistence: browserLocalPersistence,
+  popupRedirectResolver: browserPopupRedirectResolver,
+});
 export const storage = getStorage(app);
 
 export enum OperationType {
