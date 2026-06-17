@@ -1,24 +1,33 @@
 import React, { useState, useEffect } from 'react';
-import { collection, query, where, onSnapshot, updateDoc, doc, setDoc } from 'firebase/firestore';
-import { signOut } from 'firebase/auth';
+import { collection, query, where, onSnapshot, doc, setDoc } from 'firebase/firestore';
+import { signOut, updatePassword, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
 import { auth, db } from '../firebase';
-import { UserProfile, Town, Completion } from '../types';
+import { UserProfile, Completion } from '../types';
 import { motion } from 'motion/react';
-import { LogOut, RotateCcw, CheckCircle2, Trophy, MapPin, Loader2, ChevronDown } from 'lucide-react';
+import { LogOut, RotateCcw, CheckCircle2, Trophy, MapPin, Loader2, Lock, Eye, EyeOff } from 'lucide-react';
 
 interface ProfileProps {
   user: UserProfile;
-  towns: Town[];
 }
 
-export const Profile: React.FC<ProfileProps> = ({ user, towns }) => {
+const isEmailUser = () => {
+  const currentUser = auth.currentUser;
+  return currentUser?.providerData.some(p => p.providerId === 'password') ?? false;
+};
+
+export const Profile: React.FC<ProfileProps> = ({ user }) => {
   const [completions, setCompletions] = useState<Completion[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedTown, setSelectedTown] = useState(user.town || '');
-  const [savingTown, setSavingTown] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
-  const [townSaved, setTownSaved] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showCurrentPw, setShowCurrentPw] = useState(false);
+  const [showNewPw, setShowNewPw] = useState(false);
+  const [pwLoading, setPwLoading] = useState(false);
+  const [pwError, setPwError] = useState('');
+  const [pwSuccess, setPwSuccess] = useState(false);
 
   useEffect(() => {
     const q = query(collection(db, 'completions'), where('userId', '==', user.uid));
@@ -65,17 +74,31 @@ export const Profile: React.FC<ProfileProps> = ({ user, towns }) => {
     return false;
   })();
 
-  const handleTownChange = async (newTown: string) => {
-    setSelectedTown(newTown);
-    setSavingTown(true);
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPwError('');
+    if (newPassword !== confirmPassword) { setPwError('New passwords do not match.'); return; }
+    if (newPassword.length < 6) { setPwError('Password must be at least 6 characters.'); return; }
+    const currentUser = auth.currentUser;
+    if (!currentUser || !currentUser.email) return;
+    setPwLoading(true);
     try {
-      await updateDoc(doc(db, 'users', user.uid), { town: newTown });
-      setTownSaved(true);
-      setTimeout(() => setTownSaved(false), 2000);
-    } catch (err) {
-      console.error('Failed to update town:', err);
+      const credential = EmailAuthProvider.credential(currentUser.email, currentPassword);
+      await reauthenticateWithCredential(currentUser, credential);
+      await updatePassword(currentUser, newPassword);
+      setPwSuccess(true);
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setTimeout(() => setPwSuccess(false), 3000);
+    } catch (err: any) {
+      if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
+        setPwError('Current password is incorrect.');
+      } else {
+        setPwError('Failed to update password. Please try again.');
+      }
     } finally {
-      setSavingTown(false);
+      setPwLoading(false);
     }
   };
 
@@ -184,35 +207,79 @@ export const Profile: React.FC<ProfileProps> = ({ user, towns }) => {
       >
         <h2 className="font-serif italic text-2xl mb-6">Account</h2>
 
-        {/* Town selector */}
+        {/* Town -- read only */}
         <div className="mb-6">
           <label className="block text-[10px] uppercase tracking-widest text-neutral-400 font-bold mb-3">
             Your Town
           </label>
-          <div className="relative">
-            <select
-              value={selectedTown}
-              onChange={e => handleTownChange(e.target.value)}
-              disabled={savingTown}
-              className="w-full appearance-none bg-neutral-50 border border-neutral-200 rounded-2xl px-5 py-4 pr-12 text-sm font-medium text-neutral-900 focus:outline-none focus:ring-2 focus:border-transparent transition-all disabled:opacity-60"
-              style={{ '--tw-ring-color': 'var(--color-primary)' } as React.CSSProperties}
-            >
-              <option value="">Select a town...</option>
-              {towns.map(t => (
-                <option key={t.id} value={t.name}>{t.name}</option>
-              ))}
-            </select>
-            <div className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2">
-              {savingTown ? (
-                <Loader2 className="animate-spin text-neutral-400" size={16} />
-              ) : townSaved ? (
-                <CheckCircle2 size={16} style={{ color: 'var(--color-primary)' }} />
-              ) : (
-                <ChevronDown className="text-neutral-400" size={16} />
-              )}
-            </div>
+          <div className="flex items-center gap-3 bg-neutral-50 border border-neutral-200 rounded-2xl px-5 py-4">
+            <MapPin size={16} className="text-neutral-300 shrink-0" />
+            <span className="text-sm font-medium text-neutral-900">{user.town || 'Not set'}</span>
           </div>
+          <p className="text-[10px] text-neutral-400 mt-2 ml-1">Your town is assigned by the chamber. Contact them to make changes.</p>
         </div>
+
+        {/* Change password -- email users only */}
+        {isEmailUser() && (
+          <form onSubmit={handleChangePassword} className="mb-6 space-y-3">
+            <label className="block text-[10px] uppercase tracking-widest text-neutral-400 font-bold mb-3">
+              Change Password
+            </label>
+
+            <div className="relative">
+              <input
+                type={showCurrentPw ? 'text' : 'password'}
+                placeholder="Current password"
+                value={currentPassword}
+                onChange={e => setCurrentPassword(e.target.value)}
+                required
+                className="w-full bg-neutral-50 border border-neutral-200 rounded-2xl px-5 py-4 pr-12 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:border-transparent transition-all"
+                style={{ '--tw-ring-color': 'var(--color-primary)' } as React.CSSProperties}
+              />
+              <button type="button" onClick={() => setShowCurrentPw(v => !v)} className="absolute right-4 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600">
+                {showCurrentPw ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
+
+            <div className="relative">
+              <input
+                type={showNewPw ? 'text' : 'password'}
+                placeholder="New password"
+                value={newPassword}
+                onChange={e => setNewPassword(e.target.value)}
+                required
+                className="w-full bg-neutral-50 border border-neutral-200 rounded-2xl px-5 py-4 pr-12 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:border-transparent transition-all"
+                style={{ '--tw-ring-color': 'var(--color-primary)' } as React.CSSProperties}
+              />
+              <button type="button" onClick={() => setShowNewPw(v => !v)} className="absolute right-4 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600">
+                {showNewPw ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
+
+            <input
+              type="password"
+              placeholder="Confirm new password"
+              value={confirmPassword}
+              onChange={e => setConfirmPassword(e.target.value)}
+              required
+              className="w-full bg-neutral-50 border border-neutral-200 rounded-2xl px-5 py-4 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:border-transparent transition-all"
+              style={{ '--tw-ring-color': 'var(--color-primary)' } as React.CSSProperties}
+            />
+
+            {pwError && <p className="text-xs text-red-500 ml-1">{pwError}</p>}
+            {pwSuccess && <p className="text-xs ml-1" style={{ color: 'var(--color-primary)' }}>Password updated successfully.</p>}
+
+            <button
+              type="submit"
+              disabled={pwLoading}
+              className="w-full flex items-center justify-center gap-3 py-4 rounded-2xl font-bold text-sm transition-all shadow-sm hover:shadow-md disabled:opacity-60 text-white"
+              style={{ background: 'var(--color-primary)' }}
+            >
+              {pwLoading ? <Loader2 className="animate-spin" size={18} /> : <Lock size={18} />}
+              Update Password
+            </button>
+          </form>
+        )}
 
         {/* Sign out */}
         <button

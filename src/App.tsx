@@ -164,7 +164,7 @@ function App() {
               <Route path="/business" element={<BusinessDashboard user={user} />} />
             )}
             
-            <Route path="/profile" element={<Profile user={user} towns={towns} />} />
+            <Route path="/profile" element={<Profile user={user} />} />
 
             {/* Fallback */}
             <Route path="*" element={<Navigate to="/" replace />} />

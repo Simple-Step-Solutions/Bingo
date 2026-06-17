@@ -1,0 +1,8 @@
+[
+  {
+    "origin": ["http://localhost:3000", "http://localhost:5173", "https://sss-hvgcc-bingo.web.app", "https://sss-hvgcc-bingo.firebaseapp.com", "https://bingo.simplestep.tech"],
+    "method": ["GET", "POST", "PUT", "DELETE", "HEAD"],
+    "maxAgeSeconds": 3600,
+    "responseHeader": ["Content-Type", "Authorization"]
+  }
+]
