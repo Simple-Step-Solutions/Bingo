@@ -168,7 +168,7 @@ function App() {
           </Routes>
         </main>
 
-        <footer className="container mx-auto px-6 py-10 border-t border-neutral-200 mt-12 mb-24 md:mb-0">
+        <footer className="hidden md:block container mx-auto px-6 py-10 border-t border-neutral-200 mt-12">
           <div className="flex flex-col md:flex-row justify-between items-center gap-6">
             <div className="flex flex-col items-center md:items-start gap-1">
               <p className="text-[10px] text-neutral-400 uppercase tracking-widest font-bold">

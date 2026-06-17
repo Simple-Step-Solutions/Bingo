@@ -261,10 +261,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, towns, s
   );
 
   return (
-    <div className="flex flex-col max-w-4xl mx-auto" style={{ height: 'calc(100dvh - 6rem)', overflow: 'hidden', marginTop: '-2rem' }}>
+    <div className="flex flex-col max-w-4xl mx-auto" style={{ height: 'calc(100dvh - 6rem)', overflow: 'hidden', marginTop: '-1rem' }}>
 
       {/* Header */}
-      <div className="flex justify-between items-center gap-3 mb-4 md:mb-10 shrink-0">
+      <div className="flex justify-between items-center gap-3 mb-2 md:mb-10 shrink-0">
         <div>
           <h2 className="font-serif italic text-2xl md:text-5xl leading-none mb-0.5">Your Board</h2>
           <p className="text-[9px] md:text-xs text-neutral-400 uppercase tracking-[0.2em] font-bold flex items-center gap-1">
@@ -296,8 +296,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, towns, s
           style={{
             gridTemplateColumns: `repeat(${size}, 1fr)`,
             gridAutoRows: '1fr',
-            width: 'min(calc(100vw - 2rem), calc(100dvh - 10rem))',
-            height: 'min(calc(100vw - 2rem), calc(100dvh - 10rem))',
+            width: 'min(calc(100vw - 2rem), calc(100dvh - 8rem))',
+            height: 'min(calc(100vw - 2rem), calc(100dvh - 8rem))',
           }}
         >
           {board.map((bizId, idx) => {
