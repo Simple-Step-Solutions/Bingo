@@ -1,112 +1,80 @@
 # Chamber Bingo
 
-A progressive web app for the Hudson Valley Gateway Chamber of Commerce. Players visit local businesses to complete bingo cards, earn raffle entries, and explore the community.
+Chamber Bingo is a community engagement app built for local chambers of commerce. Players download the app, get a randomized bingo card filled with nearby businesses, and visit them in real life to complete their card. Each square has a task — buy a coffee, try a menu item, book a service — verified on-site by scanning a QR code or tapping an NFC tag. Complete a line, win a prize. Complete more, enter the raffle.
 
-Built by [Simple Step Solutions](https://www.simplestepsolutions.com).
+The goal is to get people off their phones and into local shops, while giving the chamber a measurable, gamified way to drive foot traffic across their member businesses.
 
----
-
-## Stack
-
-- **Frontend:** React 19, TypeScript, Vite 6, Tailwind CSS 4
-- **Backend:** Firebase (Firestore, Auth, Storage)
-- **Hosting:** Firebase Hosting
-- **CI/CD:** GitHub Actions
+Built by [Simple Step Solutions](https://www.simplestepsolutions.com) for the Hudson Valley Gateway Chamber of Commerce.
 
 ---
 
-## Local Development
+## How It Works
 
-**Prerequisites:** Node.js 20+
+### For Players
 
-1. Clone the repo and install dependencies:
-   ```bash
-   npm install
-   ```
+1. Sign up and pick your town
+2. Get a randomized bingo card — businesses from your town and surrounding areas
+3. Visit a business and complete their task
+4. Scan the QR code or tap the NFC tag at the business to verify your visit
+5. Complete a row, column, or diagonal to get BINGO and claim your prize
+6. Keep going to earn raffle entries
 
-2. Copy the env example and fill in your Firebase config:
-   ```bash
-   cp .env.example .env
-   ```
-   Values are in Firebase Console > Project Settings > Your apps.
+### For Businesses
 
-3. Start the dev server:
-   ```bash
-   npm run dev
-   ```
-   Runs at `http://localhost:3000`.
+Businesses get a QR code to print and display. When a player scans it on-site, the visit is verified and their bingo card updates automatically. Businesses with an NFC-enabled placard can also offer tap-to-verify.
 
-> **Note:** Firebase Storage uploads will fail from localhost unless you apply the CORS config (see below).
+### For the Chamber
+
+The chamber controls everything through an admin panel:
+- Add and manage participating businesses
+- Configure board size, difficulty, and the free space
+- Set bingo prizes and raffle rules
+- Pick raffle winners randomly from eligible entries
+- Broadcast notifications to all players
+- Upload branding (logo, colors) that applies across the app instantly
 
 ---
 
-## Firebase Setup
+## Features
 
-### Storage CORS
+- Randomized bingo boards per player, weighted by town and difficulty setting
+- QR code scanning and NFC tap verification
+- GPS proximity check — players must be at the business to verify
+- Raffle entry system with configurable completion requirements
+- Real-time notifications from the chamber to all players
+- Interactive business map with filtering by town
+- Progressive Web App — installable on iOS and Android, works offline
+- Role-based access: player, business, chamber, admin
+- Branded per chamber — colors, logo, and chamber name are all configurable
 
-Run once to allow uploads from localhost and production:
+---
+
+## Tech
+
+If you want to run this yourself:
+
+**Stack:** React 19 + TypeScript, Vite 6, Tailwind CSS 4, Firebase (Firestore, Auth, Storage), Firebase Hosting
+
+**Requirements:** Node.js 20+, a Firebase project with Firestore, Authentication (Google + Email), and Storage enabled
+
+**Local setup:**
 
 ```bash
-gsutil cors set cors.json gs://sss-hvgcc-bingo.firebasestorage.app
+npm install
+cp .env.example .env
+# Fill in your Firebase config values from Firebase Console > Project Settings
+npm run dev
 ```
 
-If you don't have `gsutil` locally, paste the contents of `cors.json` into Google Cloud Shell at [console.cloud.google.com](https://console.cloud.google.com) and run the command there.
+**Deploy:** Push to `main` — GitHub Actions builds and deploys to Firebase Hosting automatically. See `docs/` for setup details including required secrets, CORS configuration, and custom domain setup.
 
-### Firestore & Storage Rules
-
-Rules are in `firestore.rules` and `storage.rules`. Deploy via Firebase CLI:
-
-```bash
-firebase deploy --only firestore:rules,storage
-```
-
-Or paste them manually in the Firebase Console.
+**Docs:**
+- [Deployment & secrets](docs/updating-icons.md) — icon updates
+- See `firestore.rules` and `storage.rules` for security rules
+- See `.github/workflows/deploy.yml` for the CI/CD pipeline
 
 ---
 
-## Deployment
+## License
 
-Push to `main` and the GitHub Actions workflow deploys automatically to Firebase Hosting.
-
-**Required GitHub Actions secrets** (Settings > Secrets and variables > Actions):
-
-| Secret | Source |
-|---|---|
-| `VITE_FIREBASE_API_KEY` | Firebase Console > Project Settings > Your apps |
-| `VITE_FIREBASE_AUTH_DOMAIN` | same |
-| `VITE_FIREBASE_PROJECT_ID` | same |
-| `VITE_FIREBASE_STORAGE_BUCKET` | same |
-| `VITE_FIREBASE_MESSAGING_SENDER_ID` | same |
-| `VITE_FIREBASE_APP_ID` | same |
-| `VITE_FIREBASE_DATABASE_ID` | same |
-| `FIREBASE_SERVICE_ACCOUNT` | Firebase Console > Project Settings > Service accounts > Generate new private key (paste full JSON) |
-
-The app deploys to `https://sss-hvgcc-bingo.web.app` by default. Custom domain is configured in Firebase Console > Hosting > Add custom domain.
-
----
-
-## PWA Icons
-
-The manifest currently uses `sss-logo.png` as a placeholder. Before launch, generate proper icons:
-
-1. Go to [pwabuilder.com/imageGenerator](https://www.pwabuilder.com/imageGenerator)
-2. Upload the app icon (192x192 and 512x512 PNGs)
-3. Drop them into `public/icons/` as `icon-192.png` and `icon-512.png`
-4. Update the icon paths in `vite.config.ts`
-
----
-
-## Roles
-
-| Role | Access |
-|---|---|
-| `player` | Bingo board, map, raffle |
-| `business` | Player access + business check-in dashboard |
-| `chamber` | Business access + admin panel (chamber manager, game master) |
-| `admin` | Full access including system settings |
-
----
-
-## Project ID
-
-`sss-hvgcc-bingo`
+Private. Built and maintained by [Simple Step Solutions](https://www.simplestepsolutions.com).
