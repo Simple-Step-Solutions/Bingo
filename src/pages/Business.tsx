@@ -13,6 +13,7 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ user }) =>
   const [completions, setCompletions] = useState<Completion[]>([]);
   const [business, setBusiness] = useState<Business | null>(null);
   const [loading, setLoading] = useState(true);
+  const [visitorProfiles, setVisitorProfiles] = useState<Record<string, { displayName?: string; email: string }>>({});
   const printQR = () => {
     const printWindow = window.open('', '_blank');
     if (!printWindow || !business) return;
@@ -91,8 +92,22 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ user }) =>
   useEffect(() => {
     if (business) {
       const q = query(collection(db, 'completions'), where('businessId', '==', business.id));
-      const unsubscribe = onSnapshot(q, (snapshot) => {
-        setCompletions(snapshot.docs.map(doc => doc.data() as Completion));
+      const unsubscribe = onSnapshot(q, async (snapshot) => {
+        const comps = snapshot.docs.map(d => d.data() as Completion);
+        setCompletions(comps);
+        // Fetch visitor profiles
+        const uniqueIds = [...new Set(comps.map(c => c.userId))];
+        const profiles: Record<string, { displayName?: string; email: string }> = {};
+        await Promise.all(uniqueIds.map(async uid => {
+          try {
+            const userDoc = await getDoc(doc(db, 'users', uid));
+            if (userDoc.exists()) {
+              const data = userDoc.data();
+              profiles[uid] = { displayName: data.displayName, email: data.email };
+            }
+          } catch {}
+        }));
+        setVisitorProfiles(profiles);
       });
       return () => unsubscribe();
     }
@@ -173,7 +188,7 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ user }) =>
                       <CheckCircle2 size={20} />
                     </div>
                     <div>
-                      <p className="font-bold text-sm">Visitor #{c.userId.slice(-4).toUpperCase()}</p>
+                      <p className="font-bold text-sm">{visitorProfiles[c.userId]?.displayName || visitorProfiles[c.userId]?.email || `Visitor #${c.userId.slice(-4).toUpperCase()}`}</p>
                       <p className="text-[10px] text-neutral-400 uppercase tracking-widest font-bold">
                         {new Date(c.timestamp).toLocaleString()}
                       </p>

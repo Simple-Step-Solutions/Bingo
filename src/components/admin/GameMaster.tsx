@@ -97,6 +97,26 @@ export const GameMaster: React.FC<GameMasterProps> = ({ settings, user }) => {
             </p>
           </div>
 
+          <div className="pt-6 border-t border-neutral-100">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <label className="block text-[10px] text-neutral-400 uppercase tracking-widest font-bold">Pause Game</label>
+                  {settings.gamePaused && (
+                    <span className="px-2 py-0.5 bg-red-100 text-red-600 rounded-full text-[9px] font-black uppercase tracking-widest">Paused</span>
+                  )}
+                </div>
+                <p className="text-[10px] text-neutral-400 italic">Temporarily freeze all visit verifications. Players can still view their boards.</p>
+              </div>
+              <button
+                onClick={() => updateSettings('gamePaused', !settings.gamePaused)}
+                className={`flex items-center gap-2 transition-colors ${settings.gamePaused ? 'text-red-500' : 'text-neutral-300'}`}
+              >
+                {settings.gamePaused ? <ToggleRight size={32} /> : <ToggleLeft size={32} />}
+              </button>
+            </div>
+          </div>
+
           {user.role === 'admin' && (
             <div className="pt-6 border-t border-neutral-100">
               <div className="flex items-center justify-between">

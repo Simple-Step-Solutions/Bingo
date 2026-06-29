@@ -99,6 +99,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, towns, s
     setVerifying(true);
     setError(null);
     try {
+      if (settings?.gamePaused) {
+        setError('The game is currently paused by the Chamber. Please try again later.');
+        setVerifying(false);
+        return;
+      }
       const biz = businesses.find(b => b.qrCode === code || b.nfcId === code);
       if (!biz) { setError('Invalid code. Please try again.'); stopScanning(); return; }
 
@@ -262,6 +267,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, towns, s
 
   return (
     <div className="flex flex-col max-w-4xl mx-auto" style={{ height: 'calc(100dvh - 6rem)', overflow: 'hidden', marginTop: '-2rem', marginBottom: '-2rem', paddingTop: '0.75rem' }}>
+
+      {settings?.gamePaused && (
+        <div className="fixed top-16 md:top-20 inset-x-0 z-20 bg-red-500 text-white text-center py-2 px-4">
+          <p className="text-[10px] font-black uppercase tracking-widest">Game Paused -- Visit verification is temporarily disabled</p>
+        </div>
+      )}
 
       {/* Header */}
       <div className="flex justify-between items-center gap-3 mb-2 md:mb-10 shrink-0">

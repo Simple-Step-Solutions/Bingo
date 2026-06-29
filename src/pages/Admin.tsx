@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { UserProfile, Business, Town, RaffleEntry, AppSettings, Completion, Winner } from '../types';
+import { UserProfile, Business, Town, RaffleEntry, AppSettings, Completion, Winner, AuditLog } from '../types';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
-import { UserIcon, ShieldCheck, Gamepad2, Settings as SettingsIcon, Loader2, BarChart3 } from 'lucide-react';
+import { UserIcon, ShieldCheck, Gamepad2, Settings as SettingsIcon, Loader2, BarChart3, Clock } from 'lucide-react';
 import { AdminMenu } from '../components/admin/AdminMenu';
 import { GameMaster } from '../components/admin/GameMaster';
 import { ChamberManager } from '../components/admin/ChamberManager';
 import { Analytics } from '../components/admin/Analytics';
+import { AuditLogViewer } from '../components/admin/AuditLogViewer';
 
 interface AdminProps {
   user: UserProfile;
@@ -16,11 +17,12 @@ interface AdminProps {
 }
 
 export const Admin: React.FC<AdminProps> = ({ user, businesses, towns, settings }) => {
-  const [activeTab, setActiveTab] = useState<'admin' | 'master' | 'chamber' | 'analytics'>(user.role === 'admin' ? 'admin' : 'chamber');
+  const [activeTab, setActiveTab] = useState<'admin' | 'master' | 'chamber' | 'analytics' | 'audit'>(user.role === 'admin' ? 'admin' : 'chamber');
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [raffleEntries, setRaffleEntries] = useState<RaffleEntry[]>([]);
   const [winners, setWinners] = useState<Winner[]>([]);
   const [completions, setCompletions] = useState<Completion[]>([]);
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -46,11 +48,16 @@ export const Admin: React.FC<AdminProps> = ({ user, businesses, towns, settings 
       setLoading(false);
     });
 
+    const unsubscribeAudit = onSnapshot(collection(db, 'audit_log'), (snapshot) => {
+      setAuditLogs(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as AuditLog)));
+    }, (err) => console.error('Audit log snapshot error:', err));
+
     return () => {
       unsubscribeUsers();
       unsubscribeRaffle();
       unsubscribeWinners();
       unsubscribeCompletions();
+      unsubscribeAudit();
     };
   }, [user]);
 
@@ -67,7 +74,7 @@ export const Admin: React.FC<AdminProps> = ({ user, businesses, towns, settings 
           <h2 className="font-serif italic text-5xl mb-2">Admin Panel</h2>
           <p className="text-xs text-neutral-400 uppercase tracking-[0.2em] font-bold">System Management & Oversight</p>
         </div>
-        
+
         <div className="flex bg-neutral-100 p-1.5 rounded-2xl overflow-x-auto w-full md:w-auto shadow-inner gap-1">
           {user.role === 'admin' && (
             <button
@@ -102,22 +109,28 @@ export const Admin: React.FC<AdminProps> = ({ user, businesses, towns, settings 
             <BarChart3 size={14} />
             <span>Analytics</span>
           </button>
+          <button
+            onClick={() => setActiveTab('audit')}
+            className={`flex items-center gap-2 px-4 md:px-5 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all whitespace-nowrap shrink-0 ${activeTab === 'audit' ? 'bg-white shadow-md text-neutral-900' : 'text-neutral-400 hover:text-neutral-600'}`}
+          >
+            <Clock size={14} />
+            <span>Audit</span>
+          </button>
         </div>
       </div>
 
       <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-        {activeTab === 'admin' && user.role === 'admin' && <AdminMenu users={users} businesses={businesses} />}
-        {activeTab === 'master' && settings && <GameMaster settings={settings} user={user} />}
-        {activeTab === 'chamber' && settings && <ChamberManager businesses={businesses} towns={towns} raffleEntries={raffleEntries} winners={winners} settings={settings} />}
-        {activeTab === 'analytics' && settings && (
-          <Analytics 
-            users={users} 
-            completions={completions} 
-            businesses={businesses} 
-            settings={settings}
-            currentUser={user}
-          />
+        {activeTab === 'admin' && user.role === 'admin' && (
+          <AdminMenu users={users} businesses={businesses} currentUser={user} settings={settings!} />
         )}
+        {activeTab === 'master' && settings && <GameMaster settings={settings} user={user} />}
+        {activeTab === 'chamber' && settings && (
+          <ChamberManager businesses={businesses} towns={towns} raffleEntries={raffleEntries} winners={winners} settings={settings} />
+        )}
+        {activeTab === 'analytics' && settings && (
+          <Analytics users={users} completions={completions} businesses={businesses} settings={settings} currentUser={user} />
+        )}
+        {activeTab === 'audit' && <AuditLogViewer logs={auditLogs} />}
       </div>
     </div>
   );

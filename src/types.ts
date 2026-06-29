@@ -52,6 +52,18 @@ export interface AppSettings {
   accentColor?: string;
   chamberName?: string;
   chamberLogoUrl?: string;
+  gamePaused?: boolean;
+}
+
+export interface AuditLog {
+  id: string;
+  actorUid: string;
+  actorEmail: string;
+  action: string;
+  targetUid: string;
+  targetEmail?: string;
+  details: Record<string, any>;
+  timestamp: string;
 }
 
 export interface Notification {

@@ -1,57 +1,75 @@
 import React, { useState, useMemo } from 'react';
-import { UserProfile, Business } from '../../types';
+import { UserProfile, Business, AppSettings } from '../../types';
 import { doc, setDoc, collection, query, where, getDocs, deleteDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
-import { RefreshCw, Trash2, RotateCcw, UserMinus, Gamepad2, MapPin, Store, Search, ChevronLeft, ChevronRight } from 'lucide-react';
+import { RefreshCw, Trash2, RotateCcw, UserMinus, Gamepad2, MapPin, Store, Search, ChevronLeft, ChevronRight, LayoutGrid } from 'lucide-react';
+import { BoardImpersonation } from './BoardImpersonation';
+import { logAudit } from '../../services/auditService';
 
 const USER_PAGE_SIZE = 25;
 
 interface AdminMenuProps {
   users: UserProfile[];
   businesses: Business[];
+  currentUser: UserProfile;
+  settings: AppSettings;
 }
 
-export const AdminMenu: React.FC<AdminMenuProps> = ({ users, businesses }) => {
+export const AdminMenu: React.FC<AdminMenuProps> = ({ users, businesses, currentUser, settings }) => {
   const [confirmAction, setConfirmAction] = useState<{ uid: string; type: string } | null>(null);
   const [userSearch, setUserSearch] = useState('');
   const [userPage, setUserPage] = useState(0);
+  const [roleFilter, setRoleFilter] = useState('');
+  const [impersonating, setImpersonating] = useState<UserProfile | null>(null);
 
   const filteredUsers = useMemo(() => {
     const q = userSearch.toLowerCase().trim();
-    if (!q) return users;
-    return users.filter(u =>
+    let result = users;
+    if (roleFilter) {
+      result = result.filter(u => u.role === roleFilter);
+    }
+    if (!q) return result;
+    return result.filter(u =>
       (u.displayName || '').toLowerCase().includes(q) ||
       (u.email || '').toLowerCase().includes(q) ||
       (u.town || '').toLowerCase().includes(q) ||
       (u.role || '').toLowerCase().includes(q)
     );
-  }, [users, userSearch]);
+  }, [users, userSearch, roleFilter]);
 
   const userPageCount = Math.ceil(filteredUsers.length / USER_PAGE_SIZE);
   const pagedUsers = filteredUsers.slice(userPage * USER_PAGE_SIZE, (userPage + 1) * USER_PAGE_SIZE);
 
-  const updateUserRole = async (uid: string, role: string) => {
+  const updateUserRole = async (u: UserProfile, role: string) => {
     const updates: any = { role };
     if (role !== 'business') {
       updates.businessId = null;
     }
-    await setDoc(doc(db, 'users', uid), updates, { merge: true });
+    await setDoc(doc(db, 'users', u.uid), updates, { merge: true });
+    await logAudit(
+      currentUser.uid,
+      currentUser.email,
+      'change_role',
+      u.uid,
+      u.email,
+      { previousRole: u.role, newRole: role }
+    );
   };
 
   const updateBusinessId = async (uid: string, businessId: string) => {
     await setDoc(doc(db, 'users', uid), { businessId }, { merge: true });
   };
 
-  const handleReset = async (uid: string, type: 'town' | 'progress' | 'board' | 'everything') => {
-    if (confirmAction?.uid !== uid || confirmAction?.type !== type) {
-      setConfirmAction({ uid, type });
+  const handleReset = async (u: UserProfile, type: 'town' | 'progress' | 'board' | 'everything') => {
+    if (confirmAction?.uid !== u.uid || confirmAction?.type !== type) {
+      setConfirmAction({ uid: u.uid, type });
       setTimeout(() => setConfirmAction(null), 3000);
       return;
     }
 
     try {
       if (type === 'progress' || type === 'everything') {
-        const q = query(collection(db, 'completions'), where('userId', '==', uid));
+        const q = query(collection(db, 'completions'), where('userId', '==', u.uid));
         const snapshot = await getDocs(q);
         const deletes = snapshot.docs.map(d => deleteDoc(doc(db, 'completions', d.id)));
         await Promise.all(deletes);
@@ -65,43 +83,39 @@ export const AdminMenu: React.FC<AdminMenuProps> = ({ users, businesses }) => {
         if (type === 'town' || type === 'everything') {
           updates.town = '';
         }
-        await setDoc(doc(db, 'users', uid), updates, { merge: true });
+        await setDoc(doc(db, 'users', u.uid), updates, { merge: true });
       }
+
+      await logAudit(
+        currentUser.uid,
+        currentUser.email,
+        `reset_${type}`,
+        u.uid,
+        u.email,
+        { resetType: type }
+      );
     } catch (err) {
       console.error('Error resetting user:', err);
     }
-    
-    setConfirmAction(null);
-  };
 
-  const resetAllUsers = async () => {
-    if (!window.confirm("Are you sure you want to reset EVERYTHING for ALL users? This cannot be undone.")) return;
-    
-    // This is a heavy operation, but for a small user base it's fine.
-    // In production, you'd use a cloud function or batching.
-    for (const user of users) {
-      await handleReset(user.uid, 'everything'); // Note: this will trigger confirmation logic if not careful
-      // Wait, handleReset has confirmation logic. Let's make a direct version.
-    }
+    setConfirmAction(null);
   };
 
   const performGlobalReset = async () => {
     if (!window.confirm("DANGER: This will reset town, board, and progress for ALL users. Continue?")) return;
-    
+
     try {
-      // Reset all users' profiles
-      const userPromises = users.map(u => 
-        setDoc(doc(db, 'users', u.uid), { 
-          town: '', 
-          bingoBoard: [], 
-          boardSize: 0 
+      const userPromises = users.map(u =>
+        setDoc(doc(db, 'users', u.uid), {
+          town: '',
+          bingoBoard: [],
+          boardSize: 0
         }, { merge: true })
       );
-      
-      // Reset all completions
+
       const completionsSnapshot = await getDocs(collection(db, 'completions'));
       const completionDeletes = completionsSnapshot.docs.map(d => deleteDoc(doc(db, 'completions', d.id)));
-      
+
       await Promise.all([...userPromises, ...completionDeletes]);
       alert("System-wide reset complete.");
     } catch (err) {
@@ -109,6 +123,14 @@ export const AdminMenu: React.FC<AdminMenuProps> = ({ users, businesses }) => {
       alert("Error during global reset.");
     }
   };
+
+  const rolePills = [
+    { label: 'All', value: '' },
+    { label: 'Player', value: 'player' },
+    { label: 'Business', value: 'business' },
+    { label: 'Chamber', value: 'chamber' },
+    { label: 'Admin', value: 'admin' },
+  ];
 
   return (
     <div className="space-y-6">
@@ -121,6 +143,23 @@ export const AdminMenu: React.FC<AdminMenuProps> = ({ users, businesses }) => {
           >
             <RotateCcw size={12} /> Reset All Users
           </button>
+        </div>
+
+        {/* Role filter pills */}
+        <div className="flex flex-wrap gap-2 mb-4">
+          {rolePills.map(pill => (
+            <button
+              key={pill.value}
+              onClick={() => { setRoleFilter(pill.value); setUserPage(0); }}
+              className={`px-3 py-1.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all ${
+                roleFilter === pill.value
+                  ? 'bg-neutral-900 text-white'
+                  : 'bg-white border border-neutral-200 text-neutral-400 hover:text-neutral-700'
+              }`}
+            >
+              {pill.label}
+            </button>
+          ))}
         </div>
 
         <div className="flex items-center gap-3 bg-neutral-50 border border-neutral-100 rounded-2xl px-4 py-3 mb-6">
@@ -153,8 +192,18 @@ export const AdminMenu: React.FC<AdminMenuProps> = ({ users, businesses }) => {
               </div>
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-2 border-r border-neutral-100 pr-4 mr-2">
-                  <button 
-                    onClick={() => handleReset(u.uid, 'town')}
+                  {u.bingoBoard?.length && u.town ? (
+                    <button
+                      onClick={() => setImpersonating(u)}
+                      className="text-[10px] font-bold uppercase tracking-widest transition-colors flex items-center gap-1 text-neutral-400 hover:text-neutral-900"
+                      title="View / Edit Board"
+                    >
+                      <LayoutGrid size={10} />
+                      Board
+                    </button>
+                  ) : null}
+                  <button
+                    onClick={() => handleReset(u, 'town')}
                     className={`text-[10px] font-bold uppercase tracking-widest transition-colors flex items-center gap-1 ${
                       confirmAction?.uid === u.uid && confirmAction?.type === 'town' ? 'text-red-600' : 'text-neutral-400 hover:text-neutral-900'
                     }`}
@@ -163,8 +212,8 @@ export const AdminMenu: React.FC<AdminMenuProps> = ({ users, businesses }) => {
                     <MapPin size={10} />
                     {confirmAction?.uid === u.uid && confirmAction?.type === 'town' ? 'Confirm Reset Town?' : 'Town'}
                   </button>
-                  <button 
-                    onClick={() => handleReset(u.uid, 'progress')}
+                  <button
+                    onClick={() => handleReset(u, 'progress')}
                     className={`text-[10px] font-bold uppercase tracking-widest transition-colors flex items-center gap-1 ${
                       confirmAction?.uid === u.uid && confirmAction?.type === 'progress' ? 'text-red-600' : 'text-neutral-400 hover:text-neutral-900'
                     }`}
@@ -173,8 +222,8 @@ export const AdminMenu: React.FC<AdminMenuProps> = ({ users, businesses }) => {
                     <RefreshCw size={10} className={confirmAction?.uid === u.uid && confirmAction?.type === 'progress' ? 'animate-spin' : ''} />
                     {confirmAction?.uid === u.uid && confirmAction?.type === 'progress' ? 'Confirm?' : 'Progress'}
                   </button>
-                  <button 
-                    onClick={() => handleReset(u.uid, 'board')}
+                  <button
+                    onClick={() => handleReset(u, 'board')}
                     className={`text-[10px] font-bold uppercase tracking-widest transition-colors flex items-center gap-1 ${
                       confirmAction?.uid === u.uid && confirmAction?.type === 'board' ? 'text-red-600' : 'text-neutral-400 hover:text-neutral-900'
                     }`}
@@ -183,8 +232,8 @@ export const AdminMenu: React.FC<AdminMenuProps> = ({ users, businesses }) => {
                     <Gamepad2 size={10} />
                     {confirmAction?.uid === u.uid && confirmAction?.type === 'board' ? 'Confirm?' : 'Board'}
                   </button>
-                  <button 
-                    onClick={() => handleReset(u.uid, 'everything')}
+                  <button
+                    onClick={() => handleReset(u, 'everything')}
                     className={`text-[10px] font-bold uppercase tracking-widest transition-colors flex items-center gap-1 ${
                       confirmAction?.uid === u.uid && confirmAction?.type === 'everything' ? 'text-red-600' : 'text-neutral-400 hover:text-red-500'
                     }`}
@@ -196,17 +245,17 @@ export const AdminMenu: React.FC<AdminMenuProps> = ({ users, businesses }) => {
                 </div>
 
                 <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest ${
-                  u.role === 'admin' ? 'bg-red-50 text-red-600' : 
-                  u.role === 'chamber' ? 'bg-blue-50 text-blue-600' : 
+                  u.role === 'admin' ? 'bg-red-50 text-red-600' :
+                  u.role === 'chamber' ? 'bg-blue-50 text-blue-600' :
                   u.role === 'business' ? 'bg-orange-50 text-orange-600' :
                   'bg-neutral-100 text-neutral-600'
                 }`}>
                   {u.role}
                 </span>
                 <div className="flex flex-col gap-2">
-                  <select 
+                  <select
                     value={u.role}
-                    onChange={(e) => updateUserRole(u.uid, e.target.value as any)}
+                    onChange={(e) => updateUserRole(u, e.target.value as any)}
                     className="text-xs border border-neutral-200 p-3 rounded-xl bg-neutral-50 font-bold outline-none focus:ring-2 focus:ring-neutral-900 transition-all"
                   >
                     <option value="player">Player</option>
@@ -214,9 +263,9 @@ export const AdminMenu: React.FC<AdminMenuProps> = ({ users, businesses }) => {
                     <option value="chamber">Chamber Manager</option>
                     <option value="admin">System Admin</option>
                   </select>
-                  
+
                   {u.role === 'business' && (
-                    <select 
+                    <select
                       value={u.businessId || ''}
                       onChange={(e) => updateBusinessId(u.uid, e.target.value)}
                       className="text-[10px] border border-neutral-200 p-2 rounded-lg bg-white font-bold outline-none focus:ring-2 focus:ring-neutral-900 transition-all"
@@ -255,6 +304,16 @@ export const AdminMenu: React.FC<AdminMenuProps> = ({ users, businesses }) => {
           </div>
         )}
       </div>
+
+      {impersonating && (
+        <BoardImpersonation
+          targetUser={impersonating}
+          actingUser={currentUser}
+          businesses={businesses}
+          settings={settings}
+          onClose={() => setImpersonating(null)}
+        />
+      )}
     </div>
   );
 };
