@@ -114,7 +114,7 @@ export interface Activity {
 export interface Invite {
   id: string;
   token: string;
-  role: 'chamber' | 'business';
+  role: 'player' | 'chamber' | 'business';
   businessId?: string;
   businessName?: string;
   emailHint?: string;

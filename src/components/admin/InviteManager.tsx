@@ -11,7 +11,7 @@ interface InviteManagerProps {
 }
 
 export const InviteManager: React.FC<InviteManagerProps> = ({ businesses, currentUser }) => {
-  const [role, setRole] = useState<'chamber' | 'business'>('chamber');
+  const [role, setRole] = useState<'chamber' | 'business' | 'player'>('player');
   const [businessId, setBusinessId] = useState('');
   const [emailHint, setEmailHint] = useState('');
   const [loading, setLoading] = useState(false);
@@ -71,6 +71,7 @@ export const InviteManager: React.FC<InviteManagerProps> = ({ businesses, curren
   };
 
   const roleStyles: Record<string, string> = {
+    player: 'bg-neutral-100 text-neutral-600',
     chamber: 'bg-blue-50 text-blue-700',
     business: 'bg-orange-50 text-orange-700',
   };
@@ -89,9 +90,10 @@ export const InviteManager: React.FC<InviteManagerProps> = ({ businesses, curren
           <label className="block text-[10px] font-bold uppercase tracking-widest text-neutral-400 mb-2">Role</label>
           <select
             value={role}
-            onChange={e => { setRole(e.target.value as 'chamber' | 'business'); setBusinessId(''); }}
+            onChange={e => { setRole(e.target.value as 'chamber' | 'business' | 'player'); setBusinessId(''); }}
             className="w-full border border-neutral-200 rounded-xl px-4 py-3 text-sm font-medium bg-neutral-50 outline-none focus:ring-2 focus:ring-neutral-900 transition-all"
           >
+            <option value="player">Player</option>
             <option value="chamber">Chamber Staff</option>
             <option value="business">Business Owner</option>
           </select>
@@ -163,7 +165,7 @@ export const InviteManager: React.FC<InviteManagerProps> = ({ businesses, curren
                 <div key={invite.id} className="flex items-start justify-between gap-3 p-3 bg-neutral-50 rounded-2xl">
                   <div className="flex flex-wrap items-center gap-2 min-w-0">
                     <span className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-widest shrink-0 ${roleStyles[invite.role]}`}>
-                      {invite.role === 'chamber' ? 'Chamber' : 'Business'}
+                      {invite.role === 'chamber' ? 'Chamber' : invite.role === 'business' ? 'Business' : 'Player'}
                     </span>
                     {invite.businessName && (
                       <span className="text-[10px] text-neutral-500 font-medium truncate">{invite.businessName}</span>

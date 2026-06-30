@@ -189,19 +189,17 @@ export const Analytics: React.FC<AnalyticsProps> = ({ users, completions, busine
           </div>
         </div>
 
-        {isAdmin && (
-          <div className="bg-white border border-neutral-200 p-5 rounded-3xl shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className="bg-purple-50 p-3 rounded-2xl">
-                <ActivityIcon className="text-purple-600" size={20} />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-neutral-900 leading-none">{activePlayers.length}</p>
-                <p className="text-[10px] text-neutral-400 uppercase tracking-widest font-bold">Active Now</p>
-              </div>
+        <div className="bg-white border border-neutral-200 p-5 rounded-3xl shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="bg-purple-50 p-3 rounded-2xl">
+              <ActivityIcon className="text-purple-600" size={20} />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-neutral-900 leading-none">{activePlayers.length}</p>
+              <p className="text-[10px] text-neutral-400 uppercase tracking-widest font-bold">Active Now</p>
             </div>
           </div>
-        )}
+        </div>
       </div>
 
       {/* Real-time Map */}
@@ -307,8 +305,7 @@ export const Analytics: React.FC<AnalyticsProps> = ({ users, completions, busine
         </div>
 
         {/* Category Insights */}
-        {isAdmin && (
-          <div className="bg-white border border-neutral-200 p-5 rounded-3xl shadow-sm">
+        <div className="bg-white border border-neutral-200 p-5 rounded-3xl shadow-sm">
             <div className="flex items-center gap-3 mb-8">
               <div className="bg-neutral-100 p-2 rounded-xl">
                 <ShoppingBag className="text-neutral-900" size={20} />
@@ -333,7 +330,6 @@ export const Analytics: React.FC<AnalyticsProps> = ({ users, completions, busine
               ))}
             </div>
           </div>
-        )}
 
         {/* Top Businesses */}
         <div className="bg-white border border-neutral-200 p-5 rounded-3xl shadow-sm">
@@ -395,8 +391,7 @@ export const Analytics: React.FC<AnalyticsProps> = ({ users, completions, busine
         </div>
 
         {/* User Behavior Insights */}
-        {isAdmin && (
-          <div className="bg-neutral-900 text-white p-8 rounded-3xl shadow-xl">
+        <div className="bg-neutral-900 text-white p-8 rounded-3xl shadow-xl">
             <div className="flex items-center gap-3 mb-8">
               <div className="bg-white/10 p-2 rounded-xl">
                 <Clock className="text-white" size={20} />
@@ -433,7 +428,6 @@ export const Analytics: React.FC<AnalyticsProps> = ({ users, completions, busine
               </div>
             </div>
           </div>
-        )}
       </div>
     </div>
   );

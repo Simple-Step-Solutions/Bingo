@@ -178,7 +178,7 @@ export const AdminMenu: React.FC<AdminMenuProps> = ({ users, businesses, current
             className="flex-1 bg-transparent text-sm outline-none font-medium placeholder:text-neutral-300"
           />
           <span className="text-[10px] text-neutral-400 font-bold uppercase tracking-widest shrink-0">
-            {filteredUsers.length} of {users.length}
+            {filteredUsers.length} of {isAdmin ? users.length : users.filter(u => u.role !== 'admin').length}
           </span>
         </div>
 

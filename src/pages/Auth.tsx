@@ -264,24 +264,14 @@ export const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
 
                 <div className="space-y-4">
                   <button
-                    onClick={signInWithGoogle}
-                    disabled={loading}
-                    className="w-full bg-white border border-neutral-200 text-neutral-900 py-5 rounded-2xl font-bold text-sm hover:border-neutral-900 transition-all shadow-sm flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50"
+                    onClick={() => setAuthMode('email-signin')}
+                    className="w-full bg-neutral-900 text-white py-5 rounded-2xl font-bold text-sm transition-all shadow-lg flex items-center justify-center gap-3 active:scale-95"
                   >
-                    <img src="https://www.google.com/favicon.ico" alt="Google" className="w-5 h-5" />
-                    Continue with Google
+                    <Mail size={18} />
+                    Continue with Email
                   </button>
 
-                  <button
-                    onClick={signInWithMicrosoft}
-                    disabled={loading}
-                    className="w-full bg-white border border-neutral-200 text-neutral-900 py-5 rounded-2xl font-bold text-sm hover:border-neutral-900 transition-all shadow-sm flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50"
-                  >
-                    <img src="https://www.microsoft.com/favicon.ico" alt="Microsoft" className="w-5 h-5" />
-                    Continue with Microsoft
-                  </button>
-
-                  <div className="relative py-4">
+                  <div className="relative py-2">
                     <div className="absolute inset-0 flex items-center">
                       <div className="w-full border-t border-neutral-100"></div>
                     </div>
@@ -291,11 +281,12 @@ export const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
                   </div>
 
                   <button
-                    onClick={() => setAuthMode('email-signin')}
-                    className="w-full bg-[var(--color-primary)] text-white py-5 rounded-2xl font-bold text-sm hover:bg-[var(--color-primary)] transition-all shadow-lg flex items-center justify-center gap-3 active:scale-95"
+                    onClick={signInWithGoogle}
+                    disabled={loading}
+                    className="w-full bg-white border border-neutral-200 text-neutral-600 py-4 rounded-2xl font-bold text-sm hover:border-neutral-400 transition-all shadow-sm flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50"
                   >
-                    <Mail size={18} />
-                    Continue with Email
+                    <img src="https://www.google.com/favicon.ico" alt="Google" className="w-4 h-4" />
+                    Continue with Google
                   </button>
                 </div>
               </motion.div>

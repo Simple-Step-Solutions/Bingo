@@ -8,7 +8,7 @@ const generateToken = () => {
 
 export const createInvite = async (
   createdBy: string,
-  role: 'chamber' | 'business',
+  role: 'player' | 'chamber' | 'business',
   businessId?: string,
   businessName?: string,
   emailHint?: string
