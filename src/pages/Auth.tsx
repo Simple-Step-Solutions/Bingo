@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   signInWithPopup,
   GoogleAuthProvider,
@@ -10,7 +10,7 @@ import {
   sendEmailVerification
 } from 'firebase/auth';
 import { auth } from '../firebase';
-import { ShieldCheck, Gamepad2, Store, LayoutGrid, Loader2, Mail, Lock, User, ChevronRight, ArrowLeft } from 'lucide-react';
+import { ShieldCheck, Gamepad2, Store, LayoutGrid, Loader2, Mail, Lock, User, ChevronRight, ArrowLeft, Link2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface AuthProps {
@@ -22,11 +22,25 @@ export const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
   const [error, setError] = useState<string | null>(null);
   const [authMode, setAuthMode] = useState<'social' | 'email-signin' | 'email-signup' | 'forgot-password' | 'verify-email'>('social');
   const [resetSent, setResetSent] = useState(false);
-  
+  const [inviteToken, setInviteToken] = useState<string | null>(null);
+
   // Email/Password state
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
+
+  useEffect(() => {
+    // Check URL for invite token
+    const urlToken = new URLSearchParams(window.location.search).get('invite');
+    if (urlToken) {
+      localStorage.setItem('pendingInvite', urlToken);
+      setInviteToken(urlToken);
+    } else {
+      // Check localStorage in case they already had a pending invite (e.g. after OAuth redirect)
+      const stored = localStorage.getItem('pendingInvite');
+      if (stored) setInviteToken(stored);
+    }
+  }, []);
 
   const signInWithGoogle = async () => {
     setLoading(true);
@@ -122,6 +136,17 @@ export const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
         </div>
 
         <div className="bg-white rounded-[3rem] p-8 shadow-xl border border-neutral-100">
+          {inviteToken && (
+            <div className="bg-[var(--color-primary)]/10 border border-[var(--color-primary)]/20 rounded-2xl p-4 mb-6 flex items-center gap-3">
+              <div className="w-8 h-8 bg-[var(--color-primary)] rounded-xl flex items-center justify-center shrink-0">
+                <Link2 className="text-white" size={14} />
+              </div>
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-widest text-[var(--color-primary)]">You've been invited</p>
+                <p className="text-xs text-neutral-600 mt-0.5">Sign in or create an account to accept your invitation.</p>
+              </div>
+            </div>
+          )}
           <AnimatePresence mode="wait">
             {authMode === 'verify-email' ? (
               <motion.div

@@ -163,5 +163,19 @@ service cloud.firestore {
       allow read: if isChamber();
       allow create: if isChamber();
     }
+
+    // ===============================================================
+    // Invites
+    // Chamber can create and list invites.
+    // Any authenticated user can read (to validate token on redemption).
+    // Any authenticated user can update (to mark as used).
+    // ===============================================================
+
+    match /invites/{inviteId} {
+      allow read: if isAuthenticated();
+      allow create: if isChamber();
+      allow update: if isAuthenticated();
+      allow list: if isChamber();
+    }
   }
 }

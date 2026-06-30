@@ -4,6 +4,7 @@ import { doc, setDoc, collection, query, where, getDocs, deleteDoc } from 'fireb
 import { db } from '../../firebase';
 import { RefreshCw, Trash2, RotateCcw, UserMinus, Gamepad2, MapPin, Store, Search, ChevronLeft, ChevronRight, LayoutGrid } from 'lucide-react';
 import { BoardImpersonation } from './BoardImpersonation';
+import { InviteManager } from './InviteManager';
 import { logAudit } from '../../services/auditService';
 
 const USER_PAGE_SIZE = 25;
@@ -314,6 +315,8 @@ export const AdminMenu: React.FC<AdminMenuProps> = ({ users, businesses, current
           onClose={() => setImpersonating(null)}
         />
       )}
+
+      <InviteManager businesses={businesses} currentUser={currentUser} />
     </div>
   );
 };

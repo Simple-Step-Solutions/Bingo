@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, collection, onSnapshot, setDoc } from 'firebase/firestore';
 import { auth, db } from './firebase';
 import { UserProfile, AppSettings, Business, Town } from './types';
+import { getInviteByToken, markInviteUsed } from './services/inviteService';
 
 // Pages
 import { Dashboard } from './pages/Dashboard';
@@ -32,6 +33,7 @@ function App() {
   const [businesses, setBusinesses] = useState<Business[]>([]);
   const [towns, setTowns] = useState<Town[]>([]);
   const [loading, setLoading] = useState(true);
+  const inviteProcessed = useRef(false);
   useEffect(() => {
     const primary = settings?.primaryColor || DEFAULT_PRIMARY;
     const accent = settings?.accentColor || DEFAULT_ACCENT;
@@ -54,6 +56,7 @@ function App() {
 
     const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser) => {
       cleanupListeners();
+      inviteProcessed.current = false;
 
       if (firebaseUser) {
         setLoading(true);
@@ -65,12 +68,34 @@ function App() {
           if (profileReady && settingsReady) setLoading(false);
         };
 
+        const processPendingInvite = async () => {
+          if (inviteProcessed.current) return;
+          const token = localStorage.getItem('pendingInvite');
+          if (!token) return;
+          inviteProcessed.current = true;
+          try {
+            const invite = await getInviteByToken(token);
+            if (invite && !invite.used && new Date(invite.expiresAt) > new Date()) {
+              const updates: Record<string, any> = { role: invite.role };
+              if (invite.businessId) updates.businessId = invite.businessId;
+              if (invite.role === 'business') updates.onboardingComplete = true;
+              await setDoc(doc(db, 'users', firebaseUser.uid), updates, { merge: true });
+              await markInviteUsed(invite.id, firebaseUser.uid);
+            }
+          } catch (err) {
+            console.error('Error processing invite:', err);
+          } finally {
+            localStorage.removeItem('pendingInvite');
+          }
+        };
+
         unsubscribeProfile = onSnapshot(doc(db, 'users', firebaseUser.uid), async (docSnap) => {
           if (docSnap.exists()) {
             setUser(docSnap.data() as UserProfile);
             if (!profileReady) {
               profileReady = true;
               checkReady();
+              processPendingInvite();
             }
           } else if (!profileReady) {
             // New user -- create profile, then wait for the next snapshot fire

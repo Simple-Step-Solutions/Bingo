@@ -110,3 +110,18 @@ export interface Activity {
   timestamp: string;
   metadata?: Record<string, any>;
 }
+
+export interface Invite {
+  id: string;
+  token: string;
+  role: 'chamber' | 'business';
+  businessId?: string;
+  businessName?: string;
+  emailHint?: string;
+  createdBy: string;
+  createdAt: string;
+  expiresAt: string;
+  used: boolean;
+  usedBy?: string;
+  usedAt?: string;
+}
