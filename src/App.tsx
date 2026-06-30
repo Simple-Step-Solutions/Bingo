@@ -22,6 +22,7 @@ import { LocationTracker } from './components/LocationTracker';
 import { trackActivity } from './services/activityService';
 import { SetupWizard, SetupPending } from './components/SetupWizard';
 import { InstallPrompt } from './components/InstallPrompt';
+import { UpdateBanner } from './components/UpdateBanner';
 
 const DEFAULT_PRIMARY = '#1695B2';
 const DEFAULT_ACCENT = '#CC5500';
@@ -216,6 +217,7 @@ function App() {
           </div>
         </footer>
         <InstallPrompt />
+        <UpdateBanner />
       </div>
     </Router>
   );
