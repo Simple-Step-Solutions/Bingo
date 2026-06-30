@@ -23,9 +23,12 @@ export const AdminMenu: React.FC<AdminMenuProps> = ({ users, businesses, current
   const [roleFilter, setRoleFilter] = useState('');
   const [impersonating, setImpersonating] = useState<UserProfile | null>(null);
 
+  const isAdmin = currentUser.role === 'admin';
+
   const filteredUsers = useMemo(() => {
     const q = userSearch.toLowerCase().trim();
-    let result = users;
+    // Chamber users cannot see or manage admin accounts
+    let result = isAdmin ? users : users.filter(u => u.role !== 'admin');
     if (roleFilter) {
       result = result.filter(u => u.role === roleFilter);
     }
@@ -130,7 +133,7 @@ export const AdminMenu: React.FC<AdminMenuProps> = ({ users, businesses, current
     { label: 'Player', value: 'player' },
     { label: 'Business', value: 'business' },
     { label: 'Chamber', value: 'chamber' },
-    { label: 'Admin', value: 'admin' },
+    ...(isAdmin ? [{ label: 'Admin', value: 'admin' }] : []),
   ];
 
   return (
@@ -138,12 +141,14 @@ export const AdminMenu: React.FC<AdminMenuProps> = ({ users, businesses, current
       <div className="bg-white border border-neutral-200 p-8 rounded-3xl shadow-sm">
         <div className="flex justify-between items-center mb-6">
           <h3 className="font-bold uppercase tracking-widest text-xs text-neutral-400">User Management</h3>
-          <button
-            onClick={performGlobalReset}
-            className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-red-100 transition-all"
-          >
-            <RotateCcw size={12} /> Reset All Users
-          </button>
+          {isAdmin && (
+            <button
+              onClick={performGlobalReset}
+              className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-red-100 transition-all"
+            >
+              <RotateCcw size={12} /> Reset All Users
+            </button>
+          )}
         </div>
 
         {/* Role filter pills */}
@@ -262,7 +267,7 @@ export const AdminMenu: React.FC<AdminMenuProps> = ({ users, businesses, current
                     <option value="player">Player</option>
                     <option value="business">Participating Business</option>
                     <option value="chamber">Chamber Manager</option>
-                    <option value="admin">System Admin</option>
+                    {isAdmin && <option value="admin">System Admin</option>}
                   </select>
 
                   {u.role === 'business' && (

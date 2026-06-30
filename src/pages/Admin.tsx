@@ -76,16 +76,14 @@ export const Admin: React.FC<AdminProps> = ({ user, businesses, towns, settings 
         </div>
 
         <div className="flex bg-neutral-100 p-1.5 rounded-2xl overflow-x-auto w-full md:w-auto shadow-inner gap-1">
-          {user.role === 'admin' && (
-            <button
-              onClick={() => setActiveTab('admin')}
-              className={`flex items-center gap-2 px-4 md:px-5 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all whitespace-nowrap shrink-0 ${activeTab === 'admin' ? 'bg-white shadow-md text-neutral-900' : 'text-neutral-400 hover:text-neutral-600'}`}
-            >
-              <UserIcon size={14} />
-              <span className="hidden sm:inline">Admin Menu</span>
-              <span className="sm:hidden">Admin</span>
-            </button>
-          )}
+          <button
+            onClick={() => setActiveTab('admin')}
+            className={`flex items-center gap-2 px-4 md:px-5 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all whitespace-nowrap shrink-0 ${activeTab === 'admin' ? 'bg-white shadow-md text-neutral-900' : 'text-neutral-400 hover:text-neutral-600'}`}
+          >
+            <UserIcon size={14} />
+            <span className="hidden sm:inline">{user.role === 'admin' ? 'Admin Menu' : 'Users'}</span>
+            <span className="sm:hidden">Users</span>
+          </button>
           <button
             onClick={() => setActiveTab('master')}
             className={`flex items-center gap-2 px-4 md:px-5 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all whitespace-nowrap shrink-0 ${activeTab === 'master' ? 'bg-white shadow-md text-neutral-900' : 'text-neutral-400 hover:text-neutral-600'}`}
@@ -120,7 +118,7 @@ export const Admin: React.FC<AdminProps> = ({ user, businesses, towns, settings 
       </div>
 
       <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-        {activeTab === 'admin' && user.role === 'admin' && (
+        {activeTab === 'admin' && (
           <AdminMenu users={users} businesses={businesses} currentUser={user} settings={settings!} />
         )}
         {activeTab === 'master' && settings && <GameMaster settings={settings} user={user} />}
