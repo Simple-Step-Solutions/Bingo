@@ -37,7 +37,13 @@ export const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
     const token = urlToken || localStorage.getItem('pendingInvite');
     if (!token) return;
 
-    if (urlToken) localStorage.setItem('pendingInvite', urlToken);
+    if (urlToken) {
+      localStorage.setItem('pendingInvite', urlToken);
+      // Strip the invite param from the URL without reloading
+      const url = new URL(window.location.href);
+      url.searchParams.delete('invite');
+      window.history.replaceState({}, '', url.toString());
+    }
     setInviteToken(token);
 
     // Pre-fill role, email, and code from the invite
