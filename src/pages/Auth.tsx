@@ -24,6 +24,7 @@ export const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
   const [authMode, setAuthMode] = useState<'social' | 'email-signin' | 'email-signup' | 'forgot-password' | 'verify-email'>('social');
   const [resetSent, setResetSent] = useState(false);
   const [inviteToken, setInviteToken] = useState<string | null>(null);
+  const [inviteRole, setInviteRole] = useState<'player' | 'business' | 'chamber' | null>(null);
   const [registerAs, setRegisterAs] = useState<'player' | 'business' | 'chamber'>('player');
   const [inviteCode, setInviteCode] = useState('');
 
@@ -46,34 +47,37 @@ export const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
     }
     setInviteToken(token);
 
-    // Pre-fill role, email, and code from the invite
+    // Pre-fill and lock role, email, and code from the invite
     getInviteByToken(token).then(invite => {
       if (!invite || invite.used || new Date(invite.expiresAt) < new Date()) return;
-      if (invite.role !== 'player') {
-        setRegisterAs(invite.role);
-        setInviteCode(token);
-      }
+      setInviteRole(invite.role);
+      setRegisterAs(invite.role);
+      setInviteCode(token);
       if (invite.emailHint) setEmail(invite.emailHint);
     }).catch(() => {});
   }, []);
 
   const validateInviteCode = async (): Promise<boolean> => {
-    if (registerAs === 'player') return true;
-    if (!inviteCode.trim()) {
+    // If no invite token at all and registering as player, no validation needed
+    if (registerAs === 'player' && !inviteToken && !inviteCode.trim()) return true;
+    // Non-player roles always require a code
+    if (registerAs !== 'player' && !inviteCode.trim()) {
       setError('Please enter the invite code you received from the Chamber.');
       return false;
     }
-    const invite = await getInviteByToken(inviteCode.trim());
+    const codeToCheck = inviteCode.trim() || inviteToken;
+    if (!codeToCheck) return true;
+    const invite = await getInviteByToken(codeToCheck);
     if (!invite || invite.used || new Date(invite.expiresAt) < new Date()) {
       setError('Invalid or expired invite code. Contact your Chamber administrator.');
       return false;
     }
     if (invite.role !== registerAs) {
-      setError(`This code is for a ${invite.role} account, not ${registerAs}. Check your code.`);
-      return false;
+      // Force the correct role rather than erroring -- the invite is authoritative
+      setRegisterAs(invite.role);
     }
     // Store validated invite so App.tsx can process it post-auth
-    localStorage.setItem('pendingInvite', inviteCode.trim());
+    localStorage.setItem('pendingInvite', codeToCheck);
     return true;
   };
 
@@ -341,8 +345,9 @@ export const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
                       <button
                         key={opt.value}
                         type="button"
-                        onClick={() => setRegisterAs(opt.value)}
-                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all text-left ${
+                        onClick={() => { if (!inviteRole) setRegisterAs(opt.value); }}
+                        disabled={!!inviteRole && inviteRole !== opt.value}
+                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all text-left disabled:opacity-30 disabled:cursor-not-allowed ${
                           registerAs === opt.value
                             ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/5'
                             : 'border-transparent hover:border-neutral-200'
