@@ -49,7 +49,7 @@ export const InviteManager: React.FC<InviteManagerProps> = ({ businesses, curren
   };
 
   const inviteUrl = generatedToken
-    ? `${window.location.origin}/?invite=${generatedToken}`
+    ? `${window.location.origin}/?invite=${generatedToken}&role=${role}${emailHint.trim() ? `&hint=${encodeURIComponent(emailHint.trim())}` : ''}`
     : null;
 
   const handleCopy = async () => {
@@ -162,7 +162,7 @@ export const InviteManager: React.FC<InviteManagerProps> = ({ businesses, curren
             {invites.map(invite => {
               const status = getInviteStatus(invite);
               const expires = new Date(invite.expiresAt);
-              const url = `${window.location.origin}/?invite=${invite.token}`;
+              const url = `${window.location.origin}/?invite=${invite.token}&role=${invite.role}${invite.emailHint ? `&hint=${encodeURIComponent(invite.emailHint)}` : ''}`;
               const isCopied = copiedId === invite.id;
               return (
                 <div key={invite.id} className="p-3 bg-neutral-50 rounded-2xl space-y-2">

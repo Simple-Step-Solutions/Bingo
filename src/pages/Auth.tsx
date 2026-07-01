@@ -34,27 +34,26 @@ export const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
   const [displayName, setDisplayName] = useState('');
 
   useEffect(() => {
-    const urlToken = new URLSearchParams(window.location.search).get('invite');
+    const params = new URLSearchParams(window.location.search);
+    const urlToken = params.get('invite');
+    const urlRole = params.get('role') as 'player' | 'business' | 'chamber' | null;
+    const urlHint = params.get('hint');
     const token = urlToken || localStorage.getItem('pendingInvite');
     if (!token) return;
 
     if (urlToken) {
       localStorage.setItem('pendingInvite', urlToken);
-      // Strip the invite param from the URL without reloading
-      const url = new URL(window.location.href);
-      url.searchParams.delete('invite');
-      window.history.replaceState({}, '', url.toString());
+      // Strip invite params from URL without reloading
+      window.history.replaceState({}, '', window.location.pathname);
     }
     setInviteToken(token);
+    setInviteCode(token);
 
-    // Pre-fill and lock role, email, and code from the invite
-    getInviteByToken(token).then(invite => {
-      if (!invite || invite.used || new Date(invite.expiresAt) < new Date()) return;
-      setInviteRole(invite.role);
-      setRegisterAs(invite.role);
-      setInviteCode(token);
-      if (invite.emailHint) setEmail(invite.emailHint);
-    }).catch(() => {});
+    if (urlRole && urlRole !== 'player') {
+      setInviteRole(urlRole);
+      setRegisterAs(urlRole);
+    }
+    if (urlHint) setEmail(urlHint);
   }, []);
 
   const validateInviteCode = async (): Promise<boolean> => {
