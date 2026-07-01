@@ -24,7 +24,7 @@ export const UpdateBanner: React.FC = () => {
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <button
-              onClick={() => updateServiceWorker(true)}
+              onClick={() => { updateServiceWorker(true); window.location.reload(); }}
               className="bg-white text-neutral-900 px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-neutral-100 transition-all"
             >
               Refresh
