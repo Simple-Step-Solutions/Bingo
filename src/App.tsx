@@ -23,6 +23,8 @@ import { trackActivity } from './services/activityService';
 import { SetupWizard, SetupPending } from './components/SetupWizard';
 import { InstallPrompt } from './components/InstallPrompt';
 import { UpdateBanner } from './components/UpdateBanner';
+import { ChamberTour } from './components/tour/ChamberTour';
+import { BusinessTour } from './components/tour/BusinessTour';
 
 const DEFAULT_PRIMARY = '#1695B2';
 const DEFAULT_ACCENT = '#CC5500';
@@ -34,6 +36,7 @@ function App() {
   const [businesses, setBusinesses] = useState<Business[]>([]);
   const [towns, setTowns] = useState<Town[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showTour, setShowTour] = useState(false);
   const inviteProcessed = useRef(false);
   useEffect(() => {
     const primary = settings?.primaryColor || DEFAULT_PRIMARY;
@@ -92,19 +95,27 @@ function App() {
 
         unsubscribeProfile = onSnapshot(doc(db, 'users', firebaseUser.uid), async (docSnap) => {
           if (docSnap.exists()) {
-            setUser(docSnap.data() as UserProfile);
+            const profile = docSnap.data() as UserProfile;
+            setUser(profile);
             if (!profileReady) {
               profileReady = true;
               checkReady();
               processPendingInvite();
+              // Show tour for chamber/business users who haven't seen it
+              if ((profile.role === 'chamber' || profile.role === 'business') && !profile.tourCompleted) {
+                setShowTour(true);
+              }
             }
           } else if (!profileReady) {
             // New user -- create profile, then wait for the next snapshot fire
+            const pendingRole = localStorage.getItem('pendingBusinessRole') as 'business' | 'chamber' | null;
+            localStorage.removeItem('pendingBusinessRole');
             await setDoc(doc(db, 'users', firebaseUser.uid), {
               uid: firebaseUser.uid,
               email: firebaseUser.email,
               displayName: firebaseUser.displayName || '',
-              role: 'player',
+              role: pendingRole || 'player',
+              onboardingComplete: pendingRole ? true : undefined,
               town: '',
             }).catch(err => {
               console.error('Failed to create user profile:', err);
@@ -218,6 +229,24 @@ function App() {
         </footer>
         <InstallPrompt />
         <UpdateBanner />
+        {showTour && user?.role === 'chamber' && (
+          <ChamberTour
+            chamberName={settings?.chamberName}
+            onComplete={async () => {
+              setShowTour(false);
+              await setDoc(doc(db, 'users', user.uid), { tourCompleted: true }, { merge: true });
+            }}
+          />
+        )}
+        {showTour && user?.role === 'business' && (
+          <BusinessTour
+            businessName={businesses.find(b => b.id === user.businessId)?.name}
+            onComplete={async () => {
+              setShowTour(false);
+              await setDoc(doc(db, 'users', user.uid), { tourCompleted: true }, { merge: true });
+            }}
+          />
+        )}
       </div>
     </Router>
   );

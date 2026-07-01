@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { UserProfile, Business, Completion } from '../types';
-import { collection, onSnapshot, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
+import { collection, onSnapshot, query, where, getDocs, doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
-import { Store, Users, CheckCircle2, Loader2, QrCode, Download, MapPin, Printer, Hash } from 'lucide-react';
+import { Store, Users, CheckCircle2, Loader2, QrCode, Download, MapPin, Printer, Hash, KeyRound } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 
 interface BusinessDashboardProps {
@@ -13,6 +13,9 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ user }) =>
   const [completions, setCompletions] = useState<Completion[]>([]);
   const [business, setBusiness] = useState<Business | null>(null);
   const [loading, setLoading] = useState(true);
+  const [claimCode, setClaimCode] = useState('');
+  const [claiming, setClaiming] = useState(false);
+  const [claimError, setClaimError] = useState<string | null>(null);
   const [visitorProfiles, setVisitorProfiles] = useState<Record<string, { displayName?: string; email: string }>>({});
   const printQR = () => {
     const printWindow = window.open('', '_blank');
@@ -119,13 +122,75 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ user }) =>
     </div>
   );
 
+  const handleClaim = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!claimCode.trim()) return;
+    setClaiming(true);
+    setClaimError(null);
+    try {
+      const code = claimCode.trim();
+      const q = query(collection(db, 'businesses'), where('qrCode', '==', code));
+      const snap = await getDocs(q);
+      if (snap.empty) {
+        setClaimError('No business found with that code. Check the code and try again.');
+        return;
+      }
+      const bizDoc = snap.docs[0];
+      await setDoc(doc(db, 'users', user.uid), {
+        role: 'business',
+        businessId: bizDoc.id,
+        onboardingComplete: true,
+      }, { merge: true });
+    } catch (err) {
+      console.error(err);
+      setClaimError('Something went wrong. Please try again.');
+    } finally {
+      setClaiming(false);
+    }
+  };
+
   if (!business) return (
-    <div className="max-w-2xl mx-auto text-center py-20">
-      <div className="bg-white rounded-3xl p-12 shadow-sm border border-neutral-100">
-        <Store className="mx-auto text-neutral-200 mb-6" size={64} />
-        <h2 className="font-serif italic text-3xl mb-4">No Business Profile</h2>
-        <p className="text-neutral-500 mb-8">Your account is not currently linked to a participating business profile.</p>
-        <p className="text-xs text-neutral-400 uppercase tracking-widest font-bold">Contact the Chamber to link your store.</p>
+    <div className="max-w-md mx-auto py-20">
+      <div className="bg-white rounded-3xl overflow-hidden shadow-sm border border-neutral-100">
+        <div className="h-1.5 bg-[var(--color-primary)]" />
+        <div className="p-10 text-center">
+          <div className="w-16 h-16 bg-[var(--color-primary)]/10 rounded-3xl flex items-center justify-center mx-auto mb-6">
+            <KeyRound className="text-[var(--color-primary)]" size={28} />
+          </div>
+          <p className="text-[10px] font-black uppercase tracking-[0.25em] text-[var(--color-primary)] mb-2">Business Setup</p>
+          <h2 className="font-serif italic text-3xl mb-3">Claim your business</h2>
+          <p className="text-neutral-500 text-sm leading-relaxed mb-8">
+            Enter the claim code your Chamber administrator gave you. It's the same as the manual code on your setup sheet.
+          </p>
+          <form onSubmit={handleClaim} className="space-y-4 text-left">
+            <div>
+              <label className="block text-[10px] font-bold uppercase tracking-widest text-neutral-400 mb-2">Claim Code</label>
+              <input
+                type="text"
+                placeholder="e.g. CHAMBER_abc123"
+                value={claimCode}
+                onChange={e => setClaimCode(e.target.value)}
+                className="w-full px-4 py-4 bg-neutral-50 border border-neutral-200 rounded-2xl text-sm font-mono font-bold focus:ring-2 focus:ring-neutral-900 outline-none transition-all"
+              />
+            </div>
+            {claimError && (
+              <div className="bg-red-50 border border-red-100 rounded-2xl px-4 py-3">
+                <p className="text-xs text-red-600 font-bold">{claimError}</p>
+              </div>
+            )}
+            <button
+              type="submit"
+              disabled={claiming || !claimCode.trim()}
+              className="w-full bg-neutral-900 text-white py-4 rounded-2xl font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-50 transition-all active:scale-95"
+            >
+              {claiming ? <Loader2 className="animate-spin" size={16} /> : <KeyRound size={16} />}
+              Claim Business
+            </button>
+          </form>
+          <p className="text-[9px] text-neutral-400 mt-6 leading-relaxed">
+            Don't have a code? Contact your Chamber administrator to get set up.
+          </p>
+        </div>
       </div>
     </div>
   );

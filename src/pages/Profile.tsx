@@ -4,7 +4,7 @@ import { signOut, updatePassword, EmailAuthProvider, reauthenticateWithCredentia
 import { auth, db } from '../firebase';
 import { UserProfile, Completion } from '../types';
 import { motion } from 'motion/react';
-import { LogOut, RotateCcw, CheckCircle2, Trophy, MapPin, Loader2, Lock, Eye, EyeOff } from 'lucide-react';
+import { LogOut, RotateCcw, CheckCircle2, Trophy, MapPin, Loader2, Lock, Eye, EyeOff, PlayCircle } from 'lucide-react';
 
 interface ProfileProps {
   user: UserProfile;
@@ -279,6 +279,20 @@ export const Profile: React.FC<ProfileProps> = ({ user }) => {
               Update Password
             </button>
           </form>
+        )}
+
+        {/* Replay tour -- chamber and business only */}
+        {(user.role === 'chamber' || user.role === 'business') && (
+          <button
+            onClick={async () => {
+              await setDoc(doc(db, 'users', user.uid), { tourCompleted: false }, { merge: true });
+              window.location.reload();
+            }}
+            className="w-full flex items-center justify-center gap-3 bg-neutral-50 hover:bg-neutral-100 text-neutral-700 border border-neutral-200 py-4 rounded-2xl font-bold text-sm transition-all mb-3"
+          >
+            <PlayCircle size={18} />
+            Replay Tour
+          </button>
         )}
 
         {/* Sign out */}

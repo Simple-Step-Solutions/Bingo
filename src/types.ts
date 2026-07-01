@@ -10,6 +10,7 @@ export interface UserProfile {
   lastActive?: string;
   lastReadAt?: string;
   onboardingComplete?: boolean;
+  tourCompleted?: boolean;
   currentLocation?: {
     lat: number;
     lng: number;
