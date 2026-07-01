@@ -10,7 +10,6 @@ import {
   sendEmailVerification
 } from 'firebase/auth';
 import { auth } from '../firebase';
-import { getInviteByToken } from '../services/inviteService';
 import { ShieldCheck, Gamepad2, Store, LayoutGrid, Loader2, Mail, Lock, User, ChevronRight, ArrowLeft, Link2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -24,9 +23,6 @@ export const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
   const [authMode, setAuthMode] = useState<'social' | 'email-signin' | 'email-signup' | 'forgot-password' | 'verify-email'>('social');
   const [resetSent, setResetSent] = useState(false);
   const [inviteToken, setInviteToken] = useState<string | null>(null);
-  const [inviteRole, setInviteRole] = useState<'player' | 'business' | 'chamber' | null>(null);
-  const [registerAs, setRegisterAs] = useState<'player' | 'business' | 'chamber'>('player');
-  const [inviteCode, setInviteCode] = useState('');
 
   // Email/Password state
   const [email, setEmail] = useState('');
@@ -36,60 +32,24 @@ export const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const urlToken = params.get('invite');
-    const urlRole = params.get('role') as 'player' | 'business' | 'chamber' | null;
     const urlHint = params.get('hint');
     const token = urlToken || localStorage.getItem('pendingInvite');
     if (!token) return;
 
     if (urlToken) {
       localStorage.setItem('pendingInvite', urlToken);
-      // Strip invite params from URL without reloading
       window.history.replaceState({}, '', window.location.pathname);
     }
     setInviteToken(token);
-    setInviteCode(token);
-
-    if (urlRole && urlRole !== 'player') {
-      setInviteRole(urlRole);
-      setRegisterAs(urlRole);
-    }
     if (urlHint) setEmail(urlHint);
   }, []);
-
-  const validateInviteCode = async (): Promise<boolean> => {
-    // If no invite token at all and registering as player, no validation needed
-    if (registerAs === 'player' && !inviteToken && !inviteCode.trim()) return true;
-    // Non-player roles always require a code
-    if (registerAs !== 'player' && !inviteCode.trim()) {
-      setError('Please enter the invite code you received from the Chamber.');
-      return false;
-    }
-    const codeToCheck = inviteCode.trim() || inviteToken;
-    if (!codeToCheck) return true;
-    const invite = await getInviteByToken(codeToCheck);
-    if (!invite || invite.used || new Date(invite.expiresAt) < new Date()) {
-      setError('Invalid or expired invite code. Contact your Chamber administrator.');
-      return false;
-    }
-    if (invite.role !== registerAs) {
-      // Force the correct role rather than erroring -- the invite is authoritative
-      setRegisterAs(invite.role);
-    }
-    // Store validated invite so App.tsx can process it post-auth
-    localStorage.setItem('pendingInvite', codeToCheck);
-    return true;
-  };
 
   const signInWithGoogle = async () => {
     setLoading(true);
     setError(null);
-    const valid = await validateInviteCode();
-    if (!valid) { setLoading(false); return; }
-    if (registerAs !== 'player') localStorage.setItem('pendingBusinessRole', registerAs);
     try {
       const provider = new GoogleAuthProvider();
       await signInWithPopup(auth, provider);
-      // onAuthStateChanged in App.tsx handles navigation
     } catch (err: any) {
       console.error('Google Auth error:', err);
       setError(err.message || 'Failed to sign in with Google.');
@@ -151,9 +111,6 @@ export const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
     }
     setLoading(true);
     setError(null);
-    const valid = await validateInviteCode();
-    if (!valid) { setLoading(false); return; }
-    if (registerAs !== 'player') localStorage.setItem('pendingBusinessRole', registerAs);
     try {
       const result = await createUserWithEmailAndPassword(auth, email, password);
       await updateProfile(result.user, { displayName });
@@ -332,54 +289,6 @@ export const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
                     <img src="https://www.google.com/favicon.ico" alt="Google" className="w-4 h-4" />
                     Continue with Google
                   </button>
-
-                  {/* Role selector */}
-                  <div className="border border-neutral-100 rounded-2xl p-4 space-y-2">
-                    <p className="text-[9px] font-black uppercase tracking-widest text-neutral-400 mb-3">I am registering as...</p>
-                    {([
-                      { value: 'player', label: 'A Player', sub: 'Discover local businesses & play bingo' },
-                      { value: 'business', label: 'A Participating Business', sub: 'Manage my QR code & track visitors' },
-                      { value: 'chamber', label: 'Chamber Staff', sub: 'Manage the game & participants' },
-                    ] as const).map(opt => (
-                      <button
-                        key={opt.value}
-                        type="button"
-                        onClick={() => { if (!inviteRole) setRegisterAs(opt.value); }}
-                        disabled={!!inviteRole && inviteRole !== opt.value}
-                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all text-left disabled:opacity-30 disabled:cursor-not-allowed ${
-                          registerAs === opt.value
-                            ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/5'
-                            : 'border-transparent hover:border-neutral-200'
-                        }`}
-                      >
-                        <div className={`w-4 h-4 rounded-full border-2 shrink-0 flex items-center justify-center transition-all ${
-                          registerAs === opt.value ? 'bg-[var(--color-primary)] border-[var(--color-primary)]' : 'border-neutral-300'
-                        }`}>
-                          {registerAs === opt.value && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
-                        </div>
-                        <div>
-                          <p className={`text-xs font-bold ${registerAs === opt.value ? 'text-[var(--color-primary)]' : 'text-neutral-700'}`}>{opt.label}</p>
-                          <p className="text-[9px] text-neutral-400">{opt.sub}</p>
-                        </div>
-                      </button>
-                    ))}
-
-                    {registerAs !== 'player' && (
-                      <div className="pt-3 border-t border-neutral-100 mt-2">
-                        <label className="block text-[9px] font-black uppercase tracking-widest text-neutral-400 mb-2">
-                          Invite Code <span className="text-red-400">*</span>
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="Paste your invite code..."
-                          value={inviteCode}
-                          onChange={e => setInviteCode(e.target.value)}
-                          className="w-full px-4 py-3 bg-neutral-50 border border-neutral-200 rounded-xl text-sm font-mono focus:ring-2 focus:ring-neutral-900 outline-none transition-all"
-                        />
-                        <p className="text-[9px] text-neutral-400 mt-1.5">Get this from your Chamber administrator.</p>
-                      </div>
-                    )}
-                  </div>
                 </div>
               </motion.div>
             ) : (

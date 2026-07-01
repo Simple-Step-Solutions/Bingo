@@ -1,10 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, collection, onSnapshot, setDoc } from 'firebase/firestore';
 import { auth, db } from './firebase';
 import { UserProfile, AppSettings, Business, Town } from './types';
-import { getInviteByToken, markInviteUsed } from './services/inviteService';
 
 // Pages
 import { Dashboard } from './pages/Dashboard';
@@ -25,6 +24,7 @@ import { InstallPrompt } from './components/InstallPrompt';
 import { UpdateBanner } from './components/UpdateBanner';
 import { ChamberTour } from './components/tour/ChamberTour';
 import { BusinessTour } from './components/tour/BusinessTour';
+import { RoleSelector } from './components/RoleSelector';
 
 const DEFAULT_PRIMARY = '#1695B2';
 const DEFAULT_ACCENT = '#CC5500';
@@ -37,7 +37,7 @@ function App() {
   const [towns, setTowns] = useState<Town[]>([]);
   const [loading, setLoading] = useState(true);
   const [showTour, setShowTour] = useState(false);
-  const inviteProcessed = useRef(false);
+
   useEffect(() => {
     const primary = settings?.primaryColor || DEFAULT_PRIMARY;
     const accent = settings?.accentColor || DEFAULT_ACCENT;
@@ -60,7 +60,6 @@ function App() {
 
     const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser) => {
       cleanupListeners();
-      inviteProcessed.current = false;
 
       if (firebaseUser) {
         setLoading(true);
@@ -72,27 +71,6 @@ function App() {
           if (profileReady && settingsReady) setLoading(false);
         };
 
-        const processPendingInvite = async () => {
-          if (inviteProcessed.current) return;
-          const token = localStorage.getItem('pendingInvite');
-          if (!token) return;
-          inviteProcessed.current = true;
-          try {
-            const invite = await getInviteByToken(token);
-            if (invite && !invite.used && new Date(invite.expiresAt) > new Date()) {
-              const updates: Record<string, any> = { role: invite.role };
-              if (invite.businessId) updates.businessId = invite.businessId;
-              if (invite.role === 'business' || invite.role === 'chamber') updates.onboardingComplete = true;
-              await setDoc(doc(db, 'users', firebaseUser.uid), updates, { merge: true });
-              await markInviteUsed(invite.id, firebaseUser.uid);
-            }
-          } catch (err) {
-            console.error('Error processing invite:', err);
-          } finally {
-            localStorage.removeItem('pendingInvite');
-          }
-        };
-
         unsubscribeProfile = onSnapshot(doc(db, 'users', firebaseUser.uid), async (docSnap) => {
           if (docSnap.exists()) {
             const profile = docSnap.data() as UserProfile;
@@ -100,22 +78,20 @@ function App() {
             if (!profileReady) {
               profileReady = true;
               checkReady();
-              processPendingInvite();
-              // Show tour for chamber/business users who haven't seen it
-              if ((profile.role === 'chamber' || profile.role === 'business') && !profile.tourCompleted) {
+              // Show tour for chamber/business users who just selected their role (roleSelected just became true)
+              // or existing users who haven't completed the tour
+              if ((profile.role === 'chamber' || profile.role === 'business') && !profile.tourCompleted && profile.roleSelected) {
                 setShowTour(true);
               }
             }
           } else if (!profileReady) {
-            // New user -- create profile, then wait for the next snapshot fire
-            const pendingRole = localStorage.getItem('pendingBusinessRole') as 'business' | 'chamber' | null;
-            localStorage.removeItem('pendingBusinessRole');
+            // New user -- create minimal profile, RoleSelector will handle role assignment
             await setDoc(doc(db, 'users', firebaseUser.uid), {
               uid: firebaseUser.uid,
               email: firebaseUser.email,
               displayName: firebaseUser.displayName || '',
-              role: pendingRole || 'player',
-              ...(pendingRole ? { onboardingComplete: true } : {}),
+              role: 'player',
+              roleSelected: false,
               town: '',
             }).catch(err => {
               console.error('Failed to create user profile:', err);
@@ -164,6 +140,13 @@ function App() {
     };
   }, []);
 
+  // When roleSelected flips to true, trigger tour for non-player roles
+  useEffect(() => {
+    if (user?.roleSelected && (user.role === 'chamber' || user.role === 'business') && !user.tourCompleted) {
+      setShowTour(true);
+    }
+  }, [user?.roleSelected]);
+
   if (loading) return <LoadingScreen />;
 
   if (!user) return <Auth onAuthSuccess={() => {}} />;
@@ -175,12 +158,17 @@ function App() {
       : <SetupPending />;
   }
 
+  // New user hasn't selected their role yet
+  if (user.roleSelected === false) {
+    return <RoleSelector user={user} />;
+  }
+
   return (
     <Router>
       <div className="min-h-screen bg-[#F5F5F0] pb-24 md:pb-0 md:pt-20">
         <LocationTracker user={user} />
         <Navbar user={user} settings={settings} />
-        
+
         <main className="container mx-auto px-4 py-8">
           <Routes>
             <Route path="/" element={<Dashboard user={user} businesses={businesses} towns={towns} settings={settings} />} />
@@ -197,7 +185,7 @@ function App() {
             {(user.role === 'chamber' || user.role === 'business') && (
               <Route path="/business" element={<BusinessDashboard user={user} />} />
             )}
-            
+
             <Route path="/profile" element={<Profile user={user} />} />
 
             {/* Fallback */}

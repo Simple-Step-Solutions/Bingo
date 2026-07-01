@@ -11,6 +11,7 @@ export interface UserProfile {
   lastReadAt?: string;
   onboardingComplete?: boolean;
   tourCompleted?: boolean;
+  roleSelected?: boolean;
   currentLocation?: {
     lat: number;
     lng: number;
