@@ -47,8 +47,12 @@ service cloud.firestore {
       allow list: if isChamber();
       allow create: if isAuthenticated() && request.auth.uid == userId;
       allow update: if isAuthenticated() && (
-        // User can update their own profile but cannot change their role
-        (request.auth.uid == userId && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role'])) ||
+        // User can update their own profile but cannot change their role --
+        // EXCEPT during initial role selection (roleSelected: false -> true)
+        (request.auth.uid == userId && (
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role']) ||
+          (resource.data.roleSelected == false && request.resource.data.roleSelected == true)
+        )) ||
         // Admins can update anything including role
         isAdmin() ||
         // Chamber can update town and board (but not role or email) for admin overrides
@@ -172,10 +176,9 @@ service cloud.firestore {
     // ===============================================================
 
     match /invites/{inviteId} {
-      allow read: if isAuthenticated();
+      allow read, list: if isAuthenticated();
       allow create: if isChamber();
       allow update: if isAuthenticated();
-      allow list: if isChamber();
     }
   }
 }
