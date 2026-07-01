@@ -329,7 +329,7 @@ export const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
                     <p className="text-[9px] font-black uppercase tracking-widest text-neutral-400 mb-3">I am registering as...</p>
                     {([
                       { value: 'player', label: 'A Player', sub: 'Discover local businesses & play bingo' },
-                      { value: 'business', label: 'A Business Owner', sub: 'Manage my QR code & track visitors' },
+                      { value: 'business', label: 'A Participating Business', sub: 'Manage my QR code & track visitors' },
                       { value: 'chamber', label: 'Chamber Staff', sub: 'Manage the game & participants' },
                     ] as const).map(opt => (
                       <button
