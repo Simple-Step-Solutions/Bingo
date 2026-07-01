@@ -34,14 +34,6 @@ jobs:
           VITE_FIREBASE_DATABASE_ID: ${{ secrets.VITE_FIREBASE_DATABASE_ID }}
         run: npm run build
 
-      - name: Authenticate to Google Cloud
-        uses: google-github-actions/auth@v2
-        with:
-          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-
-      - name: Deploy Firestore rules
-        run: npx firebase-tools deploy --only firestore:rules --project sss-hvgcc-bingo --non-interactive
-
       - name: Deploy to Firebase Hosting
         uses: FirebaseExtended/action-hosting-deploy@092436dca3ec6dacb231d965ae56f7ff6c09f258 # v0
         with:
