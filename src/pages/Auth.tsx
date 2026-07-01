@@ -33,16 +33,22 @@ export const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
   const [displayName, setDisplayName] = useState('');
 
   useEffect(() => {
-    // Check URL for invite token
     const urlToken = new URLSearchParams(window.location.search).get('invite');
-    if (urlToken) {
-      localStorage.setItem('pendingInvite', urlToken);
-      setInviteToken(urlToken);
-    } else {
-      // Check localStorage in case they already had a pending invite (e.g. after OAuth redirect)
-      const stored = localStorage.getItem('pendingInvite');
-      if (stored) setInviteToken(stored);
-    }
+    const token = urlToken || localStorage.getItem('pendingInvite');
+    if (!token) return;
+
+    if (urlToken) localStorage.setItem('pendingInvite', urlToken);
+    setInviteToken(token);
+
+    // Pre-fill role, email, and code from the invite
+    getInviteByToken(token).then(invite => {
+      if (!invite || invite.used || new Date(invite.expiresAt) < new Date()) return;
+      if (invite.role !== 'player') {
+        setRegisterAs(invite.role);
+        setInviteCode(token);
+      }
+      if (invite.emailHint) setEmail(invite.emailHint);
+    }).catch(() => {});
   }, []);
 
   const validateInviteCode = async (): Promise<boolean> => {

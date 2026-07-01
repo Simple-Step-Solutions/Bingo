@@ -3,7 +3,7 @@ import { collection, onSnapshot, query, orderBy, limit } from 'firebase/firestor
 import { db } from '../../firebase';
 import { Business, UserProfile, Invite } from '../../types';
 import { createInvite } from '../../services/inviteService';
-import { Link2, Copy, Check, Loader2 } from 'lucide-react';
+import { Link2, Copy, Check, Loader2, ExternalLink } from 'lucide-react';
 
 interface InviteManagerProps {
   businesses: Business[];
@@ -17,6 +17,7 @@ export const InviteManager: React.FC<InviteManagerProps> = ({ businesses, curren
   const [loading, setLoading] = useState(false);
   const [generatedToken, setGeneratedToken] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
   const [invites, setInvites] = useState<Invite[]>([]);
 
   useEffect(() => {
@@ -161,25 +162,46 @@ export const InviteManager: React.FC<InviteManagerProps> = ({ businesses, curren
             {invites.map(invite => {
               const status = getInviteStatus(invite);
               const expires = new Date(invite.expiresAt);
+              const url = `${window.location.origin}/?invite=${invite.token}`;
+              const isCopied = copiedId === invite.id;
               return (
-                <div key={invite.id} className="flex items-start justify-between gap-3 p-3 bg-neutral-50 rounded-2xl">
-                  <div className="flex flex-wrap items-center gap-2 min-w-0">
-                    <span className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-widest shrink-0 ${roleStyles[invite.role]}`}>
-                      {invite.role === 'chamber' ? 'Chamber' : invite.role === 'business' ? 'Business' : 'Player'}
-                    </span>
-                    {invite.businessName && (
-                      <span className="text-[10px] text-neutral-500 font-medium truncate">{invite.businessName}</span>
-                    )}
-                    {invite.emailHint && (
-                      <span className="text-[10px] text-neutral-400 truncate">{invite.emailHint}</span>
-                    )}
-                    <span className="text-[9px] text-neutral-300 font-medium shrink-0">
-                      {status === 'used' ? 'Used' : `Expires ${expires.toLocaleDateString()}`}
+                <div key={invite.id} className="p-3 bg-neutral-50 rounded-2xl space-y-2">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex flex-wrap items-center gap-2 min-w-0">
+                      <span className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-widest shrink-0 ${roleStyles[invite.role]}`}>
+                        {invite.role === 'chamber' ? 'Chamber' : invite.role === 'business' ? 'Business' : 'Player'}
+                      </span>
+                      {invite.businessName && (
+                        <span className="text-[10px] text-neutral-500 font-medium truncate">{invite.businessName}</span>
+                      )}
+                      {invite.emailHint && (
+                        <span className="text-[10px] text-neutral-400 truncate">{invite.emailHint}</span>
+                      )}
+                      <span className="text-[9px] text-neutral-300 font-medium shrink-0">
+                        {status === 'used' ? `Used ${invite.usedAt ? new Date(invite.usedAt).toLocaleDateString() : ''}` : `Expires ${expires.toLocaleDateString()}`}
+                      </span>
+                    </div>
+                    <span className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-widest shrink-0 ${statusStyles[status]}`}>
+                      {status}
                     </span>
                   </div>
-                  <span className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-widest shrink-0 ${statusStyles[status]}`}>
-                    {status}
-                  </span>
+                  {status === 'pending' && (
+                    <button
+                      onClick={async () => {
+                        await navigator.clipboard.writeText(url);
+                        setCopiedId(invite.id);
+                        setTimeout(() => setCopiedId(null), 2000);
+                      }}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-widest transition-all ${
+                        isCopied
+                          ? 'bg-green-50 text-green-700 border border-green-200'
+                          : 'bg-white border border-neutral-200 text-neutral-600 hover:border-neutral-900'
+                      }`}
+                    >
+                      {isCopied ? <Check size={11} /> : <Copy size={11} />}
+                      {isCopied ? 'Copied!' : 'Copy Invite Link'}
+                    </button>
+                  )}
                 </div>
               );
             })}

@@ -82,7 +82,7 @@ function App() {
             if (invite && !invite.used && new Date(invite.expiresAt) > new Date()) {
               const updates: Record<string, any> = { role: invite.role };
               if (invite.businessId) updates.businessId = invite.businessId;
-              if (invite.role === 'business') updates.onboardingComplete = true;
+              if (invite.role === 'business' || invite.role === 'chamber') updates.onboardingComplete = true;
               await setDoc(doc(db, 'users', firebaseUser.uid), updates, { merge: true });
               await markInviteUsed(invite.id, firebaseUser.uid);
             }
