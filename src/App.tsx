@@ -115,7 +115,7 @@ function App() {
               email: firebaseUser.email,
               displayName: firebaseUser.displayName || '',
               role: pendingRole || 'player',
-              onboardingComplete: pendingRole ? true : undefined,
+              ...(pendingRole ? { onboardingComplete: true } : {}),
               town: '',
             }).catch(err => {
               console.error('Failed to create user profile:', err);
