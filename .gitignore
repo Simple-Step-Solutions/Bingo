@@ -3,6 +3,6 @@
 /coverage/
 /.DS_Store
 /*.log
-/.env*
+.env*
 !.env.example
 /firebase-applet-config.json

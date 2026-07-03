@@ -1,9 +1,12 @@
 const { onDocumentCreated } = require('firebase-functions/v2/firestore');
+const { defineString } = require('firebase-functions/params');
 const { initializeApp } = require('firebase-admin/app');
 const { getFirestore } = require('firebase-admin/firestore');
 const { getMessaging } = require('firebase-admin/messaging');
 
 initializeApp();
+
+const databaseId = defineString('FIRESTORE_DATABASE_ID', { default: '(default)' });
 
 const TYPE_TITLES = {
   info: 'Chamber Bingo',
@@ -16,13 +19,12 @@ exports.sendPushOnNotification = onDocumentCreated('notifications/{notificationI
   const notification = event.data.data();
   if (!notification) return;
 
-  const db = getFirestore();
+  const db = getFirestore(databaseId.value());
   const messaging = getMessaging();
 
   const title = TYPE_TITLES[notification.type] || 'Chamber Bingo';
   const body = notification.message;
 
-  // Gather FCM tokens from all users (or just the target user)
   let usersSnap;
   if (notification.userId === 'all') {
     usersSnap = await db.collection('users').where('fcmTokens', '!=', null).get();
@@ -38,7 +40,6 @@ exports.sendPushOnNotification = onDocumentCreated('notifications/{notificationI
 
   if (tokens.length === 0) return;
 
-  // Send in batches of 500 (FCM limit)
   const chunks = [];
   for (let i = 0; i < tokens.length; i += 500) chunks.push(tokens.slice(i, i + 500));
 
@@ -52,25 +53,26 @@ exports.sendPushOnNotification = onDocumentCreated('notifications/{notificationI
           fcmOptions: { link: 'https://bingo.simplestepsolutions.com/' },
         },
       }).then(response => {
-        // Clean up invalid tokens
         const toRemove = [];
         response.responses.forEach((resp, i) => {
-          if (!resp.success && (resp.error?.code === 'messaging/invalid-registration-token' || resp.error?.code === 'messaging/registration-token-not-registered')) {
+          if (!resp.success && (
+            resp.error?.code === 'messaging/invalid-registration-token' ||
+            resp.error?.code === 'messaging/registration-token-not-registered'
+          )) {
             toRemove.push(chunk[i]);
           }
         });
-        if (toRemove.length > 0) {
-          const batch = db.batch();
-          usersSnap.forEach(userDoc => {
-            const { fcmTokens } = userDoc.data();
-            if (!Array.isArray(fcmTokens)) return;
-            const cleaned = fcmTokens.filter(t => !toRemove.includes(t));
-            if (cleaned.length !== fcmTokens.length) {
-              batch.update(userDoc.ref, { fcmTokens: cleaned });
-            }
-          });
-          return batch.commit();
-        }
+        if (toRemove.length === 0) return;
+        const batch = db.batch();
+        usersSnap.forEach(userDoc => {
+          const { fcmTokens } = userDoc.data();
+          if (!Array.isArray(fcmTokens)) return;
+          const cleaned = fcmTokens.filter(t => !toRemove.includes(t));
+          if (cleaned.length !== fcmTokens.length) {
+            batch.update(userDoc.ref, { fcmTokens: cleaned });
+          }
+        });
+        return batch.commit();
       })
     )
   );
