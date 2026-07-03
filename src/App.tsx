@@ -38,7 +38,7 @@ function App() {
   const [towns, setTowns] = useState<Town[]>([]);
   const [loading, setLoading] = useState(true);
   const [showTour, setShowTour] = useState(false);
-  const { showPrompt: showNotifPrompt, requestPermission, dismissPrompt, debugMsg: pushDebug } = usePushNotifications(user?.uid);
+  const { showPrompt: showNotifPrompt, requestPermission, dismissPrompt } = usePushNotifications(user?.uid);
 
   useEffect(() => {
     const primary = settings?.primaryColor || DEFAULT_PRIMARY;
@@ -222,12 +222,7 @@ function App() {
         </footer>
         <InstallPrompt />
         <UpdateBanner />
-        {pushDebug && (
-          <div className="fixed top-16 inset-x-0 mx-4 z-[200] bg-black/80 text-white text-[10px] font-mono px-3 py-2 rounded-xl">
-            push: {pushDebug}
-          </div>
-        )}
-        {showNotifPrompt && (
+{showNotifPrompt && (
           <div className="fixed bottom-24 md:bottom-6 inset-x-0 mx-4 md:mx-auto md:max-w-sm z-[90] bg-neutral-900 text-white rounded-2xl shadow-xl px-4 py-3 flex items-center justify-between gap-3">
             <p className="text-[11px] font-bold uppercase tracking-widest leading-tight">Enable notifications to stay updated</p>
             <div className="flex items-center gap-2 shrink-0">

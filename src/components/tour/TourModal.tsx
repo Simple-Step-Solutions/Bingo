@@ -27,7 +27,7 @@ export const TourModal: React.FC<TourModalProps> = ({
   const isFirst = currentStep === 0;
 
   return (
-    <div className="fixed inset-0 z-[85] flex items-end md:items-center justify-center md:p-4 bg-neutral-900/90 backdrop-blur-md">
+    <div className="fixed inset-0 z-[85] flex items-end md:items-center justify-center md:p-4 bg-neutral-900/50">
       <AnimatePresence mode="wait">
         <motion.div
           key={currentStep}
