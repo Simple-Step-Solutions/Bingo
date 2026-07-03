@@ -32,7 +32,7 @@ export const GameMaster: React.FC<GameMasterProps> = ({ settings, user }) => {
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+    <div className="flex flex-col gap-8 max-w-2xl">
       {/* Bingo Configuration */}
       <div className="bg-white border border-neutral-200 p-8 rounded-3xl shadow-sm">
         <div className="flex items-center gap-3 mb-8">
@@ -205,7 +205,7 @@ export const GameMaster: React.FC<GameMasterProps> = ({ settings, user }) => {
         </div>
       </div>
       {/* Business Categories */}
-      <div className="bg-white border border-neutral-200 p-8 rounded-3xl shadow-sm lg:col-span-2">
+      <div className="bg-white border border-neutral-200 p-8 rounded-3xl shadow-sm">
         <div className="flex items-center gap-3 mb-8">
           <div className="bg-neutral-100 p-2 rounded-xl">
             <Tag className="text-neutral-900" size={20} />
