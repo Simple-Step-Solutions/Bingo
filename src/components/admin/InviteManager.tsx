@@ -138,70 +138,75 @@ export const InviteManager: React.FC<InviteManagerProps> = ({ businesses, curren
       </div>
 
       {inviteUrl && (
-        <div className="mb-8 p-4 bg-neutral-50 border border-neutral-200 rounded-2xl">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-neutral-400 mb-2">Shareable Link</p>
-          <code className="block text-xs text-neutral-700 break-all mb-3 font-mono leading-relaxed">{inviteUrl}</code>
-          <button
-            onClick={handleCopy}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all ${
-              copied
-                ? 'bg-green-50 text-green-700 border border-green-200'
-                : 'bg-white border border-neutral-200 text-neutral-700 hover:border-neutral-900'
-            }`}
-          >
-            {copied ? <Check size={12} /> : <Copy size={12} />}
-            {copied ? 'Copied!' : 'Copy Link'}
-          </button>
+        <div className="mb-8 bg-neutral-50 border border-neutral-200 rounded-2xl p-4">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-neutral-400 mb-3">Shareable Link</p>
+          <div className="flex items-start gap-3">
+            <p className="font-mono text-sm break-all text-neutral-700 flex-1 leading-relaxed">{inviteUrl}</p>
+            <button
+              onClick={handleCopy}
+              className={`shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all ${
+                copied
+                  ? 'bg-green-50 text-green-700 border border-green-200'
+                  : 'bg-white border border-neutral-200 text-neutral-700 hover:border-neutral-900'
+              }`}
+            >
+              {copied ? <Check size={12} /> : <Copy size={12} />}
+              {copied ? 'Copied!' : 'Copy'}
+            </button>
+          </div>
         </div>
       )}
 
       {invites.length > 0 && (
         <div>
           <p className="text-[10px] font-bold uppercase tracking-widest text-neutral-400 mb-4">Recent Invites</p>
-          <div className="space-y-3">
+          <div className="space-y-2">
             {invites.map(invite => {
               const status = getInviteStatus(invite);
               const expires = new Date(invite.expiresAt);
               const url = `${window.location.origin}/?invite=${invite.token}`;
               const isCopied = copiedId === invite.id;
               return (
-                <div key={invite.id} className="p-3 bg-neutral-50 rounded-2xl space-y-2">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex flex-wrap items-center gap-2 min-w-0">
-                      <span className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-widest shrink-0 ${roleStyles[invite.role]}`}>
-                        {invite.role === 'chamber' ? 'Chamber' : invite.role === 'business' ? 'Business' : 'Player'}
-                      </span>
-                      {invite.businessName && (
-                        <span className="text-[10px] text-neutral-500 font-medium truncate">{invite.businessName}</span>
-                      )}
-                      {invite.emailHint && (
-                        <span className="text-[10px] text-neutral-400 truncate">{invite.emailHint}</span>
-                      )}
-                      <span className="text-[9px] text-neutral-300 font-medium shrink-0">
-                        {status === 'used' ? `Used ${invite.usedAt ? new Date(invite.usedAt).toLocaleDateString() : ''}` : `Expires ${expires.toLocaleDateString()}`}
-                      </span>
-                    </div>
+                <div
+                  key={invite.id}
+                  className={`flex items-center gap-3 py-3 px-4 bg-neutral-50 rounded-2xl border border-neutral-100 transition-opacity ${
+                    status === 'expired' || status === 'used' ? 'opacity-50' : ''
+                  }`}
+                >
+                  <div className="flex flex-wrap items-center gap-2 min-w-0 flex-1">
+                    <span className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-widest shrink-0 ${roleStyles[invite.role]}`}>
+                      {invite.role === 'chamber' ? 'Chamber' : invite.role === 'business' ? 'Business' : 'Player'}
+                    </span>
+                    {invite.emailHint && (
+                      <span className="text-[10px] text-neutral-500 font-medium truncate">{invite.emailHint}</span>
+                    )}
+                    {invite.businessName && (
+                      <span className="text-[10px] text-neutral-400 truncate">{invite.businessName}</span>
+                    )}
                     <span className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-widest shrink-0 ${statusStyles[status]}`}>
                       {status}
                     </span>
+                    <span className="text-[9px] text-neutral-300 font-medium shrink-0">
+                      {status === 'used'
+                        ? `Used ${invite.usedAt ? new Date(invite.usedAt).toLocaleDateString() : ''}`
+                        : `Expires ${expires.toLocaleDateString()}`}
+                    </span>
                   </div>
-                  {status === 'pending' && (
-                    <button
-                      onClick={async () => {
-                        await navigator.clipboard.writeText(url);
-                        setCopiedId(invite.id);
-                        setTimeout(() => setCopiedId(null), 2000);
-                      }}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-widest transition-all ${
-                        isCopied
-                          ? 'bg-green-50 text-green-700 border border-green-200'
-                          : 'bg-white border border-neutral-200 text-neutral-600 hover:border-neutral-900'
-                      }`}
-                    >
-                      {isCopied ? <Check size={11} /> : <Copy size={11} />}
-                      {isCopied ? 'Copied!' : 'Copy Invite Link'}
-                    </button>
-                  )}
+                  <button
+                    onClick={async () => {
+                      await navigator.clipboard.writeText(url);
+                      setCopiedId(invite.id);
+                      setTimeout(() => setCopiedId(null), 2000);
+                    }}
+                    className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-widest transition-all ${
+                      isCopied
+                        ? 'bg-green-50 text-green-700 border border-green-200'
+                        : 'bg-white border border-neutral-200 text-neutral-600 hover:border-neutral-900'
+                    }`}
+                  >
+                    {isCopied ? <Check size={11} /> : <Copy size={11} />}
+                    {isCopied ? 'Copied!' : 'Copy'}
+                  </button>
                 </div>
               );
             })}

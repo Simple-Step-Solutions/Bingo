@@ -151,8 +151,23 @@ export const AdminMenu: React.FC<AdminMenuProps> = ({ users, businesses, current
           )}
         </div>
 
+        {/* Search -- full width and prominent */}
+        <div className="flex items-center gap-3 bg-neutral-50 border border-neutral-200 rounded-2xl px-4 py-3 mb-4">
+          <Search size={18} className="text-neutral-400 shrink-0" />
+          <input
+            type="text"
+            placeholder="Search by name, email, town, or role..."
+            value={userSearch}
+            onChange={e => { setUserSearch(e.target.value); setUserPage(0); }}
+            className="flex-1 bg-transparent text-sm font-medium outline-none placeholder:text-neutral-300"
+          />
+          <span className="text-[10px] text-neutral-400 font-bold uppercase tracking-widest shrink-0">
+            {filteredUsers.length} of {isAdmin ? users.length : users.filter(u => u.role !== 'admin').length}
+          </span>
+        </div>
+
         {/* Role filter pills */}
-        <div className="flex flex-wrap gap-2 mb-4">
+        <div className="flex flex-wrap gap-2 mb-6">
           {rolePills.map(pill => (
             <button
               key={pill.value}
@@ -168,101 +183,37 @@ export const AdminMenu: React.FC<AdminMenuProps> = ({ users, businesses, current
           ))}
         </div>
 
-        <div className="flex items-center gap-3 bg-neutral-50 border border-neutral-100 rounded-2xl px-4 py-3 mb-6">
-          <Search size={16} className="text-neutral-400 shrink-0" />
-          <input
-            type="text"
-            placeholder="Search by name, email, town, or role..."
-            value={userSearch}
-            onChange={e => { setUserSearch(e.target.value); setUserPage(0); }}
-            className="flex-1 bg-transparent text-sm outline-none font-medium placeholder:text-neutral-300"
-          />
-          <span className="text-[10px] text-neutral-400 font-bold uppercase tracking-widest shrink-0">
-            {filteredUsers.length} of {isAdmin ? users.length : users.filter(u => u.role !== 'admin').length}
-          </span>
-        </div>
-
         <div className="divide-y divide-neutral-100">
           {pagedUsers.map(u => (
-            <div key={u.uid} className="flex justify-between items-center py-6 first:pt-0 last:pb-0">
-              <div>
-                <p className="font-bold text-lg">{u.displayName || u.email}</p>
-                <div className="flex items-center gap-3 mt-1">
-                  <p className="text-xs text-neutral-400 uppercase tracking-widest">{u.email}</p>
-                  {u.town && (
-                    <span className="text-[10px] bg-neutral-100 px-2 py-0.5 rounded-full text-neutral-600 font-bold uppercase tracking-widest">
-                      {u.town}
+            <div key={u.uid} className="py-4 px-4 first:pt-0 last:pb-0">
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                {/* Identity */}
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-bold text-neutral-900 truncate">{u.displayName || u.email}</p>
+                  <div className="flex flex-wrap items-center gap-2 mt-1">
+                    <p className="text-xs text-neutral-400 truncate">{u.email}</p>
+                    {u.town && (
+                      <span className="text-[10px] bg-neutral-100 px-2 py-0.5 rounded-full text-neutral-600 font-bold uppercase tracking-widest shrink-0">
+                        {u.town}
+                      </span>
+                    )}
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-widest shrink-0 ${
+                      u.role === 'admin' ? 'bg-red-50 text-red-600' :
+                      u.role === 'chamber' ? 'bg-blue-50 text-blue-600' :
+                      u.role === 'business' ? 'bg-orange-50 text-orange-600' :
+                      'bg-neutral-100 text-neutral-600'
+                    }`}>
+                      {u.role}
                     </span>
-                  )}
-                </div>
-              </div>
-              <div className="flex items-center gap-4">
-                <div className="flex items-center gap-2 border-r border-neutral-100 pr-4 mr-2">
-                  {u.bingoBoard?.length && u.town ? (
-                    <button
-                      onClick={() => setImpersonating(u)}
-                      className="text-[10px] font-bold uppercase tracking-widest transition-colors flex items-center gap-1 text-neutral-400 hover:text-neutral-900"
-                      title="View / Edit Board"
-                    >
-                      <LayoutGrid size={10} />
-                      Board
-                    </button>
-                  ) : null}
-                  <button
-                    onClick={() => handleReset(u, 'town')}
-                    className={`text-[10px] font-bold uppercase tracking-widest transition-colors flex items-center gap-1 ${
-                      confirmAction?.uid === u.uid && confirmAction?.type === 'town' ? 'text-red-600' : 'text-neutral-400 hover:text-neutral-900'
-                    }`}
-                    title="Reset Town & Board"
-                  >
-                    <MapPin size={10} />
-                    {confirmAction?.uid === u.uid && confirmAction?.type === 'town' ? 'Confirm Reset Town?' : 'Town'}
-                  </button>
-                  <button
-                    onClick={() => handleReset(u, 'progress')}
-                    className={`text-[10px] font-bold uppercase tracking-widest transition-colors flex items-center gap-1 ${
-                      confirmAction?.uid === u.uid && confirmAction?.type === 'progress' ? 'text-red-600' : 'text-neutral-400 hover:text-neutral-900'
-                    }`}
-                    title="Reset Progress Only"
-                  >
-                    <RefreshCw size={10} className={confirmAction?.uid === u.uid && confirmAction?.type === 'progress' ? 'animate-spin' : ''} />
-                    {confirmAction?.uid === u.uid && confirmAction?.type === 'progress' ? 'Confirm?' : 'Progress'}
-                  </button>
-                  <button
-                    onClick={() => handleReset(u, 'board')}
-                    className={`text-[10px] font-bold uppercase tracking-widest transition-colors flex items-center gap-1 ${
-                      confirmAction?.uid === u.uid && confirmAction?.type === 'board' ? 'text-red-600' : 'text-neutral-400 hover:text-neutral-900'
-                    }`}
-                    title="Reset Board Only"
-                  >
-                    <Gamepad2 size={10} />
-                    {confirmAction?.uid === u.uid && confirmAction?.type === 'board' ? 'Confirm?' : 'Board'}
-                  </button>
-                  <button
-                    onClick={() => handleReset(u, 'everything')}
-                    className={`text-[10px] font-bold uppercase tracking-widest transition-colors flex items-center gap-1 ${
-                      confirmAction?.uid === u.uid && confirmAction?.type === 'everything' ? 'text-red-600' : 'text-neutral-400 hover:text-red-500'
-                    }`}
-                    title="Reset Town, Board & Progress"
-                  >
-                    <RotateCcw size={10} />
-                    {confirmAction?.uid === u.uid && confirmAction?.type === 'everything' ? 'Confirm Reset All?' : 'Reset All'}
-                  </button>
+                  </div>
                 </div>
 
-                <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest ${
-                  u.role === 'admin' ? 'bg-red-50 text-red-600' :
-                  u.role === 'chamber' ? 'bg-blue-50 text-blue-600' :
-                  u.role === 'business' ? 'bg-orange-50 text-orange-600' :
-                  'bg-neutral-100 text-neutral-600'
-                }`}>
-                  {u.role}
-                </span>
-                <div className="flex flex-col gap-2">
+                {/* Role selects */}
+                <div className="flex flex-col gap-2 shrink-0">
                   <select
                     value={u.role}
                     onChange={(e) => updateUserRole(u, e.target.value as any)}
-                    className="text-xs border border-neutral-200 p-3 rounded-xl bg-neutral-50 font-bold outline-none focus:ring-2 focus:ring-neutral-900 transition-all"
+                    className="text-xs border border-neutral-200 px-3 py-2 rounded-xl bg-neutral-50 font-bold outline-none focus:ring-2 focus:ring-[var(--color-primary)] transition-all"
                   >
                     <option value="player">Player</option>
                     <option value="business">Participating Business</option>
@@ -274,7 +225,7 @@ export const AdminMenu: React.FC<AdminMenuProps> = ({ users, businesses, current
                     <select
                       value={u.businessId || ''}
                       onChange={(e) => updateBusinessId(u.uid, e.target.value)}
-                      className="text-[10px] border border-neutral-200 p-2 rounded-lg bg-white font-bold outline-none focus:ring-2 focus:ring-neutral-900 transition-all"
+                      className="text-[10px] border border-neutral-200 px-3 py-2 rounded-lg bg-neutral-50 font-bold outline-none focus:ring-2 focus:ring-[var(--color-primary)] transition-all"
                     >
                       <option value="">Select Business...</option>
                       {businesses.map(b => (
@@ -283,6 +234,71 @@ export const AdminMenu: React.FC<AdminMenuProps> = ({ users, businesses, current
                     </select>
                   )}
                 </div>
+              </div>
+
+              {/* Action buttons */}
+              <div className="flex flex-wrap items-center gap-2 mt-3">
+                {u.bingoBoard?.length && u.town ? (
+                  <button
+                    onClick={() => setImpersonating(u)}
+                    className="text-[10px] font-bold uppercase tracking-widest transition-colors flex items-center gap-1 px-2 py-1 rounded-lg bg-neutral-100 text-neutral-500 hover:bg-neutral-200 hover:text-neutral-900"
+                    title="View / Edit Board"
+                  >
+                    <LayoutGrid size={10} />
+                    Board
+                  </button>
+                ) : null}
+                <button
+                  onClick={() => handleReset(u, 'town')}
+                  className={`text-[10px] font-bold uppercase tracking-widest transition-colors flex items-center gap-1 px-2 py-1 rounded-lg ${
+                    confirmAction?.uid === u.uid && confirmAction?.type === 'town'
+                      ? 'bg-red-50 text-red-600'
+                      : 'bg-neutral-100 text-neutral-500 hover:bg-neutral-200 hover:text-neutral-900'
+                  }`}
+                  title="Reset Town and Board"
+                >
+                  <MapPin size={10} />
+                  Town
+                </button>
+                <button
+                  onClick={() => handleReset(u, 'progress')}
+                  className={`text-[10px] font-bold uppercase tracking-widest transition-colors flex items-center gap-1 px-2 py-1 rounded-lg ${
+                    confirmAction?.uid === u.uid && confirmAction?.type === 'progress'
+                      ? 'bg-red-50 text-red-600'
+                      : 'bg-neutral-100 text-neutral-500 hover:bg-neutral-200 hover:text-neutral-900'
+                  }`}
+                  title="Reset Progress Only"
+                >
+                  <RefreshCw size={10} className={confirmAction?.uid === u.uid && confirmAction?.type === 'progress' ? 'animate-spin' : ''} />
+                  Progress
+                </button>
+                <button
+                  onClick={() => handleReset(u, 'board')}
+                  className={`text-[10px] font-bold uppercase tracking-widest transition-colors flex items-center gap-1 px-2 py-1 rounded-lg ${
+                    confirmAction?.uid === u.uid && confirmAction?.type === 'board'
+                      ? 'bg-red-50 text-red-600'
+                      : 'bg-neutral-100 text-neutral-500 hover:bg-neutral-200 hover:text-neutral-900'
+                  }`}
+                  title="Reset Board Only"
+                >
+                  <Gamepad2 size={10} />
+                  Board
+                </button>
+                <button
+                  onClick={() => handleReset(u, 'everything')}
+                  className={`text-[10px] font-bold uppercase tracking-widest transition-colors flex items-center gap-1 px-2 py-1 rounded-lg ${
+                    confirmAction?.uid === u.uid && confirmAction?.type === 'everything'
+                      ? 'bg-red-50 text-red-600'
+                      : 'bg-neutral-100 text-neutral-500 hover:bg-neutral-200 hover:text-red-500'
+                  }`}
+                  title="Reset Town, Board and Progress"
+                >
+                  <RotateCcw size={10} />
+                  Reset All
+                </button>
+                {confirmAction?.uid === u.uid && (
+                  <span className="text-[10px] text-red-500 font-bold italic">Click again to confirm</span>
+                )}
               </div>
             </div>
           ))}

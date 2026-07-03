@@ -154,51 +154,35 @@ export const Analytics: React.FC<AnalyticsProps> = ({ users, completions, busine
       {/* Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-white border border-neutral-200 p-5 rounded-3xl shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="bg-blue-50 p-3 rounded-2xl">
-              <Users className="text-blue-600" size={20} />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-neutral-900 leading-none">{players.length}</p>
-              <p className="text-[10px] text-neutral-400 uppercase tracking-widest font-bold">Total Players</p>
-            </div>
+          <div className="bg-blue-50 p-3 rounded-2xl w-fit mb-3">
+            <Users className="text-blue-600" size={20} />
           </div>
+          <p className="text-4xl font-black text-neutral-900 leading-none mb-1">{players.length}</p>
+          <p className="text-[10px] text-neutral-400 uppercase tracking-widest font-bold">Total Players</p>
         </div>
 
         <div className="bg-white border border-neutral-200 p-5 rounded-3xl shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="bg-green-50 p-3 rounded-2xl">
-              <CheckCircle2 className="text-green-600" size={20} />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-neutral-900 leading-none">{completions.length}</p>
-              <p className="text-[10px] text-neutral-400 uppercase tracking-widest font-bold">Total Visits</p>
-            </div>
+          <div className="bg-green-50 p-3 rounded-2xl w-fit mb-3">
+            <CheckCircle2 className="text-green-600" size={20} />
           </div>
+          <p className="text-4xl font-black text-neutral-900 leading-none mb-1">{completions.length}</p>
+          <p className="text-[10px] text-neutral-400 uppercase tracking-widest font-bold">Total Visits</p>
         </div>
 
         <div className="bg-white border border-neutral-200 p-5 rounded-3xl shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="bg-orange-50 p-3 rounded-2xl">
-              <Trophy className="text-orange-600" size={20} />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-neutral-900 leading-none">{bingoFinishers.length}</p>
-              <p className="text-[10px] text-neutral-400 uppercase tracking-widest font-bold">Bingo Finishers</p>
-            </div>
+          <div className="bg-orange-50 p-3 rounded-2xl w-fit mb-3">
+            <Trophy className="text-orange-600" size={20} />
           </div>
+          <p className="text-4xl font-black text-neutral-900 leading-none mb-1">{bingoFinishers.length}</p>
+          <p className="text-[10px] text-neutral-400 uppercase tracking-widest font-bold">Bingo Finishers</p>
         </div>
 
         <div className="bg-white border border-neutral-200 p-5 rounded-3xl shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="bg-purple-50 p-3 rounded-2xl">
-              <ActivityIcon className="text-purple-600" size={20} />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-neutral-900 leading-none">{activePlayers.length}</p>
-              <p className="text-[10px] text-neutral-400 uppercase tracking-widest font-bold">Active Now</p>
-            </div>
+          <div className="bg-purple-50 p-3 rounded-2xl w-fit mb-3">
+            <ActivityIcon className="text-purple-600" size={20} />
           </div>
+          <p className="text-4xl font-black text-neutral-900 leading-none mb-1">{activePlayers.length}</p>
+          <p className="text-[10px] text-neutral-400 uppercase tracking-widest font-bold">Active Now</p>
         </div>
       </div>
 
@@ -391,43 +375,43 @@ export const Analytics: React.FC<AnalyticsProps> = ({ users, completions, busine
         </div>
 
         {/* User Behavior Insights */}
-        <div className="bg-neutral-900 text-white p-8 rounded-3xl shadow-xl">
-            <div className="flex items-center gap-3 mb-8">
-              <div className="bg-white/10 p-2 rounded-xl">
-                <Clock className="text-white" size={20} />
-              </div>
-              <h3 className="font-bold uppercase tracking-widest text-xs text-neutral-400">User Behavior Insights</h3>
+        <div className="bg-white border border-neutral-200 p-8 rounded-3xl shadow-sm">
+          <div className="flex items-center gap-3 mb-8">
+            <div className="bg-neutral-100 p-2 rounded-xl">
+              <Clock className="text-neutral-900" size={20} />
             </div>
+            <h3 className="font-bold uppercase tracking-widest text-xs text-neutral-400">User Behavior Insights</h3>
+          </div>
 
-            <div className="grid grid-cols-2 gap-6">
-              <div className="bg-white/5 p-6 rounded-3xl border border-white/5">
-                <p className="text-2xl font-bold mb-1">{(completions.length / (players.length || 1)).toFixed(1)}</p>
-                <p className="text-[10px] text-neutral-400 uppercase tracking-widest font-bold">Avg Visits / Player</p>
-              </div>
-              <div className="bg-white/5 p-6 rounded-3xl border border-white/5">
-                <p className="text-2xl font-bold mb-1">{((bingoFinishers.length / (players.length || 1)) * 100).toFixed(0)}%</p>
-                <p className="text-[10px] text-neutral-400 uppercase tracking-widest font-bold">Bingo Success Rate</p>
-              </div>
-              <div className="bg-white/5 p-6 rounded-3xl border border-white/5">
-                <p className="text-2xl font-bold mb-1">{players.filter(u => u.metadata?.hasClickedDirections).length}</p>
-                <p className="text-[10px] text-neutral-400 uppercase tracking-widest font-bold">Directions Used</p>
-              </div>
-              <div className="bg-white/5 p-6 rounded-3xl border border-white/5">
-                <p className="text-2xl font-bold mb-1">{players.filter(u => u.metadata?.hasOpenedAppMultipleTimes).length}</p>
-                <p className="text-[10px] text-neutral-400 uppercase tracking-widest font-bold">Repeat Users</p>
-              </div>
+          <div className="grid grid-cols-2 gap-6">
+            <div className="bg-neutral-50 p-6 rounded-3xl border border-neutral-100">
+              <p className="text-4xl font-black text-neutral-900 mb-1">{(completions.length / (players.length || 1)).toFixed(1)}</p>
+              <p className="text-[10px] text-neutral-400 uppercase tracking-widest font-bold">Avg Visits / Player</p>
             </div>
-
-            <div className="mt-8 p-6 bg-white/5 rounded-3xl border border-white/5">
-              <p className="text-[10px] text-neutral-400 uppercase tracking-widest font-bold mb-4">Top Shopping Time</p>
-              <div className="flex items-center gap-4">
-                <div className="flex-1 h-1 bg-white/10 rounded-full overflow-hidden">
-                  <div className="h-full bg-yellow-400 w-full" />
-                </div>
-                <span className="text-xs font-bold">{topShoppingTime}</span>
-              </div>
+            <div className="bg-neutral-50 p-6 rounded-3xl border border-neutral-100">
+              <p className="text-4xl font-black text-neutral-900 mb-1">{((bingoFinishers.length / (players.length || 1)) * 100).toFixed(0)}%</p>
+              <p className="text-[10px] text-neutral-400 uppercase tracking-widest font-bold">Bingo Success Rate</p>
+            </div>
+            <div className="bg-neutral-50 p-6 rounded-3xl border border-neutral-100">
+              <p className="text-4xl font-black text-neutral-900 mb-1">{players.filter(u => u.metadata?.hasClickedDirections).length}</p>
+              <p className="text-[10px] text-neutral-400 uppercase tracking-widest font-bold">Directions Used</p>
+            </div>
+            <div className="bg-neutral-50 p-6 rounded-3xl border border-neutral-100">
+              <p className="text-4xl font-black text-neutral-900 mb-1">{players.filter(u => u.metadata?.hasOpenedAppMultipleTimes).length}</p>
+              <p className="text-[10px] text-neutral-400 uppercase tracking-widest font-bold">Repeat Users</p>
             </div>
           </div>
+
+          <div className="mt-8 p-6 bg-neutral-50 rounded-3xl border border-neutral-100">
+            <p className="text-[10px] text-neutral-400 uppercase tracking-widest font-bold mb-4">Top Shopping Time</p>
+            <div className="flex items-center gap-4">
+              <div className="flex-1 h-2 bg-neutral-200 rounded-full overflow-hidden">
+                <div className="h-full bg-[var(--color-accent)] w-full" />
+              </div>
+              <span className="text-sm font-bold text-neutral-900">{topShoppingTime}</span>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -3,7 +3,7 @@ import { Business, Town, RaffleEntry, Winner, AppSettings } from '../../types';
 import { doc, setDoc, deleteDoc, addDoc, collection } from 'firebase/firestore';
 import { db, storage } from '../../firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { Store, Trash2, Plus, Nfc, QrCode, MapPin, Search, Users, Ticket, Pencil, Trophy, Sparkles, Loader2, ChevronLeft, ChevronRight, Palette, ImagePlus } from 'lucide-react';
+import { Store, Trash2, Plus, Nfc, QrCode, Search, Users, Ticket, Pencil, Trophy, Sparkles, Loader2, ChevronLeft, ChevronRight, Palette, ImagePlus } from 'lucide-react';
 
 const DEFAULT_PRIMARY = '#1695B2';
 const DEFAULT_ACCENT = '#CC5500';
@@ -96,7 +96,7 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
         userName: winner.userName,
         userEmail: winner.userEmail,
         timestamp: new Date().toISOString(),
-        prize: 'Raffle Prize'
+        prize: settings.bingoPrize || 'Raffle Prize'
       });
     }
     setTempWinners([]);
@@ -162,10 +162,6 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
     });
     setEditingId(biz.id);
     setTimeout(() => formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
-  };
-
-  const updateBusinessNfc = async (id: string, nfcId: string) => {
-    await setDoc(doc(db, 'businesses', id), { nfcId }, { merge: true });
   };
 
   const deleteBusiness = async (id: string) => {
@@ -351,63 +347,35 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
             )}
           </div>
 
-          <div className="mt-6 space-y-4">
+          <div className="mt-6 divide-y divide-neutral-100">
             {pagedBusinesses.map(biz => (
-              <div key={biz.id} className="flex flex-col p-6 bg-neutral-50 rounded-3xl border border-neutral-100 group hover:border-neutral-900 transition-all">
-                <div className="flex justify-between items-start mb-6">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-white border border-neutral-200 rounded-2xl flex items-center justify-center text-neutral-400 group-hover:text-neutral-900 transition-colors shadow-sm">
-                      <Store size={24} />
-                    </div>
-                    <div>
-                      <p className="font-bold text-lg">{biz.name}</p>
-                      <p className="text-[10px] text-neutral-400 uppercase tracking-widest font-bold">
-                        {biz.town} • {biz.category || 'General'} • {biz.task}
-                      </p>
-                      {biz.address && (
-                        <p className="text-[10px] text-neutral-400 mt-1 flex items-center gap-1">
-                          <MapPin size={10} /> {biz.address}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <button 
-                      onClick={() => editBusiness(biz)}
-                      className="p-3 bg-white border border-neutral-200 rounded-xl text-neutral-400 hover:text-neutral-900 hover:border-neutral-900 transition-all shadow-sm"
-                      title="Edit Business"
-                    >
-                      <Pencil size={18} />
-                    </button>
-                    <button 
-                      onClick={() => setSelectedQR({ value: biz.qrCode, title: biz.name })}
-                      className="p-3 bg-white border border-neutral-200 rounded-xl text-neutral-400 hover:text-neutral-900 hover:border-neutral-900 transition-all shadow-sm"
-                      title="Generate QR Code"
-                    >
-                      <QrCode size={18} />
-                    </button>
-                    <button 
-                      onClick={() => deleteBusiness(biz.id)} 
-                      className="p-3 bg-white border border-neutral-200 rounded-xl text-neutral-300 hover:text-red-500 hover:border-red-200 transition-all shadow-sm"
-                    >
-                      <Trash2 size={18} />
-                    </button>
-                  </div>
+              <div key={biz.id} className="flex items-center justify-between py-3 px-4 hover:bg-neutral-50 transition-all rounded-2xl group">
+                <div className="min-w-0 flex-1">
+                  <p className="font-bold text-sm text-neutral-900 truncate">{biz.name}</p>
+                  <p className="text-xs text-neutral-400">{biz.town} &bull; {biz.category || 'General'}</p>
                 </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-6 border-t border-neutral-200/50">
-                  <div className="flex items-center gap-3 bg-white p-3 rounded-xl border border-neutral-100">
-                    <Nfc size={16} className="text-neutral-400" />
-                    <input 
-                      placeholder="Associate NFC ID"
-                      value={biz.nfcId || ''}
-                      onChange={(e) => updateBusinessNfc(biz.id, e.target.value)}
-                      className="flex-1 bg-transparent text-[10px] uppercase tracking-widest font-bold outline-none border-none focus:ring-0"
-                    />
-                  </div>
-                  <div className="flex items-center gap-3 bg-white p-3 rounded-xl border border-neutral-100">
-                    <code className="text-[10px] text-neutral-400 font-mono uppercase tracking-widest">Code: {biz.qrCode}</code>
-                  </div>
+                <div className="flex items-center gap-2 shrink-0 ml-4">
+                  <button
+                    onClick={() => editBusiness(biz)}
+                    className="p-2 bg-white border border-neutral-200 rounded-xl text-neutral-400 hover:text-neutral-900 hover:border-neutral-900 transition-all shadow-sm"
+                    title="Edit Business"
+                  >
+                    <Pencil size={15} />
+                  </button>
+                  <button
+                    onClick={() => setSelectedQR({ value: biz.qrCode, title: biz.name })}
+                    className="p-2 bg-white border border-neutral-200 rounded-xl text-neutral-400 hover:text-neutral-900 hover:border-neutral-900 transition-all shadow-sm"
+                    title="QR Code"
+                  >
+                    <QrCode size={15} />
+                  </button>
+                  <button
+                    onClick={() => deleteBusiness(biz.id)}
+                    className="p-2 bg-white border border-neutral-200 rounded-xl text-neutral-300 hover:text-red-500 hover:border-red-200 transition-all shadow-sm"
+                    title="Delete"
+                  >
+                    <Trash2 size={15} />
+                  </button>
                 </div>
               </div>
             ))}
@@ -582,13 +550,13 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
 
       {/* Add Business & Towns */}
       <div className="space-y-8">
-        <div ref={formRef} className="bg-neutral-900 text-white p-8 rounded-3xl shadow-2xl">
+        <div ref={formRef} className="bg-white border border-neutral-200 rounded-3xl p-6 shadow-sm">
           <div className="flex justify-between items-center mb-8">
             <h3 className="font-bold uppercase tracking-widest text-xs text-neutral-400">
               {editingId ? 'Edit Business' : 'Quick Add Business'}
             </h3>
             {editingId && (
-              <button 
+              <button
                 onClick={() => {
                   setEditingId(null);
                   setNewBiz({
@@ -596,7 +564,7 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
                     description: '', image: '', website: ''
                   });
                 }}
-                className="text-[10px] uppercase tracking-widest font-bold text-neutral-500 hover:text-white"
+                className="text-[10px] uppercase tracking-widest font-bold text-neutral-400 hover:text-neutral-900"
               >
                 Cancel
               </button>
@@ -605,14 +573,14 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
           <div className="space-y-6">
             <div>
               <label className="block text-[10px] text-neutral-400 uppercase tracking-widest mb-2 font-bold">Business Name</label>
-              <input 
+              <input
                 placeholder="e.g. Main Street Bakery"
                 value={newBiz.name}
                 onChange={e => setNewBiz({...newBiz, name: e.target.value})}
-                className="w-full p-4 bg-white/10 border border-white/10 rounded-2xl text-sm font-medium focus:ring-2 focus:ring-white/20 transition-all outline-none"
+                className="w-full px-4 py-3 bg-neutral-50 border border-neutral-200 rounded-2xl text-sm focus:ring-2 focus:ring-[var(--color-primary)] outline-none transition-all"
               />
             </div>
-            
+
             <div>
               <label className="block text-[10px] text-neutral-400 uppercase tracking-widest mb-2 font-bold">Location Search</label>
               <AddressSearch onSelect={(lat, lng, address) => setNewBiz({...newBiz, lat, lng, address})} />
@@ -621,23 +589,23 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-[10px] text-neutral-400 uppercase tracking-widest mb-2 font-bold">Town</label>
-                <select 
+                <select
                   value={newBiz.town}
                   onChange={e => setNewBiz({...newBiz, town: e.target.value})}
-                  className="w-full p-4 bg-white/10 border border-white/10 rounded-2xl text-sm font-medium focus:ring-2 focus:ring-white/20 transition-all outline-none"
+                  className="w-full px-4 py-3 bg-neutral-50 border border-neutral-200 rounded-2xl text-sm focus:ring-2 focus:ring-[var(--color-primary)] outline-none transition-all"
                 >
-                  {towns.map(t => <option key={t.id} value={t.name} className="bg-neutral-900">{t.name}</option>)}
+                  {towns.map(t => <option key={t.id} value={t.name}>{t.name}</option>)}
                 </select>
               </div>
               <div>
                 <label className="block text-[10px] text-neutral-400 uppercase tracking-widest mb-2 font-bold">NFC ID</label>
-                <div className="flex items-center gap-3 p-4 bg-white/10 border border-white/10 rounded-2xl focus-within:ring-2 focus-within:ring-white/20 transition-all">
-                  <Nfc size={18} className="text-neutral-400" />
-                  <input 
+                <div className="flex items-center gap-3 px-4 py-3 bg-neutral-50 border border-neutral-200 rounded-2xl focus-within:ring-2 focus-within:ring-[var(--color-primary)] transition-all">
+                  <Nfc size={16} className="text-neutral-400" />
+                  <input
                     placeholder="Optional"
                     value={newBiz.nfcId}
                     onChange={e => setNewBiz({...newBiz, nfcId: e.target.value})}
-                    className="flex-1 bg-transparent outline-none text-sm font-medium"
+                    className="flex-1 bg-transparent outline-none text-sm"
                   />
                 </div>
               </div>
@@ -648,59 +616,59 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
               <select
                 value={newBiz.category}
                 onChange={e => setNewBiz({...newBiz, category: e.target.value})}
-                className="w-full p-4 bg-white/10 border border-white/10 rounded-2xl text-sm font-medium focus:ring-2 focus:ring-white/20 transition-all outline-none"
+                className="w-full px-4 py-3 bg-neutral-50 border border-neutral-200 rounded-2xl text-sm focus:ring-2 focus:ring-[var(--color-primary)] outline-none transition-all"
               >
                 {(settings.businessCategories ?? ['Retail', 'Restaurant', 'Service', 'Entertainment', 'Other']).map(cat => (
-                  <option key={cat} value={cat} className="bg-neutral-900">{cat}</option>
+                  <option key={cat} value={cat}>{cat}</option>
                 ))}
               </select>
             </div>
 
             <div>
               <label className="block text-[10px] text-neutral-400 uppercase tracking-widest mb-2 font-bold">Task Description</label>
-              <input 
+              <input
                 placeholder="e.g. Buy a coffee"
                 value={newBiz.task}
                 onChange={e => setNewBiz({...newBiz, task: e.target.value})}
-                className="w-full p-4 bg-white/10 border border-white/10 rounded-2xl text-sm font-medium focus:ring-2 focus:ring-white/20 transition-all outline-none"
+                className="w-full px-4 py-3 bg-neutral-50 border border-neutral-200 rounded-2xl text-sm focus:ring-2 focus:ring-[var(--color-primary)] outline-none transition-all"
               />
             </div>
 
             <div>
               <label className="block text-[10px] text-neutral-400 uppercase tracking-widest mb-2 font-bold">About Business (Optional)</label>
-              <textarea 
+              <textarea
                 placeholder="Brief description of the business..."
                 value={newBiz.description}
                 onChange={e => setNewBiz({...newBiz, description: e.target.value})}
-                className="w-full p-4 bg-white/10 border border-white/10 rounded-2xl text-sm font-medium focus:ring-2 focus:ring-white/20 transition-all outline-none h-24 resize-none"
+                className="w-full px-4 py-3 bg-neutral-50 border border-neutral-200 rounded-2xl text-sm focus:ring-2 focus:ring-[var(--color-primary)] outline-none transition-all h-24 resize-none"
               />
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-[10px] text-neutral-400 uppercase tracking-widest mb-2 font-bold">Image URL (Optional)</label>
-                <input 
+                <input
                   placeholder="https://..."
                   value={newBiz.image}
                   onChange={e => setNewBiz({...newBiz, image: e.target.value})}
-                  className="w-full p-4 bg-white/10 border border-white/10 rounded-2xl text-sm font-medium focus:ring-2 focus:ring-white/20 transition-all outline-none"
+                  className="w-full px-4 py-3 bg-neutral-50 border border-neutral-200 rounded-2xl text-sm focus:ring-2 focus:ring-[var(--color-primary)] outline-none transition-all"
                 />
               </div>
               <div>
                 <label className="block text-[10px] text-neutral-400 uppercase tracking-widest mb-2 font-bold">Website (Optional)</label>
-                <input 
+                <input
                   placeholder="https://..."
                   value={newBiz.website}
                   onChange={e => setNewBiz({...newBiz, website: e.target.value})}
-                  className="w-full p-4 bg-white/10 border border-white/10 rounded-2xl text-sm font-medium focus:ring-2 focus:ring-white/20 transition-all outline-none"
+                  className="w-full px-4 py-3 bg-neutral-50 border border-neutral-200 rounded-2xl text-sm focus:ring-2 focus:ring-[var(--color-primary)] outline-none transition-all"
                 />
               </div>
             </div>
 
-            <button 
+            <button
               onClick={addBusiness}
               disabled={isGeocoding}
-              className="w-full bg-white text-neutral-900 p-5 rounded-2xl font-bold hover:bg-neutral-100 transition-all shadow-lg active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
+              className="w-full bg-neutral-900 text-white p-5 rounded-2xl font-bold hover:bg-neutral-800 transition-all shadow-lg active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {isGeocoding && <Loader2 className="animate-spin" size={18} />}
               {editingId ? 'Update Business' : 'Add Business'}
