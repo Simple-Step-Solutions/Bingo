@@ -1,8 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { AppSettings, UserProfile } from '../../types';
 import { doc, setDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
-import { Gamepad2, Trophy, ToggleLeft, ToggleRight } from 'lucide-react';
+import { Gamepad2, Trophy, ToggleLeft, ToggleRight, Tag, X, Plus } from 'lucide-react';
+
+const DEFAULT_CATEGORIES = ['Retail', 'Restaurant', 'Service', 'Entertainment', 'Other'];
 
 interface GameMasterProps {
   settings: AppSettings;
@@ -10,8 +12,23 @@ interface GameMasterProps {
 }
 
 export const GameMaster: React.FC<GameMasterProps> = ({ settings, user }) => {
+  const [newCategory, setNewCategory] = useState('');
+
+  const categories = settings.businessCategories ?? DEFAULT_CATEGORIES;
+
   const updateSettings = async (field: keyof AppSettings, value: any) => {
     await setDoc(doc(db, 'settings', 'global'), { [field]: value }, { merge: true });
+  };
+
+  const addCategory = async () => {
+    const trimmed = newCategory.trim();
+    if (!trimmed || categories.includes(trimmed)) return;
+    await updateSettings('businessCategories', [...categories, trimmed]);
+    setNewCategory('');
+  };
+
+  const removeCategory = async (cat: string) => {
+    await updateSettings('businessCategories', categories.filter(c => c !== cat));
   };
 
   return (
@@ -185,6 +202,43 @@ export const GameMaster: React.FC<GameMasterProps> = ({ settings, user }) => {
               Number of business visits required to submit a raffle entry.
             </p>
           </div>
+        </div>
+      </div>
+      {/* Business Categories */}
+      <div className="bg-white border border-neutral-200 p-8 rounded-3xl shadow-sm lg:col-span-2">
+        <div className="flex items-center gap-3 mb-8">
+          <div className="bg-neutral-100 p-2 rounded-xl">
+            <Tag className="text-neutral-900" size={20} />
+          </div>
+          <h3 className="font-bold uppercase tracking-widest text-xs text-neutral-400">Business Categories</h3>
+        </div>
+
+        <div className="flex flex-wrap gap-2 mb-6">
+          {categories.map(cat => (
+            <span key={cat} className="flex items-center gap-2 px-3 py-1.5 bg-neutral-100 rounded-xl text-xs font-bold text-neutral-700">
+              {cat}
+              <button onClick={() => removeCategory(cat)} className="text-neutral-400 hover:text-red-500 transition-colors">
+                <X size={12} />
+              </button>
+            </span>
+          ))}
+        </div>
+
+        <div className="flex gap-3">
+          <input
+            value={newCategory}
+            onChange={e => setNewCategory(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && addCategory()}
+            placeholder="New category..."
+            className="flex-1 p-4 bg-neutral-50 border border-neutral-100 rounded-2xl text-sm font-medium focus:ring-2 focus:ring-neutral-900 transition-all outline-none"
+          />
+          <button
+            onClick={addCategory}
+            disabled={!newCategory.trim()}
+            className="flex items-center gap-2 px-5 py-4 bg-neutral-900 text-white rounded-2xl text-xs font-bold uppercase tracking-widest disabled:opacity-40 transition-all hover:bg-neutral-700"
+          >
+            <Plus size={14} /> Add
+          </button>
         </div>
       </div>
     </div>

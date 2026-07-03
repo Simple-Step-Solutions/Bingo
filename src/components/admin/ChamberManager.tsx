@@ -645,16 +645,14 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
 
             <div>
               <label className="block text-[10px] text-neutral-400 uppercase tracking-widest mb-2 font-bold">Business Category</label>
-              <select 
+              <select
                 value={newBiz.category}
                 onChange={e => setNewBiz({...newBiz, category: e.target.value})}
                 className="w-full p-4 bg-white/10 border border-white/10 rounded-2xl text-sm font-medium focus:ring-2 focus:ring-white/20 transition-all outline-none"
               >
-                <option value="Retail" className="bg-neutral-900">Retail</option>
-                <option value="Restaurant" className="bg-neutral-900">Restaurant</option>
-                <option value="Service" className="bg-neutral-900">Service</option>
-                <option value="Entertainment" className="bg-neutral-900">Entertainment</option>
-                <option value="Other" className="bg-neutral-900">Other</option>
+                {(settings.businessCategories ?? ['Retail', 'Restaurant', 'Service', 'Entertainment', 'Other']).map(cat => (
+                  <option key={cat} value={cat} className="bg-neutral-900">{cat}</option>
+                ))}
               </select>
             </div>
 
