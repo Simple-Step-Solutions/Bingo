@@ -35,18 +35,23 @@ async function registerFcmToken(uid: string) {
 
 export function usePushNotifications(uid: string | undefined) {
   const [showPrompt, setShowPrompt] = useState(false);
+  const [debugMsg, setDebugMsg] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!uid || !VAPID_KEY || !('Notification' in window) || !('serviceWorker' in navigator)) return;
+    if (!uid) { setDebugMsg('no uid'); return; }
+    if (!VAPID_KEY) { setDebugMsg('no VAPID key'); return; }
+    if (!('Notification' in window)) { setDebugMsg('Notification API unavailable'); return; }
+    if (!('serviceWorker' in navigator)) { setDebugMsg('SW unavailable'); return; }
+
+    setDebugMsg(`permission: ${Notification.permission}`);
 
     if (Notification.permission === 'granted') {
-      // Already granted — register silently
-      registerFcmToken(uid).catch(err => console.warn('Push notification setup failed:', err));
+      registerFcmToken(uid)
+        .then(() => setDebugMsg('token registered'))
+        .catch(err => setDebugMsg(`FCM error: ${err?.message ?? err}`));
     } else if (Notification.permission === 'default') {
-      // Need to ask — surface the prompt banner
       setShowPrompt(true);
     }
-    // 'denied' — do nothing
   }, [uid]);
 
   const requestPermission = async () => {
@@ -61,5 +66,5 @@ export function usePushNotifications(uid: string | undefined) {
     }
   };
 
-  return { showPrompt, requestPermission, dismissPrompt: () => setShowPrompt(false) };
+  return { showPrompt, requestPermission, dismissPrompt: () => setShowPrompt(false), debugMsg };
 }
