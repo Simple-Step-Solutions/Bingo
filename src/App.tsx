@@ -205,7 +205,7 @@ function App() {
                 &copy; 2026 All Rights Reserved
               </p>
               <p className="text-[9px] text-neutral-300 uppercase tracking-widest font-bold">
-                v{(globalThis as any).__APP_VERSION__}
+                v{__APP_VERSION__}
               </p>
             </div>
             <a
