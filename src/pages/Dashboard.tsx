@@ -320,9 +320,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, towns, s
                 <div key="free"
                   className="bg-orange-50 border-2 border-orange-200 rounded-xl md:rounded-3xl flex flex-col items-center justify-center text-center p-1 shadow-sm relative overflow-hidden group">
                   <div className="absolute inset-0 bg-orange-100/50 opacity-0 group-hover:opacity-100 transition-opacity" />
-                  <Trophy className="text-orange-500 mb-0.5 relative z-10 w-4 h-4 md:w-6 md:h-6" />
-                  <p className="text-[7px] md:text-[10px] font-black text-orange-900 uppercase tracking-tighter relative z-10 leading-none px-1">{settings.freeSpaceName}</p>
-                  <p className="text-[5px] md:text-[8px] text-orange-600 font-bold uppercase tracking-widest mt-0.5 relative z-10 opacity-60 px-1 leading-tight hidden sm:block">{settings.freeSpaceTask}</p>
+                  <Trophy className="text-orange-500 mb-1 relative z-10 w-5 h-5 md:w-8 md:h-8" />
+                  <p className="text-[9px] md:text-sm font-black text-orange-900 uppercase tracking-tighter relative z-10 leading-none px-1">{settings.freeSpaceName}</p>
+                  <p className="text-[7px] md:text-[10px] text-orange-600 font-bold uppercase tracking-widest mt-0.5 relative z-10 opacity-60 px-1 leading-tight hidden sm:block">{settings.freeSpaceTask}</p>
                 </div>
               );
             }
@@ -349,14 +349,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, towns, s
               >
                 {isDone ? (
                   <>
-                    <CheckCircle2 className="text-orange-500 mb-0.5 md:mb-1 w-4 h-4 md:w-6 md:h-6 shrink-0" />
-                    <p className="text-[7px] md:text-[10px] font-bold uppercase tracking-tighter leading-tight line-clamp-2 px-0.5">{biz?.name || 'Unknown'}</p>
+                    <CheckCircle2 className="text-orange-500 mb-1 w-5 h-5 md:w-8 md:h-8 shrink-0" />
+                    <p className="text-[9px] md:text-sm font-bold uppercase tracking-tighter leading-tight line-clamp-2 px-1">{biz?.name || 'Unknown'}</p>
                   </>
                 ) : (
                   <>
-                    <Store className="text-neutral-200 mb-0.5 md:mb-1 group-hover:text-neutral-400 transition-colors w-3.5 h-3.5 md:w-5 md:h-5 shrink-0" />
-                    <p className="text-[7px] md:text-[10px] font-bold uppercase tracking-tighter leading-tight line-clamp-2 px-0.5">{biz?.name || '...'}</p>
-                    <p className="text-[5px] md:text-[8px] text-neutral-400 font-medium uppercase tracking-widest mt-0.5 hidden sm:block">{biz?.town}</p>
+                    <Store className="text-neutral-200 mb-1 group-hover:text-neutral-400 transition-colors w-5 h-5 md:w-8 md:h-8 shrink-0" />
+                    <p className="text-[9px] md:text-sm font-bold uppercase tracking-tighter leading-tight line-clamp-2 px-1">{biz?.name || '...'}</p>
+                    <p className="text-[7px] md:text-[10px] text-neutral-400 font-medium uppercase tracking-widest mt-0.5 hidden sm:block">{biz?.town}</p>
                   </>
                 )}
               </div>
