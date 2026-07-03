@@ -471,7 +471,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, towns, s
                       <a
                         href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(selectedBusiness.address || selectedBusiness.name + ' ' + selectedBusiness.town)}`}
                         target="_blank" rel="noopener noreferrer"
-
                         className="flex items-center justify-center gap-2 bg-neutral-100 p-4 rounded-2xl hover:bg-neutral-200 transition-all group"
                       >
                         <Navigation size={18} className="text-neutral-400 group-hover:text-neutral-900 transition-colors" />

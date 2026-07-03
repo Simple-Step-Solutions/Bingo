@@ -393,12 +393,12 @@ export const Analytics: React.FC<AnalyticsProps> = ({ users, completions, busine
               <p className="text-[10px] text-neutral-400 uppercase tracking-widest font-bold">Bingo Success Rate</p>
             </div>
             <div className="bg-neutral-50 p-6 rounded-3xl border border-neutral-100">
-              <p className="text-4xl font-black text-neutral-900 mb-1">{players.filter(u => u.metadata?.hasClickedDirections).length}</p>
-              <p className="text-[10px] text-neutral-400 uppercase tracking-widest font-bold">Directions Used</p>
+              <p className="text-4xl font-black text-neutral-900 mb-1">{players.filter(u => completions.some(c => c.userId === u.uid)).length}</p>
+              <p className="text-[10px] text-neutral-400 uppercase tracking-widest font-bold">Players Engaged</p>
             </div>
             <div className="bg-neutral-50 p-6 rounded-3xl border border-neutral-100">
-              <p className="text-4xl font-black text-neutral-900 mb-1">{players.filter(u => u.metadata?.hasOpenedAppMultipleTimes).length}</p>
-              <p className="text-[10px] text-neutral-400 uppercase tracking-widest font-bold">Repeat Users</p>
+              <p className="text-4xl font-black text-neutral-900 mb-1">{players.filter(u => !completions.some(c => c.userId === u.uid)).length}</p>
+              <p className="text-[10px] text-neutral-400 uppercase tracking-widest font-bold">Not Started</p>
             </div>
           </div>
 
