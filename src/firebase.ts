@@ -2,6 +2,7 @@ import { initializeApp } from 'firebase/app';
 import { initializeAuth, browserLocalPersistence, browserPopupRedirectResolver } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
+import { getMessaging, isSupported } from 'firebase/messaging';
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -21,6 +22,7 @@ export const auth = initializeAuth(app, {
   popupRedirectResolver: browserPopupRedirectResolver,
 });
 export const storage = getStorage(app);
+export const messaging = isSupported().then(yes => yes ? getMessaging(app) : null);
 
 export enum OperationType {
   CREATE = 'create',

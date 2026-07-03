@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { collection, query, limit, onSnapshot, addDoc, doc, updateDoc } from 'firebase/firestore';
+import { collection, query, limit, onSnapshot, addDoc, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { Notification, UserProfile } from '../types';
-import { Bell, X, Info, Trophy, Ticket, Gamepad2, Plus, Loader2 } from 'lucide-react';
+import { Bell, X, Info, Trophy, Ticket, Gamepad2, Plus, Loader2, Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface NotificationBellProps {
@@ -188,7 +188,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({ user }) => {
                   return (
                     <div
                       key={n.id}
-                      className={`flex items-start gap-3 px-5 py-4 transition-colors ${isRead ? 'bg-white' : 'bg-blue-50/40'}`}
+                      className={`group flex items-start gap-3 px-5 py-4 transition-colors ${isRead ? 'bg-white' : 'bg-blue-50/40'}`}
                     >
                       <div className={`shrink-0 p-2 rounded-xl mt-0.5 ${TYPE_COLOR[n.type] || TYPE_COLOR.info}`}>
                         {TYPE_ICON[n.type] || TYPE_ICON.info}
@@ -199,9 +199,20 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({ user }) => {
                           {new Date(n.timestamp).toLocaleString()}
                         </p>
                       </div>
-                      {!isRead && (
-                        <div className="shrink-0 w-2 h-2 rounded-full bg-[var(--color-accent,#CC5500)] mt-2" />
-                      )}
+                      <div className="shrink-0 flex items-center gap-1">
+                        {!isRead && (
+                          <div className="w-2 h-2 rounded-full bg-[var(--color-accent,#CC5500)]" />
+                        )}
+                        {canCompose && (
+                          <button
+                            onClick={() => deleteDoc(doc(db, 'notifications', n.id)).catch(console.error)}
+                            className="opacity-0 group-hover:opacity-100 p-1 rounded-lg text-neutral-300 hover:text-red-500 hover:bg-red-50 transition-all"
+                            title="Delete notification"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        )}
+                      </div>
                     </div>
                   );
                 })

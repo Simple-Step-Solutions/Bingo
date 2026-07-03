@@ -156,6 +156,7 @@ service cloud.firestore {
     match /notifications/{notificationId} {
       allow read: if isAuthenticated();
       allow create: if isChamber();
+      allow delete: if isChamber();
     }
 
     // ===============================================================

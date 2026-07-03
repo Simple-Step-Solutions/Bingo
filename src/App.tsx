@@ -25,6 +25,7 @@ import { UpdateBanner } from './components/UpdateBanner';
 import { ChamberTour } from './components/tour/ChamberTour';
 import { BusinessTour } from './components/tour/BusinessTour';
 import { RoleSelector } from './components/RoleSelector';
+import { usePushNotifications } from './hooks/usePushNotifications';
 
 const DEFAULT_PRIMARY = '#1695B2';
 const DEFAULT_ACCENT = '#CC5500';
@@ -37,6 +38,7 @@ function App() {
   const [towns, setTowns] = useState<Town[]>([]);
   const [loading, setLoading] = useState(true);
   const [showTour, setShowTour] = useState(false);
+  usePushNotifications(user?.uid);
 
   useEffect(() => {
     const primary = settings?.primaryColor || DEFAULT_PRIMARY;

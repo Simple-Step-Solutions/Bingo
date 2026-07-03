@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { UserProfile, Business, Town, RaffleEntry, AppSettings, Completion, Winner, AuditLog } from '../types';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
@@ -17,7 +18,15 @@ interface AdminProps {
 }
 
 export const Admin: React.FC<AdminProps> = ({ user, businesses, towns, settings }) => {
-  const [activeTab, setActiveTab] = useState<'admin' | 'master' | 'chamber' | 'analytics' | 'audit'>(user.role === 'admin' ? 'admin' : 'chamber');
+  const [searchParams] = useSearchParams();
+  const tabParam = searchParams.get('tab') as 'admin' | 'master' | 'chamber' | 'analytics' | 'audit' | null;
+  const [activeTab, setActiveTab] = useState<'admin' | 'master' | 'chamber' | 'analytics' | 'audit'>(
+    tabParam || (user.role === 'admin' ? 'admin' : 'chamber')
+  );
+
+  useEffect(() => {
+    if (tabParam) setActiveTab(tabParam);
+  }, [tabParam]);
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [raffleEntries, setRaffleEntries] = useState<RaffleEntry[]>([]);
   const [winners, setWinners] = useState<Winner[]>([]);
