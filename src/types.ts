@@ -33,6 +33,7 @@ export interface Business {
   description?: string;
   image?: string;
   website?: string;
+  email?: string;
 }
 
 export interface Town {

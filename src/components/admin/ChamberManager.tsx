@@ -3,7 +3,8 @@ import { Business, Town, RaffleEntry, Winner, AppSettings } from '../../types';
 import { doc, setDoc, deleteDoc, addDoc, collection } from 'firebase/firestore';
 import { db, storage } from '../../firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { Store, Trash2, Plus, Nfc, QrCode, Search, Users, Ticket, Pencil, Trophy, Sparkles, Loader2, ChevronLeft, ChevronRight, Palette, ImagePlus } from 'lucide-react';
+import { Store, Trash2, Plus, Nfc, QrCode, Search, Users, Ticket, Pencil, Trophy, Sparkles, Loader2, ChevronLeft, ChevronRight, Palette, ImagePlus, Download } from 'lucide-react';
+import { createInvite } from '../../services/inviteService';
 
 const DEFAULT_PRIMARY = '#1695B2';
 const DEFAULT_ACCENT = '#CC5500';
@@ -34,9 +35,11 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
     nfcId: '',
     description: '',
     image: '',
-    website: ''
+    website: '',
+    email: ''
   });
   const [newTown, setNewTown] = useState('');
+  const [exporting, setExporting] = useState(false);
   const [selectedQR, setSelectedQR] = useState<{ value: string; title: string } | null>(null);
 
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -141,7 +144,8 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
       nfcId: '',
       description: '',
       image: '',
-      website: ''
+      website: '',
+      email: ''
     });
     setEditingId(null);
   };
@@ -158,7 +162,8 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
       nfcId: biz.nfcId || '',
       description: biz.description || '',
       image: biz.image || '',
-      website: biz.website || ''
+      website: biz.website || '',
+      email: biz.email || ''
     });
     setEditingId(biz.id);
     setTimeout(() => formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
@@ -166,6 +171,30 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
 
   const deleteBusiness = async (id: string) => {
     await deleteDoc(doc(db, 'businesses', id));
+  };
+
+  const exportMailMerge = async () => {
+    const bizWithEmail = businesses.filter((b: Business) => b.email?.trim());
+    if (bizWithEmail.length === 0) return;
+    setExporting(true);
+    try {
+      const rows = await Promise.all(
+        bizWithEmail.map(async (biz: Business) => {
+          const token = await createInvite('system', 'business', biz.id, biz.name, biz.email);
+          const url = `${window.location.origin}/?invite=${token}`;
+          return [biz.name, biz.email ?? '', url];
+        })
+      );
+      const csv = ['Business Name,Email,Invite URL', ...rows.map((r: string[]) => r.map((v: string) => `"${v}"`).join(','))].join('\n');
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'chamber-bingo-invites.csv';
+      a.click();
+      URL.revokeObjectURL(a.href);
+    } finally {
+      setExporting(false);
+    }
   };
 
   const addTown = async () => {
@@ -331,7 +360,18 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
 
           <CSVImport onComplete={() => {}} />
 
-          <div className="mt-8 flex items-center gap-3 bg-neutral-50 border border-neutral-100 rounded-2xl px-4 py-3">
+          <div className="mt-8 flex items-center gap-3">
+            <button
+              onClick={exportMailMerge}
+              disabled={exporting || businesses.filter(b => b.email?.trim()).length === 0}
+              className="shrink-0 flex items-center gap-2 px-4 py-3 bg-neutral-900 text-white rounded-2xl text-xs font-bold uppercase tracking-widest disabled:opacity-40 hover:bg-neutral-700 transition-all"
+              title={`Export ${businesses.filter(b => b.email?.trim()).length} businesses with emails`}
+            >
+              <Download size={14} />
+              {exporting ? 'Exporting...' : 'Mail Merge'}
+            </button>
+          </div>
+          <div className="mt-3 flex items-center gap-3 bg-neutral-50 border border-neutral-100 rounded-2xl px-4 py-3">
             <Search size={16} className="text-neutral-400 shrink-0" />
             <input
               type="text"
@@ -662,6 +702,17 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
                   onChange={e => setNewBiz({...newBiz, website: e.target.value})}
                   className="w-full px-4 py-3 bg-neutral-50 border border-neutral-200 rounded-2xl text-sm focus:ring-2 focus:ring-[var(--color-primary)] outline-none transition-all"
                 />
+              </div>
+              <div>
+                <label className="block text-[10px] text-neutral-400 uppercase tracking-widest mb-2 font-bold">Contact Email (Optional)</label>
+                <input
+                  type="email"
+                  placeholder="owner@business.com"
+                  value={newBiz.email}
+                  onChange={e => setNewBiz({...newBiz, email: e.target.value})}
+                  className="w-full px-4 py-3 bg-neutral-50 border border-neutral-200 rounded-2xl text-sm focus:ring-2 focus:ring-[var(--color-primary)] outline-none transition-all"
+                />
+                <p className="text-[9px] text-neutral-400 mt-1">Used for mail merge invite export.</p>
               </div>
             </div>
 
