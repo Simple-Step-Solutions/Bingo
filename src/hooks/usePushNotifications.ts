@@ -1,60 +1,65 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { getToken, onMessage } from 'firebase/messaging';
 import { doc, updateDoc, arrayUnion } from 'firebase/firestore';
 import { messaging, db } from '../firebase';
 
 const VAPID_KEY = import.meta.env.VITE_FIREBASE_VAPID_KEY;
 
+async function registerFcmToken(uid: string) {
+  const msg = await messaging;
+  if (!msg) return;
+
+  const fcmReg = await navigator.serviceWorker.register('/firebase-messaging-sw.js', {
+    scope: '/fcm-push/',
+  });
+
+  const token = await getToken(msg, {
+    vapidKey: VAPID_KEY,
+    serviceWorkerRegistration: fcmReg,
+  });
+
+  if (token) {
+    await updateDoc(doc(db, 'users', uid), {
+      fcmTokens: arrayUnion(token),
+    });
+  }
+
+  // Handle foreground messages
+  onMessage(msg, (payload) => {
+    const { title = 'Chamber Bingo', body = '' } = payload.notification || {};
+    if (Notification.permission === 'granted') {
+      new Notification(title, { body, icon: '/icons/icon-192.png' });
+    }
+  });
+}
+
 export function usePushNotifications(uid: string | undefined) {
+  const [showPrompt, setShowPrompt] = useState(false);
+
   useEffect(() => {
     if (!uid || !VAPID_KEY || !('Notification' in window) || !('serviceWorker' in navigator)) return;
 
-    const register = async () => {
-      try {
-        const msg = await messaging;
-        if (!msg) return;
-
-        // Request permission
-        const permission = await Notification.requestPermission();
-        if (permission !== 'granted') return;
-
-        // Register the Firebase messaging SW with its own scope so it doesn't
-        // conflict with the vite-plugin-pwa SW. Push events are tied to the
-        // SW registration used when getting the token, so FCM will deliver
-        // pushes to this SW which has a proper push handler.
-        const fcmReg = await navigator.serviceWorker.register('/firebase-messaging-sw.js', {
-          scope: '/fcm-push/',
-        });
-
-        // Get FCM token
-        const token = await getToken(msg, {
-          vapidKey: VAPID_KEY,
-          serviceWorkerRegistration: fcmReg,
-        });
-
-        if (token) {
-          // Store token in user's Firestore doc (arrayUnion prevents duplicates)
-          await updateDoc(doc(db, 'users', uid), {
-            fcmTokens: arrayUnion(token),
-          });
-        }
-
-        // Handle foreground messages
-        onMessage(msg, (payload) => {
-          const { title = 'Chamber Bingo', body = '' } = payload.notification || {};
-          if (Notification.permission === 'granted') {
-            new Notification(title, {
-              body,
-              icon: '/icons/icon-192.png',
-            });
-          }
-        });
-      } catch (err) {
-        // Non-fatal -- push notifications are an enhancement
-        console.warn('Push notification setup failed:', err);
-      }
-    };
-
-    register();
+    if (Notification.permission === 'granted') {
+      // Already granted — register silently
+      registerFcmToken(uid).catch(err => console.warn('Push notification setup failed:', err));
+    } else if (Notification.permission === 'default') {
+      // Need to ask — surface the prompt banner
+      setShowPrompt(true);
+    }
+    // 'denied' — do nothing
   }, [uid]);
+
+  const requestPermission = async () => {
+    setShowPrompt(false);
+    try {
+      const permission = await Notification.requestPermission();
+      if (permission === 'granted' && uid) {
+        await registerFcmToken(uid);
+      }
+    } catch (err) {
+      console.warn('Push notification setup failed:', err);
+    }
+  };
+
+  return { showPrompt, requestPermission, dismissPrompt: () => setShowPrompt(false) };
 }

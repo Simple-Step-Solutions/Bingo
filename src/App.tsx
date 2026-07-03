@@ -38,7 +38,7 @@ function App() {
   const [towns, setTowns] = useState<Town[]>([]);
   const [loading, setLoading] = useState(true);
   const [showTour, setShowTour] = useState(false);
-  usePushNotifications(user?.uid);
+  const { showPrompt: showNotifPrompt, requestPermission, dismissPrompt } = usePushNotifications(user?.uid);
 
   useEffect(() => {
     const primary = settings?.primaryColor || DEFAULT_PRIMARY;
@@ -219,6 +219,15 @@ function App() {
         </footer>
         <InstallPrompt />
         <UpdateBanner />
+        {showNotifPrompt && (
+          <div className="fixed bottom-24 md:bottom-6 inset-x-0 mx-4 md:mx-auto md:max-w-sm z-[90] bg-neutral-900 text-white rounded-2xl shadow-xl px-4 py-3 flex items-center justify-between gap-3">
+            <p className="text-[11px] font-bold uppercase tracking-widest leading-tight">Enable notifications to stay updated</p>
+            <div className="flex items-center gap-2 shrink-0">
+              <button onClick={requestPermission} className="bg-white text-neutral-900 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-neutral-100 transition-all">Enable</button>
+              <button onClick={dismissPrompt} className="text-neutral-500 hover:text-white transition-colors text-[10px] font-bold uppercase tracking-widest">Later</button>
+            </div>
+          </div>
+        )}
         {showTour && user?.role === 'chamber' && (
           <ChamberTour
             chamberName={settings?.chamberName}
