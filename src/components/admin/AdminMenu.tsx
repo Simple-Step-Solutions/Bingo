@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { UserProfile, Business, AppSettings } from '../../types';
 import { doc, setDoc, collection, query, where, getDocs, deleteDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
-import { RefreshCw, Trash2, RotateCcw, UserMinus, Gamepad2, MapPin, Store, Search, ChevronLeft, ChevronRight, LayoutGrid } from 'lucide-react';
+import { RefreshCw, Trash2, RotateCcw, UserMinus, Gamepad2, MapPin, Store, Search, ChevronLeft, ChevronRight, LayoutGrid, AlertTriangle } from 'lucide-react';
 import { BoardImpersonation } from './BoardImpersonation';
 import { InviteManager } from './InviteManager';
 import { logAudit } from '../../services/auditService';
@@ -103,6 +103,32 @@ export const AdminMenu: React.FC<AdminMenuProps> = ({ users, businesses, current
     }
 
     setConfirmAction(null);
+  };
+
+  const [clearConfirm, setClearConfirm] = useState(false);
+  const [clearing, setClearing] = useState(false);
+
+  const clearTestData = async () => {
+    setClearing(true);
+    setClearConfirm(false);
+    try {
+      const collections = ['completions', 'raffle_entries', 'winners', 'notifications'];
+      for (const col of collections) {
+        const snap = await getDocs(collection(db, col));
+        await Promise.all(snap.docs.map(d => deleteDoc(d.ref)));
+      }
+      // Delete all user docs except current admin
+      const usersSnap = await getDocs(collection(db, 'users'));
+      await Promise.all(
+        usersSnap.docs
+          .filter(d => d.id !== currentUser.uid)
+          .map(d => deleteDoc(d.ref))
+      );
+    } catch (err) {
+      console.error('Clear failed:', err);
+    } finally {
+      setClearing(false);
+    }
   };
 
   const performGlobalReset = async () => {
@@ -338,6 +364,43 @@ export const AdminMenu: React.FC<AdminMenuProps> = ({ users, businesses, current
       )}
 
       <InviteManager businesses={businesses} currentUser={currentUser} />
+
+      {/* Danger Zone */}
+      <div className="bg-white border border-red-200 p-8 rounded-3xl shadow-sm">
+        <div className="flex items-center gap-3 mb-2">
+          <AlertTriangle className="text-red-500" size={18} />
+          <h3 className="font-bold uppercase tracking-widest text-xs text-red-400">Danger Zone</h3>
+        </div>
+        <p className="text-sm text-neutral-500 mb-6">
+          Clear all test data and start fresh. This deletes all users (except you), completions, raffle entries, winners, and notifications. Businesses, towns, and settings are kept.
+        </p>
+        {clearConfirm ? (
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-bold text-red-600 flex-1">Are you sure? This cannot be undone.</span>
+            <button
+              onClick={() => setClearConfirm(false)}
+              className="px-4 py-2 text-xs font-bold uppercase tracking-widest border border-neutral-200 rounded-xl hover:border-neutral-400 transition-all"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={clearTestData}
+              disabled={clearing}
+              className="px-4 py-2 text-xs font-bold uppercase tracking-widest bg-red-500 text-white rounded-xl hover:bg-red-600 transition-all disabled:opacity-50"
+            >
+              {clearing ? 'Clearing...' : 'Yes, Clear Everything'}
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => setClearConfirm(true)}
+            className="flex items-center gap-2 px-5 py-3 border border-red-200 text-red-500 rounded-2xl text-sm font-bold hover:bg-red-50 transition-all"
+          >
+            <Trash2 size={16} />
+            Clear All Test Data
+          </button>
+        )}
+      </div>
     </div>
   );
 };
