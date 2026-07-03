@@ -55,6 +55,7 @@ export interface AppSettings {
   chamberName?: string;
   chamberLogoUrl?: string;
   gamePaused?: boolean;
+  businessCategories?: string[];
 }
 
 export interface AuditLog {
