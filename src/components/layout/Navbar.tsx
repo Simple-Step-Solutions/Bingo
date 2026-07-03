@@ -156,6 +156,11 @@ const MobileAccountMenu: React.FC<{ user: UserProfile }> = ({ user }) => {
                   Sign Out
                 </button>
               </div>
+
+              {/* Version */}
+              <p className="text-center text-[9px] text-neutral-300 uppercase tracking-widest font-bold mt-4 pb-2">
+                v{(globalThis as any).__APP_VERSION__}
+              </p>
             </motion.div>
 
             <motion.div

@@ -204,6 +204,9 @@ function App() {
               <p className="text-[10px] text-neutral-300 uppercase tracking-widest font-bold">
                 &copy; 2026 All Rights Reserved
               </p>
+              <p className="text-[9px] text-neutral-300 uppercase tracking-widest font-bold">
+                v{(globalThis as any).__APP_VERSION__}
+              </p>
             </div>
             <a
               href="https://www.simplestepsolutions.com"
