@@ -86,6 +86,7 @@ export const AdminMenu: React.FC<AdminMenuProps> = ({ users, businesses, current
         };
         if (type === 'town' || type === 'everything') {
           updates.town = '';
+          updates.onboardingComplete = false;
         }
         await setDoc(doc(db, 'users', u.uid), updates, { merge: true });
       }
@@ -139,7 +140,8 @@ export const AdminMenu: React.FC<AdminMenuProps> = ({ users, businesses, current
         setDoc(doc(db, 'users', u.uid), {
           town: '',
           bingoBoard: [],
-          boardSize: 0
+          boardSize: 0,
+          onboardingComplete: false
         }, { merge: true })
       );
 
