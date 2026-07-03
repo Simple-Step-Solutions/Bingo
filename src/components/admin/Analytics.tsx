@@ -125,7 +125,7 @@ export const Analytics: React.FC<AnalyticsProps> = ({ users, completions, busine
     return acc;
   }, {} as Record<string, number>);
 
-  const topBusinesses = Object.entries(bizStats)
+  const topBusinesses = Object.entries<number>(bizStats)
     .map(([id, count]) => ({
       biz: businesses.find(b => b.id === id),
       count
@@ -142,7 +142,7 @@ export const Analytics: React.FC<AnalyticsProps> = ({ users, completions, busine
       return acc;
     }, {} as Record<number, number>);
     
-    const topHour = Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0];
+    const topHour = Object.entries<number>(counts).sort((a, b) => b[1] - a[1])[0][0];
     const hour = parseInt(topHour);
     const ampm = hour >= 12 ? 'PM' : 'AM';
     const displayHour = hour % 12 || 12;
@@ -314,7 +314,7 @@ export const Analytics: React.FC<AnalyticsProps> = ({ users, completions, busine
             </div>
 
             <div className="space-y-6">
-              {Object.entries(categoryStats).sort((a, b) => b[1] - a[1]).map(([cat, count]) => (
+              {Object.entries<number>(categoryStats).sort((a, b) => b[1] - a[1]).map(([cat, count]) => (
                 <div key={cat}>
                   <div className="flex justify-between items-center mb-2">
                     <span className="text-xs font-bold uppercase tracking-widest text-neutral-600">{cat}</span>
@@ -373,7 +373,7 @@ export const Analytics: React.FC<AnalyticsProps> = ({ users, completions, busine
           </div>
 
           <div className="space-y-6">
-            {Object.entries(townStats).sort((a, b) => b[1] - a[1]).map(([town, count]) => (
+            {Object.entries<number>(townStats).sort((a, b) => b[1] - a[1]).map(([town, count]) => (
               <div key={town}>
                 <div className="flex justify-between items-center mb-2">
                   <span className="text-xs font-bold uppercase tracking-widest text-neutral-600">{town}</span>
