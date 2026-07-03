@@ -304,14 +304,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, towns, s
       </div>
 
       {/* Board */}
-      <div className="flex-1 flex items-start justify-center relative pt-2">
+      <div className="flex-1 min-h-0 flex items-center justify-center relative">
         <div
           className="grid gap-1.5 md:gap-3"
           style={{
             gridTemplateColumns: `repeat(${size}, 1fr)`,
             gridAutoRows: '1fr',
-            width: 'min(calc(100vw - 2rem), calc(100dvh - 8rem))',
-            height: 'min(calc(100vw - 2rem), calc(100dvh - 8rem))',
+            width: 'min(calc(100vw - 2rem), calc(100dvh - 16rem))',
+            height: 'min(calc(100vw - 2rem), calc(100dvh - 16rem))',
           }}
         >
           {board.map((bizId, idx) => {
