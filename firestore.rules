@@ -58,6 +58,7 @@ service cloud.firestore {
         // Chamber can update town and board (but not role or email) for admin overrides
         (isChamber() && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'email']))
       );
+      allow delete: if isAdmin();
     }
 
     // ===============================================================

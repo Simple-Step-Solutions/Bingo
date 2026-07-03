@@ -172,8 +172,6 @@ function App() {
 
   if (loading) return <LoadingScreen />;
 
-  if (!user) return <Auth onAuthSuccess={() => {}} />;
-
   if (needsEmailVerification) {
     return (
       <div className="min-h-screen bg-[#F5F5F0] flex items-center justify-center p-6">
@@ -186,7 +184,7 @@ function App() {
           <p className="text-[10px] font-black uppercase tracking-[0.25em] text-[var(--color-primary)] mb-2">Almost there</p>
           <h2 className="font-serif italic text-3xl mb-3">Check your email</h2>
           <p className="text-sm text-neutral-500 leading-relaxed mb-8">
-            We sent a verification link to <strong className="text-neutral-900">{auth.currentUser?.email}</strong>. Click the link to activate your account.
+            We sent a verification link to <strong className="text-neutral-900">{auth.currentUser?.email}</strong>. Click the link to activate your account. If you don't see it, check your spam folder.
           </p>
           <div className="space-y-3">
             <button
@@ -209,6 +207,8 @@ function App() {
       </div>
     );
   }
+
+  if (!user) return <Auth onAuthSuccess={() => {}} />;
 
   // Settings doc missing -- admin sees setup wizard, everyone else sees holding screen
   if (settingsExist === false) {

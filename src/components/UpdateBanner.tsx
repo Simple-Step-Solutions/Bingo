@@ -1,43 +1,20 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { RefreshCw, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { useRegisterSW } from 'virtual:pwa-register/react';
 
 export const UpdateBanner: React.FC = () => {
-  const [waitingWorker, setWaitingWorker] = useState<ServiceWorker | null>(null);
-  const [dismissed, setDismissed] = useState(false);
-
-  useEffect(() => {
-    if (!('serviceWorker' in navigator)) return;
-
-    const checkForWaiting = (reg: ServiceWorkerRegistration) => {
-      if (reg.waiting) setWaitingWorker(reg.waiting);
-    };
-
-    navigator.serviceWorker.getRegistration().then(reg => {
-      if (!reg) return;
-      checkForWaiting(reg);
-      reg.addEventListener('updatefound', () => {
-        const newWorker = reg.installing;
-        if (!newWorker) return;
-        newWorker.addEventListener('statechange', () => {
-          if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-            setWaitingWorker(newWorker);
-            setDismissed(false);
-          }
-        });
-      });
-    });
-  }, []);
+  const { needRefresh: [needRefresh, setNeedRefresh], updateServiceWorker } = useRegisterSW({
+    onRegisteredSW() {},
+    onNeedRefresh() {},
+  });
 
   const applyUpdate = () => {
-    if (!waitingWorker) return;
-    navigator.serviceWorker.addEventListener('controllerchange', () => {
-      window.location.reload();
-    }, { once: true });
-    waitingWorker.postMessage({ type: 'SKIP_WAITING' });
+    setNeedRefresh(false);
+    updateServiceWorker(true);
   };
 
-  const show = !!waitingWorker && !dismissed;
+  const show = needRefresh;
 
   return (
     <AnimatePresence>
@@ -61,7 +38,7 @@ export const UpdateBanner: React.FC = () => {
               Refresh
             </button>
             <button
-              onClick={() => setDismissed(true)}
+              onClick={() => setNeedRefresh(false)}
               className="p-1.5 text-neutral-500 hover:text-white transition-colors"
             >
               <X size={14} />
