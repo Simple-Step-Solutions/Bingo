@@ -18,13 +18,18 @@ export function usePushNotifications(uid: string | undefined) {
         const permission = await Notification.requestPermission();
         if (permission !== 'granted') return;
 
-        // Use the existing vite-plugin-pwa service worker registration
-        const swReg = await navigator.serviceWorker.ready;
+        // Register the Firebase messaging SW with its own scope so it doesn't
+        // conflict with the vite-plugin-pwa SW. Push events are tied to the
+        // SW registration used when getting the token, so FCM will deliver
+        // pushes to this SW which has a proper push handler.
+        const fcmReg = await navigator.serviceWorker.register('/firebase-messaging-sw.js', {
+          scope: '/fcm-push/',
+        });
 
         // Get FCM token
         const token = await getToken(msg, {
           vapidKey: VAPID_KEY,
-          serviceWorkerRegistration: swReg,
+          serviceWorkerRegistration: fcmReg,
         });
 
         if (token) {

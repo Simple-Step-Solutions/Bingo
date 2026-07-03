@@ -1,52 +1,29 @@
-importScripts('https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js');
-importScripts('https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js');
-
-// Config is injected at build time via a fetch to /__/firebase/init.json
-// or hardcoded here. We fetch it dynamically so we don't duplicate secrets.
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', () => self.clients.claim());
 
-let messagingInstance = null;
+self.addEventListener('push', (event) => {
+  if (!event.data) return;
+  const payload = event.data.json();
+  const n = payload.notification ?? {};
+  const title = n.title ?? 'Chamber Bingo';
+  const body = n.body ?? '';
+  const icon = n.icon ?? '/icons/icon-192.png';
+  const link = payload.fcmOptions?.link ?? payload.webpush?.fcmOptions?.link ?? 'https://bingo.simplestepsolutions.com/';
 
-async function initMessaging() {
-  if (messagingInstance) return messagingInstance;
-  try {
-    const resp = await fetch('/__/firebase/init.json');
-    const config = await resp.json();
-    if (!firebase.apps.length) firebase.initializeApp(config);
-    messagingInstance = firebase.messaging();
-    return messagingInstance;
-  } catch {
-    // Fallback: messaging won't work but SW won't crash
-    return null;
-  }
-}
-
-self.addEventListener('push', async (event) => {
-  const messaging = await initMessaging();
-  if (!messaging) {
-    // Handle raw push payload directly if FCM SDK not available
-    const data = event.data?.json() || {};
-    const { title = 'Chamber Bingo', body = '' } = data.notification || {};
-    event.waitUntil(
-      self.registration.showNotification(title, {
-        body,
-        icon: '/icons/icon-192.png',
-        badge: '/icons/icon-192.png',
-        data: data.data || {},
-      })
-    );
-  }
+  event.waitUntil(
+    self.registration.showNotification(title, { body, icon, data: { link } })
+  );
 });
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
+  const link = event.notification.data?.link ?? '/';
   event.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(windowClients => {
-      if (windowClients.length > 0) {
-        return windowClients[0].focus();
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
+      for (const c of list) {
+        if ('focus' in c) return c.focus();
       }
-      return clients.openWindow('/');
+      return clients.openWindow(link);
     })
   );
 });
