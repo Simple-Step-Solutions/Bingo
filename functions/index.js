@@ -15,7 +15,10 @@ const TYPE_TITLES = {
   game: 'Game Update',
 };
 
-exports.sendPushOnNotification = onDocumentCreated('notifications/{notificationId}', async (event) => {
+exports.sendPushOnNotification = onDocumentCreated({
+  document: 'notifications/{notificationId}',
+  database: databaseId,
+}, async (event) => {
   const notification = event.data.data();
   if (!notification) return;
 
