@@ -79,7 +79,7 @@ function App() {
             await firebaseUser.reload();
             if (auth.currentUser?.emailVerified) {
               clearInterval(verifyPollRef.current!);
-              setNeedsEmailVerification(false);
+              window.location.reload();
             }
           }, 4000);
           return;
