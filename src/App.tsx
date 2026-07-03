@@ -18,10 +18,8 @@ import { Profile } from './pages/Profile';
 import { Navbar } from './components/layout/Navbar';
 import { LoadingScreen } from './components/layout/LoadingScreen';
 import { LocationTracker } from './components/LocationTracker';
-import { trackActivity } from './services/activityService';
 import { SetupWizard, SetupPending } from './components/SetupWizard';
 import { InstallPrompt } from './components/InstallPrompt';
-import { UpdateBanner } from './components/UpdateBanner';
 import { ChamberTour } from './components/tour/ChamberTour';
 import { BusinessTour } from './components/tour/BusinessTour';
 import { RoleSelector } from './components/RoleSelector';
@@ -67,8 +65,6 @@ function App() {
 
       if (firebaseUser) {
         setLoading(true);
-        trackActivity(firebaseUser.uid, 'open_app');
-
         // Gate email/password users until they verify their address
         const isEmailUser = firebaseUser.providerData.some(p => p.providerId === 'password');
         if (isEmailUser && !firebaseUser.emailVerified) {
@@ -278,7 +274,6 @@ function App() {
           </div>
         </footer>
         <InstallPrompt />
-        <UpdateBanner />
 {showNotifPrompt && (
           <div className="fixed bottom-24 md:bottom-6 inset-x-0 mx-4 md:mx-auto md:max-w-sm z-[90] bg-neutral-900 text-white rounded-2xl shadow-xl px-4 py-3 flex items-center justify-between gap-3">
             <p className="text-[11px] font-bold uppercase tracking-widest leading-tight">Enable notifications to stay updated</p>

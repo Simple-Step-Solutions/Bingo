@@ -21,7 +21,7 @@ export default defineConfig(({ mode }) => {
       react(),
       tailwindcss(),
       VitePWA({
-        registerType: 'prompt',
+        registerType: 'autoUpdate',
         includeAssets: ['sss-logo.png'],
         manifest: {
           name: 'Chamber Bingo',

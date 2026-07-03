@@ -9,7 +9,6 @@ import { generateBingoBoard } from '../services/bingoService';
 import { Link } from 'react-router-dom';
 import { Html5Qrcode } from 'html5-qrcode';
 import { calculateDistance } from '../lib/utils';
-import { trackActivity } from '../services/activityService';
 import { Onboarding } from '../components/Onboarding';
 
 interface DashboardProps {
@@ -341,7 +340,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, towns, s
             return (
               <div key={idx}
                 onClick={() => {
-                  if (biz) { setSelectedBusiness(biz); trackActivity(user.uid, 'view_business', { businessId: biz.id, businessName: biz.name }); }
+                  if (biz) { setSelectedBusiness(biz); }
                 }}
                 className={`rounded-xl md:rounded-3xl flex flex-col items-center justify-center text-center transition-all relative overflow-hidden group cursor-pointer p-1 md:p-3 ${
                   isDone ? 'bg-neutral-900 text-white shadow-lg' : 'bg-white border border-neutral-100 text-neutral-900 hover:border-neutral-300 hover:shadow-sm shadow-sm'
@@ -472,7 +471,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, towns, s
                       <a
                         href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(selectedBusiness.address || selectedBusiness.name + ' ' + selectedBusiness.town)}`}
                         target="_blank" rel="noopener noreferrer"
-                        onClick={() => trackActivity(user.uid, 'click_directions', { businessId: selectedBusiness.id, businessName: selectedBusiness.name })}
+
                         className="flex items-center justify-center gap-2 bg-neutral-100 p-4 rounded-2xl hover:bg-neutral-200 transition-all group"
                       >
                         <Navigation size={18} className="text-neutral-400 group-hover:text-neutral-900 transition-colors" />

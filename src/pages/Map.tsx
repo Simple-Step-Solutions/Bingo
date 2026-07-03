@@ -4,7 +4,6 @@ import { MapPin, Store, Navigation } from 'lucide-react';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { trackActivity } from '../services/activityService';
 
 interface MapProps {
   user: UserProfile;
@@ -77,7 +76,6 @@ export const Map: React.FC<MapProps> = ({ user, businesses }) => {
                       href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(biz.address)}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      onClick={() => trackActivity(user.uid, 'click_directions', { businessId: biz.id, businessName: biz.name })}
                       className="flex items-center justify-center gap-2 w-full bg-neutral-100 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest hover:bg-neutral-200 transition-all"
                     >
                       <Navigation size={12} /> Directions
