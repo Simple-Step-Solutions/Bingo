@@ -18,6 +18,7 @@ const TYPE_TITLES = {
 exports.sendPushOnNotification = onDocumentCreated({
   document: 'notifications/{notificationId}',
   database: databaseId,
+  region: 'us-east1',
 }, async (event) => {
   const notification = event.data.data();
   if (!notification) return;
