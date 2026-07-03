@@ -47,6 +47,7 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
   const [bizPage, setBizPage] = useState(0);
   const [logoUploading, setLogoUploading] = useState(false);
   const logoInputRef = useRef<HTMLInputElement>(null);
+  const formRef = useRef<HTMLDivElement>(null);
 
   const filteredBusinesses = useMemo(() => {
     const q = bizSearch.toLowerCase().trim();
@@ -160,8 +161,7 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
       website: biz.website || ''
     });
     setEditingId(biz.id);
-    // Scroll to form
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setTimeout(() => formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
   };
 
   const updateBusinessNfc = async (id: string, nfcId: string) => {
@@ -582,7 +582,7 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
 
       {/* Add Business & Towns */}
       <div className="space-y-8">
-        <div className="bg-neutral-900 text-white p-8 rounded-3xl shadow-2xl">
+        <div ref={formRef} className="bg-neutral-900 text-white p-8 rounded-3xl shadow-2xl">
           <div className="flex justify-between items-center mb-8">
             <h3 className="font-bold uppercase tracking-widest text-xs text-neutral-400">
               {editingId ? 'Edit Business' : 'Quick Add Business'}
