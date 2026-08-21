@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import Papa from 'papaparse';
 import { doc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
+import { newDocId } from '../lib/utils';
 import { Upload, CheckCircle2, Loader2, AlertCircle, Download } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -73,7 +74,7 @@ export const CSVImport: React.FC<CSVImportProps> = ({ onComplete }) => {
 
           for (let i = 0; i < rows.length; i++) {
             const row = rows[i];
-            const id = Math.random().toString(36).substr(2, 9);
+            const id = newDocId();
 
             let lat = 0;
             let lng = 0;

@@ -132,7 +132,7 @@ export const Admin: React.FC<AdminProps> = ({ user, businesses, towns, settings 
         )}
         {activeTab === 'master' && settings && <GameMaster settings={settings} user={user} />}
         {activeTab === 'chamber' && settings && (
-          <ChamberManager businesses={businesses} towns={towns} raffleEntries={raffleEntries} winners={winners} settings={settings} />
+          <ChamberManager businesses={businesses} towns={towns} raffleEntries={raffleEntries} winners={winners} settings={settings} currentUser={user} />
         )}
         {activeTab === 'analytics' && settings && (
           <Analytics users={users} completions={completions} businesses={businesses} settings={settings} currentUser={user} />

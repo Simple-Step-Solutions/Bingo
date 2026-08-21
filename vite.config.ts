@@ -41,6 +41,13 @@ export default defineConfig(({ mode }) => {
         },
         workbox: {
           globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+          // The variable fonts ship one woff2 per unicode-range subset. Only the
+          // Latin ones are ever needed here, and precaching all 24 added ~675KB
+          // to the install for nothing. The rest stay in the build and are still
+          // fetched on demand by any browser that actually needs them.
+          globIgnores: [
+            '**/*-{cyrillic,cyrillic-ext,vietnamese,greek,greek-ext,math,symbols}-*.woff2',
+          ],
           // Exclude Firebase's reserved /__/ paths from the SW navigation fallback.
           // Without this, the SW intercepts /__/auth/handler and serves our app
           // instead of Firebase's auth handler, breaking OAuth popups.

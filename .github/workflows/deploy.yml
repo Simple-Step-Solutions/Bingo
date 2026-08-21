@@ -3,22 +3,36 @@ name: Deploy to Firebase
 on:
   push:
     branches: [main]
+  # Runs the gates (lint, rules tests) without deploying anything, so a broken
+  # rules test surfaces on the PR instead of silently skipping deploy-rules
+  # after the merge -- which would look like a green build with stale rules.
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
   contents: read
   id-token: write
 
+env:
+  # Pinned so a firebase-tools release cannot break the pipeline unannounced.
+  FIREBASE_TOOLS: firebase-tools@14
+
 jobs:
   changes:
     runs-on: ubuntu-latest
     outputs:
-      hosting: ${{ steps.filter.outputs.hosting }}
-      functions: ${{ steps.filter.outputs.functions }}
+      # workflow_dispatch gives paths-filter no base ref to diff against, so a
+      # manual run treats everything as changed. That is the escape hatch for
+      # pushing rules without an accompanying commit.
+      hosting: ${{ steps.filter.outputs.hosting == 'true' || github.event_name == 'workflow_dispatch' }}
+      functions: ${{ steps.filter.outputs.functions == 'true' || github.event_name == 'workflow_dispatch' }}
+      rules: ${{ steps.filter.outputs.rules == 'true' || github.event_name == 'workflow_dispatch' }}
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-      - uses: dorny/paths-filter@v3
+      - uses: dorny/paths-filter@0e4a8c6effa4802afeda77dc8d303f8176d7dfad # v3
         id: filter
+        if: github.event_name != 'workflow_dispatch'
         with:
           filters: |
             hosting:
@@ -31,10 +45,31 @@ jobs:
               - 'tsconfig.json'
             functions:
               - 'functions/**'
+            rules:
+              - 'firestore.rules'
+              - 'storage.rules'
+              - 'firestore.indexes.json'
+              - 'firebase.json'
+              - 'rules-tests/**'
 
-  deploy-hosting:
+  # Typecheck gates the hosting deploy. Without this a compile error
+  # (see the trackActivity crash in src/pages/Map.tsx) ships to production.
+  lint:
     needs: changes
     if: needs.changes.outputs.hosting == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+
+  deploy-hosting:
+    needs: [changes, lint]
+    if: needs.changes.outputs.hosting == 'true' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -67,9 +102,65 @@ jobs:
           projectId: sss-hvgcc-bingo
           channelId: live
 
+  # Exercises firestore.rules against the emulator. Each test corresponds to a
+  # real hole found in review, so a failure here means an exploit was reopened.
+  test-rules:
+    needs: changes
+    if: needs.changes.outputs.rules == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          cache: npm
+      # The Firestore emulator is a Java process.
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - run: npm ci
+      - run: npm run test:rules
+
+  # Firestore and Storage rules were previously never deployed by CI, so the
+  # rules in this repo could drift from the rules actually protecting the data.
+  #
+  # firebase.json pins the named database explicitly (the array form with a
+  # "database" key). Without that this job deploys to (default) and reports
+  # success while changing nothing -- which is what used to happen by hand.
+  # --only firestore:rules applies to every entry in that array, so the named
+  # database is covered.
+  #
+  # Index deletion is not a risk: firebase-tools only removes indexes that are
+  # absent from firestore.indexes.json when passed --force, which this omits.
+  #
+  # The service account needs roles/firebaserules.admin. A 403 on the first run
+  # means that role is missing, not that the config is wrong.
+  deploy-rules:
+    needs: [changes, test-rules]
+    if: needs.changes.outputs.rules == 'true' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed # v2
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+
+      - name: Deploy Firestore and Storage rules
+        run: >
+          npx ${{ env.FIREBASE_TOOLS }} deploy
+          --only firestore:rules,firestore:indexes,storage
+          --project sss-hvgcc-bingo --non-interactive
+
   deploy-functions:
     needs: changes
-    if: needs.changes.outputs.functions == 'true'
+    if: needs.changes.outputs.functions == 'true' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -80,15 +171,17 @@ jobs:
           cache: npm
 
       - name: Authenticate to Google Cloud
-        uses: google-github-actions/auth@v2
+        uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed # v2
         with:
           credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
 
       - name: Install function dependencies
-        run: npm install
+        run: npm ci
         working-directory: functions
 
       - name: Deploy Cloud Functions
-        run: npx firebase-tools deploy --only functions --project sss-hvgcc-bingo --non-interactive
+        run: >
+          npx ${{ env.FIREBASE_TOOLS }} deploy
+          --only functions --project sss-hvgcc-bingo --non-interactive
         env:
           FIRESTORE_DATABASE_ID: ${{ secrets.VITE_FIREBASE_DATABASE_ID }}

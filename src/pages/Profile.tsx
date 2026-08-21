@@ -3,8 +3,10 @@ import { collection, query, where, onSnapshot, doc, setDoc } from 'firebase/fire
 import { signOut, updatePassword, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
 import { auth, db } from '../firebase';
 import { UserProfile, Completion } from '../types';
+import { checkBingo } from '../services/bingoService';
 import { motion } from 'motion/react';
-import { LogOut, RotateCcw, CheckCircle2, Trophy, MapPin, Loader2, Lock, Eye, EyeOff, PlayCircle } from 'lucide-react';
+import { LogOut, RotateCcw, CheckCircle2, Trophy, MapPin, Loader2, Lock, Eye, EyeOff, PlayCircle, Download } from 'lucide-react';
+import { InstallPrompt, isStandalone } from '../components/InstallPrompt';
 
 interface ProfileProps {
   user: UserProfile;
@@ -28,6 +30,7 @@ export const Profile: React.FC<ProfileProps> = ({ user }) => {
   const [pwLoading, setPwLoading] = useState(false);
   const [pwError, setPwError] = useState('');
   const [pwSuccess, setPwSuccess] = useState(false);
+  const [showInstall, setShowInstall] = useState(false);
 
   useEffect(() => {
     const q = query(collection(db, 'completions'), where('userId', '==', user.uid));
@@ -52,27 +55,7 @@ export const Profile: React.FC<ProfileProps> = ({ user }) => {
     business: 'bg-emerald-600 text-white',
   };
 
-  const hasBingo = (() => {
-    const board = user.bingoBoard || [];
-    const size = user.boardSize || 3;
-    if (!board.length) return false;
-    const completedIds = new Set(completions.map(c => c.businessId));
-    const grid: string[][] = [];
-    for (let i = 0; i < board.length; i += size) {
-      const row = board.slice(i, i + size);
-      if (row.length === size) grid.push(row);
-    }
-    if (grid.length !== size) return false;
-    for (let r = 0; r < size; r++) {
-      if (grid[r].every(id => id === 'FREE' || completedIds.has(id))) return true;
-    }
-    for (let c = 0; c < size; c++) {
-      if (grid.every(row => row[c] === 'FREE' || completedIds.has(row[c]))) return true;
-    }
-    if (grid.every((row, i) => row[i] === 'FREE' || completedIds.has(row[i]))) return true;
-    if (grid.every((row, i) => row[size - 1 - i] === 'FREE' || completedIds.has(row[size - 1 - i]))) return true;
-    return false;
-  })();
+  const hasBingo = checkBingo(user.bingoBoard, completions, user.boardSize || 3);
 
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -280,6 +263,20 @@ export const Profile: React.FC<ProfileProps> = ({ user }) => {
             </button>
           </form>
         )}
+
+        {/* Install to home screen. Surfaced explicitly so it can be walked
+            through during an in-person onboarding, on any platform, rather than
+            depending on the browser deciding to offer it. */}
+        {!isStandalone() && (
+          <button
+            onClick={() => setShowInstall(true)}
+            className="w-full flex items-center justify-center gap-3 bg-neutral-50 hover:bg-neutral-100 text-neutral-700 border border-neutral-200 py-4 rounded-2xl font-bold text-sm transition-all mb-3"
+          >
+            <Download size={18} aria-hidden="true" />
+            Install this app
+          </button>
+        )}
+        {showInstall && <InstallPrompt force onClose={() => setShowInstall(false)} />}
 
         {/* Replay tour -- chamber and business only */}
         {(user.role === 'chamber' || user.role === 'business') && (

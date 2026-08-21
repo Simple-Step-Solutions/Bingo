@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { UserProfile, Business } from '../types';
 import { MapPin, Store, Navigation } from 'lucide-react';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
-import L from 'leaflet';
+import { trackActivity } from '../services/activityService';
+import { applyLeafletDefaultIcons } from '../lib/leafletIcons';
 import 'leaflet/dist/leaflet.css';
 
 interface MapProps {
@@ -15,15 +16,8 @@ export const Map: React.FC<MapProps> = ({ user, businesses }) => {
   const [town, setTown] = useState('');
   const filteredBusinesses = town ? businesses.filter(b => b.town === town) : businesses;
 
-  // Fix for Leaflet marker icons
-  useEffect(() => {
-    delete (L.Icon.Default.prototype as any)._getIconUrl;
-    L.Icon.Default.mergeOptions({
-      iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
-      iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
-      shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-    });
-  }, []);
+  // Marker images ship with the leaflet package; see lib/leafletIcons.
+  useEffect(() => { applyLeafletDefaultIcons(); }, []);
 
   const center: [number, number] = [41.2723, -73.8055];
 

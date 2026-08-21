@@ -5,7 +5,7 @@ import { db } from '../firebase';
 import { motion, AnimatePresence } from 'motion/react';
 import confetti from 'canvas-confetti';
 import { Trophy, CheckCircle2, MapPin, Store, RefreshCw, Loader2, ExternalLink, Ticket, QrCode, Radio, X, Navigation, Globe, Info, Star } from 'lucide-react';
-import { generateBingoBoard } from '../services/bingoService';
+import { generateBingoBoard, checkBingo, boardIsIncomplete } from '../services/bingoService';
 import { Link } from 'react-router-dom';
 import { Html5Qrcode } from 'html5-qrcode';
 import { calculateDistance } from '../lib/utils';
@@ -32,37 +32,32 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, towns, s
   const [error, setError] = useState<string | null>(null);
   const qrScannerRef = useRef<Html5Qrcode | null>(null);
 
+  // The mobile sheet and the desktop overlay used to render at the same time,
+  // hidden from each other with CSS. That put two elements with id="qr-reader"
+  // in the DOM, and Html5Qrcode grabs the first by id, so on desktop the camera
+  // attached to the display:none mobile copy and no preview ever appeared.
+  // Render exactly one of them instead.
+  const [isDesktop, setIsDesktop] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(min-width: 768px)').matches
+  );
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 768px)');
+    const onChange = (e: MediaQueryListEvent) => setIsDesktop(e.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+
   const size = user.boardSize || settings?.boardSize || 3;
   const board = user.bingoBoard || [];
 
-  const isBingo = (board: string[], completions: Completion[]) => {
-    if (!board || board.length === 0) return false;
-    const completedIds = new Set(completions.map(c => c.businessId));
-    const grid: string[][] = [];
-    for (let i = 0; i < board.length; i += size) {
-      const row = board.slice(i, i + size);
-      if (row.length === size) grid.push(row);
-    }
-    if (grid.length !== size) return false;
-    for (let r = 0; r < size; r++) {
-      if (grid[r].every(id => id === 'FREE' || completedIds.has(id))) return true;
-    }
-    for (let c = 0; c < size; c++) {
-      let colDone = true;
-      for (let r = 0; r < size; r++) {
-        if (grid[r][c] !== 'FREE' && !completedIds.has(grid[r][c])) { colDone = false; break; }
-      }
-      if (colDone) return true;
-    }
-    let d1 = true, d2 = true;
-    for (let i = 0; i < size; i++) {
-      if (grid[i][i] !== 'FREE' && !completedIds.has(grid[i][i])) d1 = false;
-      if (grid[i][size - 1 - i] !== 'FREE' && !completedIds.has(grid[i][size - 1 - i])) d2 = false;
-    }
-    return d1 || d2;
-  };
+  const hasBingo = checkBingo(board, completions, size);
 
-  const hasBingo = isBingo(board, completions);
+  // A town with fewer businesses than the board has squares produces 'EMPTY'
+  // cells, which render as tiny "TBD" tiles that can never be completed. That
+  // silently makes some rows unwinnable, so say so rather than leaving the
+  // player to work it out.
+  const incomplete = boardIsIncomplete(board);
+  const emptyCount = board.filter(c => c === 'EMPTY').length;
 
   useEffect(() => {
     if (hasBingo && !hasShownFanfare) {
@@ -94,7 +89,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, towns, s
     }
   }, [loading, settings, businesses, user.bingoBoard, user.uid, user.town]);
 
+  // The QR callback fires at 10fps for as long as the code stays in frame.
+  // setVerifying is async, so without a synchronous lock a single scan wrote
+  // several duplicate completions before the first one finished.
+  const verifyLockRef = useRef(false);
+
   const handleVerify = async (code: string) => {
+    if (verifyLockRef.current) return;
+    verifyLockRef.current = true;
     setVerifying(true);
     setError(null);
     try {
@@ -121,7 +123,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, towns, s
       }
 
       await addDoc(collection(db, 'completions'), {
-        userId: user.uid, businessId: biz.id, timestamp: new Date().toISOString(), town: biz.town
+        userId: user.uid,
+        businessId: biz.id,
+        timestamp: new Date().toISOString(),
+        town: biz.town,
+        userName: user.displayName || '',
       });
       confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 }, colors: ['#141414', '#F27D26', '#FFFFFF'] });
       setManualCode('');
@@ -131,6 +137,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, towns, s
       console.error(err);
       setError('Verification failed. Please try again.');
     } finally {
+      verifyLockRef.current = false;
       setVerifying(false);
     }
   };
@@ -199,8 +206,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, towns, s
     </div>
   );
 
-  // Verify panel content -- shared between mobile sheet and desktop overlay
-  const VerifyContent = () => (
+  // Verify panel content, shared between the mobile sheet and the desktop overlay.
+  //
+  // This is a plain JSX value, NOT a component. Declaring it as `const X = () => ...`
+  // inside the render made React see a brand new component type on every keystroke,
+  // so the manual-code input was unmounted and remounted after every character
+  // (losing focus) and an in-progress QR scan was torn down.
+  const verifyContent = (
     <div className="flex flex-col gap-6">
       {error && (
         <div className="bg-red-50 border border-red-200 rounded-2xl px-4 py-3">
@@ -302,6 +314,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, towns, s
         </div>
       </div>
 
+      {incomplete && (
+        <div role="status" className="shrink-0 mb-2 bg-amber-50 border border-amber-200 rounded-2xl px-4 py-2.5">
+          <p className="text-[11px] text-amber-800 leading-snug">
+            <span className="font-bold">{emptyCount} {emptyCount === 1 ? 'square is' : 'squares are'} still open.</span>{' '}
+            The Chamber is adding more businesses near {user.town || 'you'}. Lines
+            through an open square cannot be completed yet, so aim for the filled ones.
+          </p>
+        </div>
+      )}
+
       {/* Board */}
       <div className="flex-1 min-h-0 flex items-center justify-center relative">
         <div
@@ -328,8 +350,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, towns, s
 
             if (bizId === 'EMPTY') {
               return (
-                <div key={idx} className="rounded-xl md:rounded-3xl bg-neutral-50 border border-dashed border-neutral-200 flex items-center justify-center">
-                  <span className="text-[7px] text-neutral-300 font-bold uppercase tracking-widest">TBD</span>
+                <div
+                  key={idx}
+                  className="rounded-xl md:rounded-3xl bg-neutral-50 border border-dashed border-neutral-300 flex items-center justify-center p-1"
+                  aria-label="Empty square, no business assigned yet"
+                >
+                  <span className="text-[10px] md:text-xs text-neutral-500 font-bold uppercase tracking-wider text-center leading-tight">
+                    Coming<br />soon
+                  </span>
                 </div>
               );
             }
@@ -366,7 +394,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, towns, s
 
       {/* Verify -- bottom sheet on mobile, overlay on desktop */}
       <AnimatePresence>
-        {showManual && (
+        {showManual && !isDesktop && (
           <>
             {/* Mobile: bottom sheet */}
             <motion.div
@@ -375,7 +403,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, towns, s
               animate={{ y: 0 }}
               exit={{ y: '100%' }}
               transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-              className="md:hidden fixed inset-x-0 bottom-0 z-40 bg-white rounded-t-[2rem] shadow-2xl border-t border-neutral-200 p-6 pb-28 overflow-y-auto max-h-[85dvh]"
+              className="md:hidden fixed inset-x-0 bottom-0 z-40 bg-white rounded-t-[2rem] shadow-2xl border-t border-neutral-200 p-6 pb-28 mb-safe overflow-y-auto max-h-[85dvh]"
             >
               <div className="w-10 h-1 bg-neutral-200 rounded-full mx-auto mb-6" />
               <div className="flex items-center justify-between mb-6">
@@ -385,7 +413,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, towns, s
                   <X size={20} />
                 </button>
               </div>
-              <VerifyContent />
+              {verifyContent}
             </motion.div>
 
             {/* Mobile: backdrop */}
@@ -397,18 +425,20 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, towns, s
               className="md:hidden fixed inset-0 z-30 bg-neutral-900/40 backdrop-blur-sm"
               onClick={() => { setShowManual(false); stopScanning(); setError(null); }}
             />
-
-            {/* Desktop: inline overlay on board */}
-            <motion.div
-              key="desktop-overlay"
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="hidden md:block absolute inset-0 z-20 bg-white/95 backdrop-blur-sm p-8 rounded-[2.5rem] shadow-2xl border border-neutral-200 overflow-y-auto"
-            >
-              <VerifyContent />
-            </motion.div>
           </>
+        )}
+
+        {/* Desktop: inline overlay on board */}
+        {showManual && isDesktop && (
+          <motion.div
+            key="desktop-overlay"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            className="absolute inset-0 z-20 bg-white/95 backdrop-blur-sm p-8 rounded-[2.5rem] shadow-2xl border border-neutral-200 overflow-y-auto"
+          >
+            {verifyContent}
+          </motion.div>
         )}
       </AnimatePresence>
 
@@ -433,12 +463,25 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, towns, s
 
               <div className="overflow-y-auto" style={{ maxHeight: '90dvh' }}>
                 <div className="h-48 md:h-64 relative shrink-0">
-                  <img
-                    src={selectedBusiness.image || `https://picsum.photos/seed/${selectedBusiness.id}/800/600`}
-                    alt={selectedBusiness.name}
-                    className="w-full h-full object-cover"
-                    referrerPolicy="no-referrer"
-                  />
+                  {selectedBusiness.image ? (
+                    <img
+                      src={selectedBusiness.image}
+                      alt={selectedBusiness.name}
+                      className="w-full h-full object-cover"
+                      referrerPolicy="no-referrer"
+                    />
+                  ) : (
+                    // Businesses without a photo previously fell back to a random
+                    // picsum.photos image: an unrelated stranger's photograph shown
+                    // on a member business's square, fetched from a third party and
+                    // broken offline. A branded placeholder is the honest option.
+                    <div
+                      className="w-full h-full flex items-center justify-center"
+                      style={{ background: 'linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%)' }}
+                    >
+                      <Store className="text-white/70" size={56} aria-hidden="true" />
+                    </div>
+                  )}
                   <div className="absolute inset-0 bg-gradient-to-t from-white via-transparent to-transparent" />
                 </div>
 

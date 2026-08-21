@@ -86,6 +86,13 @@ export interface Completion {
   businessId: string;
   timestamp: string;
   town: string;
+  /**
+   * Visitor's display name, denormalised at write time so a business owner can
+   * see who came in. Business accounts cannot read other users' documents, so
+   * the old approach of fetching users/{uid} per completion always failed.
+   * Cosmetic only, and it becomes server-written in Phase 2.
+   */
+  userName?: string;
 }
 
 export interface RaffleEntry {
