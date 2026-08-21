@@ -155,6 +155,17 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, settings
     setScanning(false);
   };
 
+  /** True when the browser has an explicit denial recorded for this origin. */
+  const locationDenied = async (): Promise<boolean> => {
+    if (!navigator.permissions?.query) return false;
+    try {
+      const status = await navigator.permissions.query({ name: 'geolocation' as PermissionName });
+      return status.state === 'denied';
+    } catch {
+      return false;
+    }
+  };
+
   /**
    * Fresh fix rather than the cached user.currentLocation, which LocationTracker
    * only refreshes once a minute and only after 30m of movement. Walking into a
@@ -189,6 +200,19 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, settings
     setError(null);
     try {
       const pos = await currentPosition();
+
+      // A denied permission is close to unrecoverable on its own: the browser
+      // will not prompt again, so the player would just keep failing with
+      // "Location required" and no idea why. Say what actually has to happen.
+      if (!pos && (await locationDenied())) {
+        setError(
+          'Location is blocked for this site. Tap the padlock or the (i) in your '
+          + 'address bar, allow Location, then try again.',
+        );
+        stopScanning();
+        return;
+      }
+
       const result = await verifyVisit({
         code,
         method,
