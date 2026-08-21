@@ -5,7 +5,7 @@ import { db } from '../firebase';
 import { motion, AnimatePresence } from 'motion/react';
 import confetti from 'canvas-confetti';
 import { Trophy, CheckCircle2, MapPin, Store, RefreshCw, Loader2, ExternalLink, Ticket, QrCode, Radio, X, Navigation, Globe, Info, Star } from 'lucide-react';
-import { generateBingoBoard, checkBingo, boardIsIncomplete, businessesNeededFor } from '../services/bingoService';
+import { generateBingoBoard, checkBingo, boardIsIncomplete } from '../services/bingoService';
 import { Link } from 'react-router-dom';
 import { Html5Qrcode } from 'html5-qrcode';
 import { calculateDistance } from '../lib/utils';
