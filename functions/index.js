@@ -198,3 +198,21 @@ exports.regenerateBoard = boards.regenerateBoard;
 exports.provisionBusinessCode = businessCodes.provisionBusinessCode;
 exports.rotateAllCodes = businessCodes.rotateAllCodes;
 exports.setBusinessNfc = businessCodes.setBusinessNfc;
+
+// Invites, business claiming, admin bootstrap (Phase 2e)
+const invites = require('./invites');
+
+exports.createInvite = invites.createInvite;
+exports.peekInvite = invites.peekInvite;
+exports.redeemInvite = invites.redeemInvite;
+exports.revokeInvite = invites.revokeInvite;
+exports.claimBusiness = invites.claimBusiness;
+exports.bootstrapAdmin = invites.bootstrapAdmin;
+
+// Role administration, raffle draw, win redemption, cheat review
+const admin = require('./admin');
+
+exports.setUserRole = admin.setUserRole;
+exports.drawRaffleWinner = admin.drawRaffleWinner;
+exports.redeemWin = admin.redeemWin;
+exports.reviewSuspiciousActivity = admin.reviewSuspiciousActivity;
