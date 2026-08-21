@@ -1,11 +1,16 @@
-const { onDocumentCreated } = require('firebase-functions/v2/firestore');
+const { onDocumentCreated, onDocumentWritten } = require('firebase-functions/v2/firestore');
 const { defineString } = require('firebase-functions/params');
+const logger = require('firebase-functions/logger');
 const { initializeApp } = require('firebase-admin/app');
 const { getFirestore } = require('firebase-admin/firestore');
 const { getMessaging } = require('firebase-admin/messaging');
+const { getAuth } = require('firebase-admin/auth');
 
 initializeApp();
 
+// The app runs on a NAMED database. getFirestore() with no argument reads and
+// writes an empty (default) database with no error and no log, so every
+// function here must pass databaseId.value().
 const databaseId = defineString('FIRESTORE_DATABASE_ID', { default: '(default)' });
 
 const TYPE_TITLES = {
@@ -80,4 +85,93 @@ exports.sendPushOnNotification = onDocumentCreated({
       })
     )
   );
+});
+
+// =====================================================================
+// Role claims (Phase 2a)
+//
+// users/{uid}.role stays the human-editable source of truth. This trigger
+// projects it into a custom claim so security rules can read the role from
+// the token instead of chasing get() calls through the users collection.
+//
+// Nothing reads these claims yet. This deploys with no visible effect, which
+// is the point: it runs long enough to confirm claims are landing before any
+// rule depends on them.
+//
+// Two properties worth keeping:
+//
+//   * 'player' is represented by the ABSENCE of a role claim. Rules default an
+//     absent claim to player, so the overwhelming majority of accounts never
+//     carry a claim and existing players need no backfill at all.
+//
+//   * It fails closed. Anything unrecognized, missing, or deleted resolves to
+//     player rather than to whatever the document happened to say.
+//
+// Known trade-off, documented so nobody "fixes" it later: a demotion takes up
+// to an hour to reach security rules, because rules cannot check token
+// revocation. Operations where that hour actually matters belong in callables,
+// which can check tokensValidAfterTime directly.
+// =====================================================================
+
+const ROLES = ['player', 'business', 'chamber', 'admin'];
+
+exports.syncRoleClaims = onDocumentWritten({
+  document: 'users/{uid}',
+  database: databaseId,
+  region: 'us-east1',
+  maxInstances: 10,
+}, async (event) => {
+  const uid = event.params.uid;
+
+  const beforeSnap = event.data && event.data.before;
+  const afterSnap = event.data && event.data.after;
+  const before = beforeSnap && beforeSnap.exists ? beforeSnap.data() : null;
+  const after = afterSnap && afterSnap.exists ? afterSnap.data() : null;
+
+  // This fires on every write to a user document, and LocationTracker updates
+  // currentLocation continuously while the app is open. Bail out before
+  // touching the Auth API unless something claim-relevant actually moved.
+  if (before && after
+      && before.role === after.role
+      && before.businessId === after.businessId) {
+    return;
+  }
+
+  const role = after && ROLES.includes(after.role) ? after.role : 'player';
+  const businessId = role === 'business'
+    && typeof (after && after.businessId) === 'string'
+    && after.businessId
+    ? after.businessId
+    : null;
+
+  let user;
+  try {
+    user = await getAuth().getUser(uid);
+  } catch (err) {
+    // Seed data and test fixtures create user documents with no matching Auth
+    // account. There is nothing to sync and nothing has gone wrong.
+    if (err.code === 'auth/user-not-found') return;
+    throw err;
+  }
+
+  const existing = user.customClaims || {};
+  const desiredRole = role === 'player' ? undefined : role;
+  const desiredBid = businessId || undefined;
+
+  if (existing.role === desiredRole && existing.bid === desiredBid) return;
+
+  // Preserve anything else already on the token. setCustomUserClaims replaces
+  // the whole object, so a naive { role } would silently drop other claims.
+  const next = { ...existing };
+  if (desiredRole === undefined) delete next.role; else next.role = desiredRole;
+  if (desiredBid === undefined) delete next.bid; else next.bid = desiredBid;
+
+  await getAuth().setCustomUserClaims(uid, next);
+
+  logger.info('syncRoleClaims', {
+    uid,
+    role: desiredRole || 'player',
+    bid: desiredBid || null,
+    previousRole: existing.role || 'player',
+  });
 });
