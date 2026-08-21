@@ -3,6 +3,7 @@ import { collection, query, where, onSnapshot, doc, setDoc } from 'firebase/fire
 import { signOut, updatePassword, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
 import { auth, db } from '../firebase';
 import { UserProfile, Completion } from '../types';
+import { checkBingo } from '../services/bingoService';
 import { motion } from 'motion/react';
 import { LogOut, RotateCcw, CheckCircle2, Trophy, MapPin, Loader2, Lock, Eye, EyeOff, PlayCircle } from 'lucide-react';
 
@@ -52,27 +53,7 @@ export const Profile: React.FC<ProfileProps> = ({ user }) => {
     business: 'bg-emerald-600 text-white',
   };
 
-  const hasBingo = (() => {
-    const board = user.bingoBoard || [];
-    const size = user.boardSize || 3;
-    if (!board.length) return false;
-    const completedIds = new Set(completions.map(c => c.businessId));
-    const grid: string[][] = [];
-    for (let i = 0; i < board.length; i += size) {
-      const row = board.slice(i, i + size);
-      if (row.length === size) grid.push(row);
-    }
-    if (grid.length !== size) return false;
-    for (let r = 0; r < size; r++) {
-      if (grid[r].every(id => id === 'FREE' || completedIds.has(id))) return true;
-    }
-    for (let c = 0; c < size; c++) {
-      if (grid.every(row => row[c] === 'FREE' || completedIds.has(row[c]))) return true;
-    }
-    if (grid.every((row, i) => row[i] === 'FREE' || completedIds.has(row[i]))) return true;
-    if (grid.every((row, i) => row[size - 1 - i] === 'FREE' || completedIds.has(row[size - 1 - i]))) return true;
-    return false;
-  })();
+  const hasBingo = checkBingo(user.bingoBoard, completions, user.boardSize || 3);
 
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();

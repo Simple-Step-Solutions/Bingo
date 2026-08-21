@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { collection, query, limit, onSnapshot, addDoc, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { collection, query, limit, orderBy, onSnapshot, addDoc, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { Notification, UserProfile } from '../types';
 import { Bell, X, Info, Trophy, Ticket, Gamepad2, Plus, Loader2, Trash2 } from 'lucide-react';
@@ -37,14 +37,16 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({ user }) => {
   const canCompose = user.role === 'admin' || user.role === 'chamber';
 
   useEffect(() => {
-    // No orderBy -- sort client-side to avoid needing a Firestore index
-    const q = query(collection(db, 'notifications'), limit(100));
+    // Newest 50, ordered server-side. This previously used a bare limit(100)
+    // with a comment claiming orderBy would need an index -- it does not, a
+    // single-field index is created automatically. Without the ordering
+    // Firestore returns the first 100 documents by ID, so once the collection
+    // passed 100 notifications the newest ones could stop appearing entirely.
+    const q = query(collection(db, 'notifications'), orderBy('timestamp', 'desc'), limit(50));
     const unsub = onSnapshot(q, snap => {
       const all = snap.docs
         .map(d => ({ id: d.id, ...d.data() } as Notification))
-        .filter(n => n.userId === 'all' || n.userId === user.uid)
-        .sort((a, b) => b.timestamp.localeCompare(a.timestamp))
-        .slice(0, 50);
+        .filter(n => n.userId === 'all' || n.userId === user.uid);
       setNotifications(all);
     }, err => console.error('Notification snapshot error:', err));
     return unsub;

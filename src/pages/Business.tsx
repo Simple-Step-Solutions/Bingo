@@ -4,6 +4,7 @@ import { collection, onSnapshot, query, where, getDocs, doc, getDoc, setDoc } fr
 import { db } from '../firebase';
 import { Store, Users, CheckCircle2, Loader2, QrCode, Download, MapPin, Printer, Hash, KeyRound } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
+import { svgToDataUrl } from '../lib/utils';
 
 interface BusinessDashboardProps {
   user: UserProfile;
@@ -16,38 +17,56 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ user }) =>
   const [claimCode, setClaimCode] = useState('');
   const [claiming, setClaiming] = useState(false);
   const [claimError, setClaimError] = useState<string | null>(null);
-  const [visitorProfiles, setVisitorProfiles] = useState<Record<string, { displayName?: string; email: string }>>({});
   const printQR = () => {
     const printWindow = window.open('', '_blank');
     if (!printWindow || !business) return;
     const svg = document.getElementById('business-qr-svg');
     if (!svg) return;
-    const svgData = new XMLSerializer().serializeToString(svg);
-    printWindow.document.write(`
-      <html><head><title>${business.name} - QR Code</title>
-      <style>
-        body { margin: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; font-family: sans-serif; }
-        h1 { font-size: 24px; margin-bottom: 8px; text-align: center; }
-        p { font-size: 12px; color: #666; text-transform: uppercase; letter-spacing: 0.15em; margin-bottom: 24px; text-align: center; }
-        .code { font-size: 18px; font-weight: bold; letter-spacing: 0.2em; margin-top: 16px; color: #333; }
-        img { width: 280px; height: 280px; }
-      </style></head>
-      <body>
-        <h1>${business.name}</h1>
-        <p>Scan to verify your visit</p>
-        <img src="data:image/svg+xml;base64,${btoa(svgData)}" />
-        <p class="code">Manual code: ${business.qrCode}</p>
-      </body></html>
-    `);
-    printWindow.document.close();
-    printWindow.focus();
-    printWindow.print();
+
+    // Built with DOM APIs rather than document.write with template literals.
+    // business.name is chamber-entered and also arrives via CSV import, so a
+    // name like `<img src=x onerror=...>` used to execute in this window, which
+    // is same-origin with the app and therefore holds the Firebase session.
+    // textContent escapes by construction.
+    const doc = printWindow.document;
+    doc.title = `${business.name} - QR Code`;
+
+    const style = doc.createElement('style');
+    style.textContent = `
+      body { margin: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; font-family: sans-serif; }
+      h1 { font-size: 24px; margin-bottom: 8px; text-align: center; }
+      p { font-size: 12px; color: #666; text-transform: uppercase; letter-spacing: 0.15em; margin-bottom: 24px; text-align: center; }
+      .code { font-size: 18px; font-weight: bold; letter-spacing: 0.2em; margin-top: 16px; color: #333; }
+      img { width: 280px; height: 280px; }
+    `;
+    doc.head.appendChild(style);
+
+    const heading = doc.createElement('h1');
+    heading.textContent = business.name;
+
+    const caption = doc.createElement('p');
+    caption.textContent = 'Scan to verify your visit';
+
+    const img = doc.createElement('img');
+    img.src = svgToDataUrl(svg);
+    img.alt = `QR code for ${business.name}`;
+
+    const code = doc.createElement('p');
+    code.className = 'code';
+    code.textContent = `Manual code: ${business.qrCode}`;
+
+    doc.body.append(heading, caption, img, code);
+
+    // Wait for the QR image to decode, otherwise the print dialog can open on
+    // a blank page.
+    const go = () => { printWindow.focus(); printWindow.print(); };
+    if (img.complete) go();
+    else { img.onload = go; img.onerror = go; }
   };
 
   const downloadQR = () => {
     const svg = document.getElementById('business-qr-svg');
     if (!svg || !business) return;
-    const svgData = new XMLSerializer().serializeToString(svg);
     const canvas = document.createElement('canvas');
     canvas.width = 400;
     canvas.height = 400;
@@ -60,7 +79,7 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ user }) =>
       link.href = canvas.toDataURL('image/png');
       link.click();
     };
-    img.src = 'data:image/svg+xml;base64,' + btoa(svgData);
+    img.src = svgToDataUrl(svg);
   };
 
   useEffect(() => {
@@ -93,27 +112,18 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ user }) =>
   }, [user]);
 
   useEffect(() => {
-    if (business) {
-      const q = query(collection(db, 'completions'), where('businessId', '==', business.id));
-      const unsubscribe = onSnapshot(q, async (snapshot) => {
-        const comps = snapshot.docs.map(d => d.data() as Completion);
-        setCompletions(comps);
-        // Fetch visitor profiles
-        const uniqueIds = [...new Set(comps.map(c => c.userId))];
-        const profiles: Record<string, { displayName?: string; email: string }> = {};
-        await Promise.all(uniqueIds.map(async uid => {
-          try {
-            const userDoc = await getDoc(doc(db, 'users', uid));
-            if (userDoc.exists()) {
-              const data = userDoc.data();
-              profiles[uid] = { displayName: data.displayName, email: data.email };
-            }
-          } catch {}
-        }));
-        setVisitorProfiles(profiles);
-      });
-      return () => unsubscribe();
-    }
+    if (!business) return;
+    // Visitor names come from the completion itself. This used to fan out one
+    // getDoc(users/{uid}) per visitor, which a business account is not allowed
+    // to read, so every one of those reads was denied, the names never appeared,
+    // and the failures were swallowed by an empty catch on each snapshot.
+    const q = query(collection(db, 'completions'), where('businessId', '==', business.id));
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => setCompletions(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Completion))),
+      (err) => console.error('Completions snapshot error:', err),
+    );
+    return () => unsubscribe();
   }, [business]);
 
   if (loading) return (
@@ -253,7 +263,7 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ user }) =>
                       <CheckCircle2 size={20} />
                     </div>
                     <div>
-                      <p className="font-bold text-sm">{visitorProfiles[c.userId]?.displayName || visitorProfiles[c.userId]?.email || `Visitor #${c.userId.slice(-4).toUpperCase()}`}</p>
+                      <p className="font-bold text-sm">{c.userName || `Visitor #${c.userId.slice(-4).toUpperCase()}`}</p>
                       <p className="text-[10px] text-neutral-400 uppercase tracking-widest font-bold">
                         {new Date(c.timestamp).toLocaleString()}
                       </p>

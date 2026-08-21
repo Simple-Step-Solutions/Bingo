@@ -1,10 +1,12 @@
 import React, { useState, useMemo, useRef } from 'react';
-import { Business, Town, RaffleEntry, Winner, AppSettings } from '../../types';
+import { Business, Town, RaffleEntry, Winner, AppSettings, UserProfile } from '../../types';
 import { doc, setDoc, deleteDoc, addDoc, collection } from 'firebase/firestore';
 import { db, storage } from '../../firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { Store, Trash2, Plus, Nfc, QrCode, Search, Users, Ticket, Pencil, Trophy, Sparkles, Loader2, ChevronLeft, ChevronRight, Palette, ImagePlus, Download } from 'lucide-react';
 import { createInvite } from '../../services/inviteService';
+import { shuffle } from '../../services/bingoService';
+import { logAudit } from '../../services/auditService';
 
 const DEFAULT_PRIMARY = '#1695B2';
 const DEFAULT_ACCENT = '#CC5500';
@@ -13,6 +15,7 @@ const BIZ_PAGE_SIZE = 20;
 import { CSVImport } from '../CSVImport';
 import { AddressSearch } from '../AddressSearch';
 import { geocodeAddress } from '../../lib/geocoding';
+import { newDocId } from '../../lib/utils';
 import { QRModal } from '../QRModal';
 
 interface ChamberManagerProps {
@@ -21,9 +24,10 @@ interface ChamberManagerProps {
   raffleEntries: RaffleEntry[];
   winners: Winner[];
   settings: AppSettings;
+  currentUser: UserProfile;
 }
 
-export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, towns, raffleEntries, winners, settings }) => {
+export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, towns, raffleEntries, winners, settings, currentUser }) => {
   const [newBiz, setNewBiz] = useState({ 
     name: '', 
     town: 'Yorktown', 
@@ -45,6 +49,7 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
   const [editingId, setEditingId] = useState<string | null>(null);
   const [numWinnersToPick, setNumWinnersToPick] = useState(1);
   const [tempWinners, setTempWinners] = useState<RaffleEntry[]>([]);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [isGeocoding, setIsGeocoding] = useState(false);
   const [bizSearch, setBizSearch] = useState('');
   const [bizPage, setBizPage] = useState(0);
@@ -73,10 +78,13 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
 
   const pickWinners = () => {
     if (raffleEntries.length === 0) return;
-    
-    // Shuffle entries
-    const shuffled = [...raffleEntries].sort(() => Math.random() - 0.5);
-    
+
+    // Unbiased draw. This previously used `.sort(() => Math.random() - 0.5)`,
+    // an inconsistent comparator that does not produce a uniform permutation,
+    // so entries in some positions were measurably more likely to win. This
+    // picks real prize winners, so it needs to be defensibly fair.
+    const shuffled: RaffleEntry[] = shuffle<RaffleEntry>(raffleEntries);
+
     // Pick unique users
     const uniqueWinners: RaffleEntry[] = [];
     const seenUsers = new Set<string>();
@@ -89,20 +97,40 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
       if (uniqueWinners.length >= numWinnersToPick) break;
     }
     
+    setSaveError(null);
     setTempWinners(uniqueWinners);
   };
 
   const saveWinners = async () => {
-    for (const winner of tempWinners) {
-      await addDoc(collection(db, 'winners'), {
-        userId: winner.userId,
-        userName: winner.userName,
-        userEmail: winner.userEmail,
-        timestamp: new Date().toISOString(),
-        prize: settings.bingoPrize || 'Raffle Prize'
-      });
+    const drawn = [...tempWinners];
+    try {
+      for (const winner of drawn) {
+        await addDoc(collection(db, 'winners'), {
+          userId: winner.userId,
+          userName: winner.userName,
+          userEmail: winner.userEmail,
+          timestamp: new Date().toISOString(),
+          prize: settings.bingoPrize || 'Raffle Prize'
+        });
+      }
+      // A prize draw is the thing most likely to be questioned later.
+      await logAudit(
+        currentUser.uid,
+        currentUser.email,
+        'raffle_draw',
+        currentUser.uid,
+        currentUser.email,
+        {
+          entryPool: raffleEntries.length,
+          winners: drawn.map(w => ({ userId: w.userId, userEmail: w.userEmail })),
+          prize: settings.bingoPrize || 'Raffle Prize',
+        }
+      );
+      setTempWinners([]);
+    } catch (err) {
+      console.error('Failed to save winners:', err);
+      setSaveError('Could not save the winners. Nothing was recorded. Please try again.');
     }
-    setTempWinners([]);
   };
 
   const deleteWinner = async (id: string) => {
@@ -125,7 +153,7 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
       setIsGeocoding(false);
     }
 
-    const id = editingId || Math.random().toString(36).substr(2, 9);
+    const id = editingId || newDocId();
     await setDoc(doc(db, 'businesses', id), {
       ...newBiz,
       lat: finalLat,
@@ -496,6 +524,11 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
                   </div>
                 ))}
               </div>
+              {saveError && (
+                <div role="alert" className="mt-6 bg-red-50 border border-red-200 rounded-2xl px-4 py-3">
+                  <p className="text-xs text-red-600 font-bold">{saveError}</p>
+                </div>
+              )}
               <div className="flex gap-3 mt-6">
                 <button 
                   onClick={saveWinners}
@@ -601,7 +634,7 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
                   setEditingId(null);
                   setNewBiz({
                     name: '', town: 'Yorktown', task: '', category: 'Retail', address: '', lat: 0, lng: 0, nfcId: '',
-                    description: '', image: '', website: ''
+                    description: '', image: '', website: '', email: ''
                   });
                 }}
                 className="text-[10px] uppercase tracking-widest font-bold text-neutral-400 hover:text-neutral-900"

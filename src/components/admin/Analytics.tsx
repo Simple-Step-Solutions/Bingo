@@ -4,6 +4,8 @@ import { Users, CheckCircle2, Trophy, MapPin, TrendingUp, Star, Activity as Acti
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { checkBingo } from '../../services/bingoService';
+import { applyLeafletDefaultIcons } from '../../lib/leafletIcons';
 
 const PlayerIcon = L.divIcon({
   className: 'custom-div-icon',
@@ -31,61 +33,17 @@ export const Analytics: React.FC<AnalyticsProps> = ({ users, completions, busine
   const [showMap, setShowMap] = useState(true);
   const globalSize = settings.boardSize || 3;
 
-  // Fix for Leaflet marker icons
-  useEffect(() => {
-    delete (L.Icon.Default.prototype as any)._getIconUrl;
-    L.Icon.Default.mergeOptions({
-      iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
-      iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
-      shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-    });
-  }, []);
+  // Marker images ship with the leaflet package; see lib/leafletIcons.
+  useEffect(() => { applyLeafletDefaultIcons(); }, []);
 
   const canSeeMap = currentUser.role === 'admin' || settings.showRealtimeMapToChamber;
   const isAdmin = currentUser.role === 'admin';
 
-  const checkBingo = (board: string[], userCompletions: Completion[], userBoardSize?: number) => {
-    if (!board || board.length === 0) return false;
-    const size = userBoardSize || Math.sqrt(board.length) || globalSize;
-    if (board.length !== size * size) return false;
-
-    const completedIds = new Set(userCompletions.map(c => c.businessId));
-    const grid: string[][] = [];
-    for (let i = 0; i < board.length; i += size) {
-      const row = board.slice(i, i + size);
-      if (row.length === size) grid.push(row);
-    }
-    
-    if (grid.length !== size) return false;
-
-    for (let r = 0; r < size; r++) {
-      if (grid[r].every(id => id === 'FREE' || completedIds.has(id))) return true;
-    }
-    for (let c = 0; c < size; c++) {
-      let colDone = true;
-      for (let r = 0; r < size; r++) {
-        const id = grid[r][c];
-        if (id !== 'FREE' && !completedIds.has(id)) {
-          colDone = false;
-          break;
-        }
-      }
-      if (colDone) return true;
-    }
-    let d1 = true, d2 = true;
-    for (let i = 0; i < size; i++) {
-      const id1 = grid[i][i];
-      const id2 = grid[i][size - 1 - i];
-      if (id1 !== 'FREE' && !completedIds.has(id1)) d1 = false;
-      if (id2 !== 'FREE' && !completedIds.has(id2)) d2 = false;
-    }
-    return d1 || d2;
-  };
-
   const players = users.filter(u => u.role === 'player' || u.bingoBoard?.length);
   const bingoFinishers = players.filter(u => {
     const userCompletions = completions.filter(c => c.userId === u.uid);
-    return checkBingo(u.bingoBoard || [], userCompletions, u.boardSize);
+    const size = u.boardSize || Math.round(Math.sqrt((u.bingoBoard || []).length)) || globalSize;
+    return checkBingo(u.bingoBoard, userCompletions, size);
   });
 
   // Active players (last 5 minutes)

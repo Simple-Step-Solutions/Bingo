@@ -5,7 +5,7 @@ import { UserProfile, AppSettings, Notification } from '../../types';
 import { signOut } from 'firebase/auth';
 import { auth, db } from '../../firebase';
 import { NotificationBell } from '../NotificationBell';
-import { collection, query, limit, onSnapshot, updateDoc, doc } from 'firebase/firestore';
+import { collection, query, limit, orderBy, onSnapshot, updateDoc, doc } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface NavbarProps {
@@ -33,13 +33,16 @@ const MobileAccountMenu: React.FC<{ user: UserProfile }> = ({ user }) => {
   const lastReadAt = user.lastReadAt || '1970-01-01T00:00:00.000Z';
 
   useEffect(() => {
-    const q = query(collection(db, 'notifications'), limit(100));
+    // Newest 50, ordered server-side. This previously used a bare limit(100)
+    // with a comment claiming orderBy would need an index -- it does not, a
+    // single-field index is created automatically. Without the ordering
+    // Firestore returns the first 100 documents by ID, so once the collection
+    // passed 100 notifications the newest ones could stop appearing entirely.
+    const q = query(collection(db, 'notifications'), orderBy('timestamp', 'desc'), limit(50));
     return onSnapshot(q, snap => {
       const all = snap.docs
         .map(d => ({ id: d.id, ...d.data() } as Notification))
-        .filter(n => n.userId === 'all' || n.userId === user.uid)
-        .sort((a, b) => b.timestamp.localeCompare(a.timestamp))
-        .slice(0, 50);
+        .filter(n => n.userId === 'all' || n.userId === user.uid);
       setNotifications(all);
     }, err => console.error('Notification snapshot error:', err));
   }, [user.uid]);

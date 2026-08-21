@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { AppSettings, UserProfile } from '../../types';
 import { doc, setDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
@@ -13,26 +13,71 @@ interface GameMasterProps {
 
 export const GameMaster: React.FC<GameMasterProps> = ({ settings, user }) => {
   const [newCategory, setNewCategory] = useState('');
+  const [saveError, setSaveError] = useState<string | null>(null);
 
-  const categories = settings.businessCategories ?? DEFAULT_CATEGORIES;
+  // Every field here used to write to settings/global straight from onChange,
+  // so typing a prize name produced one document write per character on a
+  // document every connected client subscribes to. Keep a local draft for
+  // responsiveness and coalesce the writes.
+  const [draft, setDraft] = useState<Partial<AppSettings>>({});
+  const pendingRef = useRef<Partial<AppSettings>>({});
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const updateSettings = async (field: keyof AppSettings, value: any) => {
-    await setDoc(doc(db, 'settings', 'global'), { [field]: value }, { merge: true });
+  const flush = useCallback(async () => {
+    if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; }
+    const payload = pendingRef.current;
+    pendingRef.current = {};
+    if (Object.keys(payload).length === 0) return;
+    try {
+      await setDoc(doc(db, 'settings', 'global'), payload, { merge: true });
+      // Snapshot is authoritative again, so stop shadowing these fields.
+      setDraft(d => {
+        const next = { ...d };
+        for (const k of Object.keys(payload)) delete next[k as keyof AppSettings];
+        return next;
+      });
+      setSaveError(null);
+    } catch (err) {
+      console.error('Failed to save settings:', err);
+      setSaveError('Could not save your changes. Check your connection and try again.');
+    }
+  }, []);
+
+  // Do not lose a half-typed value when the admin switches tabs.
+  useEffect(() => () => { void flush(); }, [flush]);
+
+  const updateSettings = (field: keyof AppSettings, value: any, immediate = false) => {
+    setDraft(d => ({ ...d, [field]: value }));
+    pendingRef.current = { ...pendingRef.current, [field]: value };
+    if (timerRef.current) clearTimeout(timerRef.current);
+    if (immediate) { void flush(); return; }
+    timerRef.current = setTimeout(() => { void flush(); }, 500);
   };
 
-  const addCategory = async () => {
+  /** Current value: the local draft if the admin is mid-edit, else the snapshot. */
+  const val = <K extends keyof AppSettings>(key: K): AppSettings[K] =>
+    (draft[key] !== undefined ? draft[key] : settings[key]) as AppSettings[K];
+
+  const categories = (val('businessCategories') ?? DEFAULT_CATEGORIES) as string[];
+
+  const addCategory = () => {
     const trimmed = newCategory.trim();
     if (!trimmed || categories.includes(trimmed)) return;
-    await updateSettings('businessCategories', [...categories, trimmed]);
+    updateSettings('businessCategories', [...categories, trimmed], true);
     setNewCategory('');
   };
 
-  const removeCategory = async (cat: string) => {
-    await updateSettings('businessCategories', categories.filter(c => c !== cat));
+  const removeCategory = (cat: string) => {
+    updateSettings('businessCategories', categories.filter(c => c !== cat), true);
   };
 
   return (
     <div className="flex flex-col gap-8">
+      {saveError && (
+        <div role="alert" className="bg-red-50 border border-red-200 rounded-2xl px-5 py-4">
+          <p className="text-xs text-red-600 font-bold">{saveError}</p>
+        </div>
+      )}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
       {/* Bingo Configuration */}
       <div className="bg-white border border-neutral-200 p-8 rounded-3xl shadow-sm">
@@ -48,7 +93,7 @@ export const GameMaster: React.FC<GameMasterProps> = ({ settings, user }) => {
             <div>
               <label className="block text-[10px] text-neutral-400 uppercase tracking-widest mb-2 font-bold">Free Space Name</label>
               <input 
-                value={settings.freeSpaceName}
+                value={val('freeSpaceName')}
                 onChange={(e) => updateSettings('freeSpaceName', e.target.value)}
                 className="w-full p-4 bg-neutral-50 border border-neutral-100 rounded-2xl text-sm font-medium focus:ring-2 focus:ring-neutral-900 transition-all outline-none"
               />
@@ -56,7 +101,7 @@ export const GameMaster: React.FC<GameMasterProps> = ({ settings, user }) => {
             <div>
               <label className="block text-[10px] text-neutral-400 uppercase tracking-widest mb-2 font-bold">Free Space Task</label>
               <input 
-                value={settings.freeSpaceTask}
+                value={val('freeSpaceTask')}
                 onChange={(e) => updateSettings('freeSpaceTask', e.target.value)}
                 className="w-full p-4 bg-neutral-50 border border-neutral-100 rounded-2xl text-sm font-medium focus:ring-2 focus:ring-neutral-900 transition-all outline-none"
               />
@@ -66,11 +111,11 @@ export const GameMaster: React.FC<GameMasterProps> = ({ settings, user }) => {
           <div>
             <div className="flex justify-between items-center mb-4">
               <label className="block text-[10px] text-neutral-400 uppercase tracking-widest font-bold">Board Size</label>
-              <span className="text-xs font-bold bg-neutral-900 text-white px-3 py-1 rounded-full">{settings.boardSize}x{settings.boardSize}</span>
+              <span className="text-xs font-bold bg-neutral-900 text-white px-3 py-1 rounded-full">{val('boardSize')}x{val('boardSize')}</span>
             </div>
             <input 
               type="range" min="3" max="5" step="1"
-              value={settings.boardSize}
+              value={val('boardSize')}
               onChange={(e) => updateSettings('boardSize', parseInt(e.target.value))}
               className="w-full h-2 bg-neutral-100 rounded-lg appearance-none cursor-pointer accent-neutral-900"
             />
@@ -84,14 +129,14 @@ export const GameMaster: React.FC<GameMasterProps> = ({ settings, user }) => {
           <div>
             <div className="flex justify-between items-center mb-2">
               <label className="block text-[10px] text-neutral-400 uppercase tracking-widest font-bold">Difficulty Meter</label>
-              <span className="text-xs font-bold bg-orange-100 text-orange-600 px-3 py-1 rounded-full">{settings.difficulty}%</span>
+              <span className="text-xs font-bold bg-orange-100 text-orange-600 px-3 py-1 rounded-full">{val('difficulty')}%</span>
             </div>
             <p className="text-[10px] text-neutral-400 mb-4 italic leading-relaxed">
               Higher difficulty increases the ratio of businesses from other towns on player boards.
             </p>
             <input 
               type="range" min="0" max="100" step="5"
-              value={settings.difficulty}
+              value={val('difficulty')}
               onChange={(e) => updateSettings('difficulty', parseInt(e.target.value))}
               className="w-full h-2 bg-neutral-100 rounded-lg appearance-none cursor-pointer accent-orange-500"
             />
@@ -105,7 +150,7 @@ export const GameMaster: React.FC<GameMasterProps> = ({ settings, user }) => {
           <div>
             <label className="block text-[10px] text-neutral-400 uppercase tracking-widest mb-2 font-bold">Bingo Completion Prize</label>
             <input 
-              value={settings.bingoPrize || ''}
+              value={val('bingoPrize') || ''}
               onChange={(e) => updateSettings('bingoPrize', e.target.value)}
               placeholder="e.g., Free Coffee at Main St Cafe"
               className="w-full p-4 bg-neutral-50 border border-neutral-100 rounded-2xl text-sm font-medium focus:ring-2 focus:ring-neutral-900 transition-all outline-none"
@@ -120,17 +165,17 @@ export const GameMaster: React.FC<GameMasterProps> = ({ settings, user }) => {
               <div>
                 <div className="flex items-center gap-2 mb-1">
                   <label className="block text-[10px] text-neutral-400 uppercase tracking-widest font-bold">Pause Game</label>
-                  {settings.gamePaused && (
+                  {val('gamePaused') && (
                     <span className="px-2 py-0.5 bg-red-100 text-red-600 rounded-full text-[9px] font-black uppercase tracking-widest">Paused</span>
                   )}
                 </div>
                 <p className="text-[10px] text-neutral-400 italic">Temporarily freeze all visit verifications. Players can still view their boards.</p>
               </div>
               <button
-                onClick={() => updateSettings('gamePaused', !settings.gamePaused)}
-                className={`flex items-center gap-2 transition-colors ${settings.gamePaused ? 'text-red-500' : 'text-neutral-300'}`}
+                onClick={() => updateSettings('gamePaused', !val('gamePaused'), true)}
+                className={`flex items-center gap-2 transition-colors ${val('gamePaused') ? 'text-red-500' : 'text-neutral-300'}`}
               >
-                {settings.gamePaused ? <ToggleRight size={32} /> : <ToggleLeft size={32} />}
+                {val('gamePaused') ? <ToggleRight size={32} /> : <ToggleLeft size={32} />}
               </button>
             </div>
           </div>
@@ -143,10 +188,10 @@ export const GameMaster: React.FC<GameMasterProps> = ({ settings, user }) => {
                   <p className="text-[10px] text-neutral-400 italic">Allow Chamber users to see the live player map in Analytics.</p>
                 </div>
                 <button
-                  onClick={() => updateSettings('showRealtimeMapToChamber', !settings.showRealtimeMapToChamber)}
-                  className={`flex items-center gap-2 transition-colors ${settings.showRealtimeMapToChamber ? 'text-neutral-900' : 'text-neutral-300'}`}
+                  onClick={() => updateSettings('showRealtimeMapToChamber', !val('showRealtimeMapToChamber'), true)}
+                  className={`flex items-center gap-2 transition-colors ${val('showRealtimeMapToChamber') ? 'text-neutral-900' : 'text-neutral-300'}`}
                 >
-                  {settings.showRealtimeMapToChamber ? <ToggleRight size={32} /> : <ToggleLeft size={32} />}
+                  {val('showRealtimeMapToChamber') ? <ToggleRight size={32} /> : <ToggleLeft size={32} />}
                 </button>
               </div>
             </div>
@@ -164,10 +209,10 @@ export const GameMaster: React.FC<GameMasterProps> = ({ settings, user }) => {
             <h3 className="font-bold uppercase tracking-widest text-xs text-neutral-400">Raffle Settings</h3>
           </div>
           <button 
-            onClick={() => updateSettings('raffleEnabled', !settings.raffleEnabled)}
-            className={`flex items-center gap-2 transition-colors ${settings.raffleEnabled ? 'text-green-600' : 'text-neutral-300'}`}
+            onClick={() => updateSettings('raffleEnabled', !val('raffleEnabled'), true)}
+            className={`flex items-center gap-2 transition-colors ${val('raffleEnabled') ? 'text-green-600' : 'text-neutral-300'}`}
           >
-            {settings.raffleEnabled ? <ToggleRight size={32} /> : <ToggleLeft size={32} />}
+            {val('raffleEnabled') ? <ToggleRight size={32} /> : <ToggleLeft size={32} />}
           </button>
         </div>
 
@@ -175,7 +220,7 @@ export const GameMaster: React.FC<GameMasterProps> = ({ settings, user }) => {
           <div>
             <label className="block text-[10px] text-neutral-400 uppercase tracking-widest mb-2 font-bold">Raffle Description</label>
             <textarea 
-              value={settings.raffleDescription || ''}
+              value={val('raffleDescription') || ''}
               onChange={(e) => updateSettings('raffleDescription', e.target.value)}
               placeholder="Explain the raffle prizes and rules..."
               rows={3}
@@ -186,11 +231,11 @@ export const GameMaster: React.FC<GameMasterProps> = ({ settings, user }) => {
           <div>
             <div className="flex justify-between items-center mb-4">
               <label className="block text-[10px] text-neutral-400 uppercase tracking-widest font-bold">Entry Requirement</label>
-              <span className="text-xs font-bold bg-neutral-100 text-neutral-600 px-3 py-1 rounded-full">{settings.raffleRequirement || 5} Tasks</span>
+              <span className="text-xs font-bold bg-neutral-100 text-neutral-600 px-3 py-1 rounded-full">{val('raffleRequirement') || 5} Tasks</span>
             </div>
             <input 
               type="range" min="1" max="25" step="1"
-              value={settings.raffleRequirement || 5}
+              value={val('raffleRequirement') || 5}
               onChange={(e) => updateSettings('raffleRequirement', parseInt(e.target.value))}
               className="w-full h-2 bg-neutral-100 rounded-lg appearance-none cursor-pointer accent-neutral-900"
             />
