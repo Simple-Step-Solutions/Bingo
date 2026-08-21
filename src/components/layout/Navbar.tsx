@@ -201,7 +201,7 @@ export const Navbar: React.FC<NavbarProps> = ({ user, settings }) => {
   }
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-xl border-t border-neutral-200 px-6 py-4 flex justify-around items-center z-50 md:top-0 md:bottom-auto md:border-t-0 md:border-b shadow-2xl md:shadow-sm">
+    <nav className="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-xl border-t border-neutral-200 px-6 py-4 pb-safe md:pb-4 flex justify-around items-center z-50 md:top-0 md:bottom-auto md:border-t-0 md:border-b shadow-2xl md:shadow-sm">
       <div className="hidden md:flex items-center gap-3 mr-8">
         {settings?.chamberLogoUrl ? (
           <img src={settings.chamberLogoUrl} alt="Chamber" className="h-8 w-auto" />

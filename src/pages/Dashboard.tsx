@@ -380,7 +380,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, towns, s
               animate={{ y: 0 }}
               exit={{ y: '100%' }}
               transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-              className="md:hidden fixed inset-x-0 bottom-0 z-40 bg-white rounded-t-[2rem] shadow-2xl border-t border-neutral-200 p-6 pb-28 overflow-y-auto max-h-[85dvh]"
+              className="md:hidden fixed inset-x-0 bottom-0 z-40 bg-white rounded-t-[2rem] shadow-2xl border-t border-neutral-200 p-6 pb-28 mb-safe overflow-y-auto max-h-[85dvh]"
             >
               <div className="w-10 h-1 bg-neutral-200 rounded-full mx-auto mb-6" />
               <div className="flex items-center justify-between mb-6">
