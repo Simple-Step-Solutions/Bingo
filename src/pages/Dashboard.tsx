@@ -5,7 +5,7 @@ import { db } from '../firebase';
 import { motion, AnimatePresence } from 'motion/react';
 import confetti from 'canvas-confetti';
 import { Trophy, CheckCircle2, MapPin, Store, RefreshCw, Loader2, ExternalLink, Ticket, QrCode, Radio, X, Navigation, Globe, Info, Star } from 'lucide-react';
-import { generateBingoBoard, checkBingo } from '../services/bingoService';
+import { generateBingoBoard, checkBingo, boardIsIncomplete, businessesNeededFor } from '../services/bingoService';
 import { Link } from 'react-router-dom';
 import { Html5Qrcode } from 'html5-qrcode';
 import { calculateDistance } from '../lib/utils';
@@ -51,6 +51,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, towns, s
   const board = user.bingoBoard || [];
 
   const hasBingo = checkBingo(board, completions, size);
+
+  // A town with fewer businesses than the board has squares produces 'EMPTY'
+  // cells, which render as tiny "TBD" tiles that can never be completed. That
+  // silently makes some rows unwinnable, so say so rather than leaving the
+  // player to work it out.
+  const incomplete = boardIsIncomplete(board);
+  const emptyCount = board.filter(c => c === 'EMPTY').length;
 
   useEffect(() => {
     if (hasBingo && !hasShownFanfare) {
@@ -307,6 +314,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, towns, s
         </div>
       </div>
 
+      {incomplete && (
+        <div role="status" className="shrink-0 mb-2 bg-amber-50 border border-amber-200 rounded-2xl px-4 py-2.5">
+          <p className="text-[11px] text-amber-800 leading-snug">
+            <span className="font-bold">{emptyCount} {emptyCount === 1 ? 'square is' : 'squares are'} still open.</span>{' '}
+            The Chamber is adding more businesses near {user.town || 'you'}. Lines
+            through an open square cannot be completed yet, so aim for the filled ones.
+          </p>
+        </div>
+      )}
+
       {/* Board */}
       <div className="flex-1 min-h-0 flex items-center justify-center relative">
         <div
@@ -333,8 +350,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, towns, s
 
             if (bizId === 'EMPTY') {
               return (
-                <div key={idx} className="rounded-xl md:rounded-3xl bg-neutral-50 border border-dashed border-neutral-200 flex items-center justify-center">
-                  <span className="text-[7px] text-neutral-300 font-bold uppercase tracking-widest">TBD</span>
+                <div
+                  key={idx}
+                  className="rounded-xl md:rounded-3xl bg-neutral-50 border border-dashed border-neutral-300 flex items-center justify-center p-1"
+                  aria-label="Empty square, no business assigned yet"
+                >
+                  <span className="text-[10px] md:text-xs text-neutral-500 font-bold uppercase tracking-wider text-center leading-tight">
+                    Coming<br />soon
+                  </span>
                 </div>
               );
             }
