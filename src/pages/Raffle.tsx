@@ -112,10 +112,10 @@ export const Raffle: React.FC<RaffleProps> = ({ user }) => {
 
           <div className="flex flex-wrap gap-4 items-center">
             <div className="bg-white/10 px-4 py-2 rounded-full backdrop-blur-sm border border-white/10">
-              <span className="text-xs font-bold uppercase tracking-widest text-neutral-300">Requirement: {requirement} Tasks</span>
+              <span className="text-xs font-bold uppercase tracking-widest text-neutral-500">Requirement: {requirement} Tasks</span>
             </div>
             <div className="bg-white/10 px-4 py-2 rounded-full backdrop-blur-sm border border-white/10">
-              <span className="text-xs font-bold uppercase tracking-widest text-neutral-300">Your Progress: {completions.length}</span>
+              <span className="text-xs font-bold uppercase tracking-widest text-neutral-500">Your Progress: {completions.length}</span>
             </div>
           </div>
         </div>

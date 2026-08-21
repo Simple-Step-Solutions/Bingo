@@ -114,14 +114,14 @@ export const RoleSelector: React.FC<RoleSelectorProps> = ({ user }) => {
                       : 'border-neutral-100 hover:border-neutral-300 bg-neutral-50'
                   }`}
                 >
-                  <div className={`shrink-0 transition-colors ${role === value ? 'text-[var(--color-primary)]' : 'text-neutral-300'}`}>
+                  <div className={`shrink-0 transition-colors ${role === value ? 'text-[var(--color-primary)]' : 'text-neutral-500'}`}>
                     {opt.icon}
                   </div>
                   <div className="flex-1">
                     <p className={`text-sm font-bold ${role === value ? 'text-[var(--color-primary)]' : 'text-neutral-700'}`}>{opt.label}</p>
                     <p className="text-[10px] text-neutral-400 mt-0.5">{opt.sub}</p>
                   </div>
-                  {value !== 'player' && <Lock size={12} className="text-neutral-300 shrink-0" />}
+                  {value !== 'player' && <Lock size={12} className="text-neutral-500 shrink-0" />}
                 </button>
               ))}
               <p className="text-[9px] text-neutral-400 text-center pt-1">Business and chamber accounts require an invite link.</p>

@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { UserProfile, Business, AppSettings, Completion } from '../../types';
-import { collection, query, where, onSnapshot, addDoc, deleteDoc, doc } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, deleteDoc, doc } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { ShieldCheck, X, Trophy, Store, CheckCircle2, Loader2 } from 'lucide-react';
 import { logAudit } from '../../services/auditService';
+import { adminGrantCompletion, errorMessage, isExpectedError } from '../../services/api';
 
 interface BoardImpersonationProps {
   targetUser: UserProfile;
@@ -21,6 +22,7 @@ export const BoardImpersonation: React.FC<BoardImpersonationProps> = ({
   onClose,
 }) => {
   const [completions, setCompletions] = useState<Completion[]>([]);
+  const [error, setError] = useState<string | null>(null);
   const [working, setWorking] = useState<string | null>(null);
 
   const board = targetUser.bingoBoard || [];
@@ -36,24 +38,19 @@ export const BoardImpersonation: React.FC<BoardImpersonationProps> = ({
   const addCompletion = async (biz: Business) => {
     setWorking(biz.id);
     try {
-      await addDoc(collection(db, 'completions'), {
+      // Completions are closed to every client now, so an override has to go
+      // through the callable. That is the better place for it anyway: the
+      // server validates the pair, stamps a server timestamp, and writes a
+      // non-forgeable audit entry naming who granted it and why. The moment
+      // that matters is when a prize gets disputed.
+      await adminGrantCompletion({
         userId: targetUser.uid,
         businessId: biz.id,
-        timestamp: new Date().toISOString(),
-        town: biz.town,
-        adminOverride: true,
-        overrideBy: actingUser.uid,
+        reason: `Chamber override from the board tool for ${biz.name}`,
       });
-      await logAudit(
-        actingUser.uid,
-        actingUser.email,
-        'add_completion',
-        targetUser.uid,
-        targetUser.email,
-        { businessId: biz.id, businessName: biz.name }
-      );
     } catch (err) {
-      console.error('Error adding completion:', err);
+      if (!isExpectedError(err)) console.error('adminGrantCompletion failed:', err);
+      setError(errorMessage(err, 'Could not add that visit.'));
     } finally {
       setWorking(null);
     }
@@ -108,6 +105,11 @@ export const BoardImpersonation: React.FC<BoardImpersonationProps> = ({
       {/* Body */}
       <div className="flex-1 overflow-y-auto p-6">
         <div className="max-w-2xl mx-auto space-y-2">
+          {error && (
+            <div role="alert" className="bg-red-500/20 border border-red-500/40 rounded-2xl px-5 py-4 mb-2">
+              <p className="text-red-200 text-xs font-bold">{error}</p>
+            </div>
+          )}
           {board.map((bizId, idx) => {
             if (bizId === 'FREE') {
               return (

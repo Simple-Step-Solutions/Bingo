@@ -315,7 +315,7 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
               ) : settings.chamberLogoUrl ? (
                 <img src={settings.chamberLogoUrl} alt="Chamber Logo" className="h-12 w-auto object-contain" />
               ) : (
-                <ImagePlus className="text-neutral-300" size={24} />
+                <ImagePlus className="text-neutral-500" size={24} />
               )}
               <span className="text-[10px] font-bold uppercase tracking-widest text-neutral-400">
                 {settings.chamberLogoUrl ? 'Replace' : 'Upload Logo'}
@@ -440,7 +440,7 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
               placeholder="Search by name, town, category, or task..."
               value={bizSearch}
               onChange={e => handleBizSearch(e.target.value)}
-              className="flex-1 bg-transparent text-sm outline-none font-medium placeholder:text-neutral-300"
+              className="flex-1 bg-transparent text-sm outline-none font-medium placeholder:text-neutral-500"
             />
             {bizSearch && (
               <span className="text-[10px] text-neutral-400 font-bold uppercase tracking-widest shrink-0">
@@ -473,7 +473,7 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
                   </button>
                   <button
                     onClick={() => deleteBusiness(biz.id)}
-                    className="p-2 bg-white border border-neutral-200 rounded-xl text-neutral-300 hover:text-red-500 hover:border-red-200 transition-all shadow-sm"
+                    className="p-2 bg-white border border-neutral-200 rounded-xl text-neutral-500 hover:text-red-500 hover:border-red-200 transition-all shadow-sm"
                     title="Delete"
                   >
                     <Trash2 size={15} />
@@ -599,7 +599,7 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
                 </div>
                 <button 
                   onClick={() => deleteRaffleEntry(entry.id)} 
-                  className="p-2 text-neutral-300 hover:text-red-500 transition-colors"
+                  className="p-2 text-neutral-500 hover:text-red-500 transition-colors"
                 >
                   <Trash2 size={18} />
                 </button>
@@ -640,7 +640,7 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
                 </div>
                 <button 
                   onClick={() => deleteWinner(winner.id)} 
-                  className="p-2 text-neutral-300 hover:text-red-500 transition-colors"
+                  className="p-2 text-neutral-500 hover:text-red-500 transition-colors"
                 >
                   <Trash2 size={18} />
                 </button>
@@ -816,7 +816,7 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
                 <span className="text-sm font-bold">{t.name}</span>
                 <button 
                   onClick={() => deleteTown(t.id)} 
-                  className="p-2 text-neutral-300 hover:text-red-500 transition-colors"
+                  className="p-2 text-neutral-500 hover:text-red-500 transition-colors"
                 >
                   <Trash2 size={16} />
                 </button>

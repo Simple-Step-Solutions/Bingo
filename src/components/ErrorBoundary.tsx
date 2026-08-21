@@ -44,7 +44,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
           >
             Reload the app
           </button>
-          <p className="text-[9px] text-neutral-300 uppercase tracking-widest mt-6 break-words">
+          <p className="text-[9px] text-neutral-500 uppercase tracking-widest mt-6 break-words">
             {this.state.error.message}
           </p>
         </div>

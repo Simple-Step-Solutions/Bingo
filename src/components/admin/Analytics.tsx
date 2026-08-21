@@ -238,7 +238,7 @@ export const Analytics: React.FC<AnalyticsProps> = ({ users, completions, busine
                 </div>
                 <div className="text-right">
                   <p className="font-bold text-lg">{u.count}</p>
-                  <p className="text-[8px] text-neutral-400 uppercase tracking-widest font-bold">Visits</p>
+                  <p className="text-[10px] text-neutral-400 uppercase tracking-widest font-bold">Visits</p>
                 </div>
               </div>
             ))}
@@ -295,7 +295,7 @@ export const Analytics: React.FC<AnalyticsProps> = ({ users, completions, busine
                 </div>
                 <div className="text-right">
                   <p className="font-bold text-lg">{item.count}</p>
-                  <p className="text-[8px] text-neutral-400 uppercase tracking-widest font-bold">Visits</p>
+                  <p className="text-[10px] text-neutral-400 uppercase tracking-widest font-bold">Visits</p>
                 </div>
               </div>
             ))}

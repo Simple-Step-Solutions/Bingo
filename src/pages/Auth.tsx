@@ -210,7 +210,7 @@ export const Auth: React.FC<AuthProps> = () => {
                 ) : (
                   <form onSubmit={handlePasswordReset} className="space-y-4">
                     <div className="relative">
-                      <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-300" size={18} />
+                      <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-500" size={18} />
                       <input
                         type="email"
                         placeholder="Email Address"
@@ -262,8 +262,8 @@ export const Auth: React.FC<AuthProps> = () => {
                     <div className="absolute inset-0 flex items-center">
                       <div className="w-full border-t border-neutral-100"></div>
                     </div>
-                    <div className="relative flex justify-center text-[8px] uppercase tracking-[0.3em] font-black">
-                      <span className="bg-white px-4 text-neutral-300">Or</span>
+                    <div className="relative flex justify-center text-[10px] uppercase tracking-[0.3em] font-black">
+                      <span className="bg-white px-4 text-neutral-500">Or</span>
                     </div>
                   </div>
 
@@ -311,7 +311,7 @@ export const Auth: React.FC<AuthProps> = () => {
                 <form onSubmit={authMode === 'email-signin' ? handleEmailSignIn : handleEmailSignUp} className="space-y-4">
                   {authMode === 'email-signup' && (
                     <div className="relative">
-                      <User className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-300" size={18} />
+                      <User className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-500" size={18} />
                       <input 
                         type="text"
                         placeholder="Full Name"
@@ -323,7 +323,7 @@ export const Auth: React.FC<AuthProps> = () => {
                     </div>
                   )}
                   <div className="relative">
-                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-300" size={18} />
+                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-500" size={18} />
                     <input 
                       type="email"
                       placeholder="Email Address"
@@ -334,7 +334,7 @@ export const Auth: React.FC<AuthProps> = () => {
                     />
                   </div>
                   <div className="relative">
-                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-300" size={18} />
+                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-500" size={18} />
                     <input 
                       type="password"
                       placeholder="Password"
@@ -372,7 +372,7 @@ export const Auth: React.FC<AuthProps> = () => {
                   {authMode === 'email-signin' && (
                     <button
                       onClick={() => { setAuthMode('forgot-password'); setError(null); setResetSent(false); }}
-                      className="w-full text-[10px] font-bold text-neutral-300 uppercase tracking-widest hover:text-neutral-600 transition-colors"
+                      className="w-full text-[10px] font-bold text-neutral-500 uppercase tracking-widest hover:text-neutral-600 transition-colors"
                     >
                       Forgot Password?
                     </button>
@@ -390,7 +390,7 @@ export const Auth: React.FC<AuthProps> = () => {
                 </div>
                 <div>
                   <p className="text-[9px] font-black uppercase tracking-widest text-neutral-900">Play</p>
-                  <p className="text-[8px] text-neutral-400 leading-tight mt-0.5">Fill your board</p>
+                  <p className="text-[10px] text-neutral-400 leading-tight mt-0.5">Fill your board</p>
                 </div>
               </div>
               <div className="flex flex-col items-center gap-2 text-center">
@@ -399,7 +399,7 @@ export const Auth: React.FC<AuthProps> = () => {
                 </div>
                 <div>
                   <p className="text-[9px] font-black uppercase tracking-widest text-neutral-900">Visit</p>
-                  <p className="text-[8px] text-neutral-400 leading-tight mt-0.5">Local shops</p>
+                  <p className="text-[10px] text-neutral-400 leading-tight mt-0.5">Local shops</p>
                 </div>
               </div>
               <div className="flex flex-col items-center gap-2 text-center">
@@ -408,7 +408,7 @@ export const Auth: React.FC<AuthProps> = () => {
                 </div>
                 <div>
                   <p className="text-[9px] font-black uppercase tracking-widest text-neutral-900">Win</p>
-                  <p className="text-[8px] text-neutral-400 leading-tight mt-0.5">Chamber prizes</p>
+                  <p className="text-[10px] text-neutral-400 leading-tight mt-0.5">Chamber prizes</p>
                 </div>
               </div>
             </div>

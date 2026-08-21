@@ -233,10 +233,10 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ user }) =>
           <div className="flex flex-wrap gap-4 items-center mb-10">
             <div className="bg-white/10 px-4 py-2 rounded-full backdrop-blur-sm border border-white/10 flex items-center gap-2">
               <MapPin size={14} className="text-neutral-400" />
-              <span className="text-xs font-bold uppercase tracking-widest text-neutral-300">{business.town}</span>
+              <span className="text-xs font-bold uppercase tracking-widest text-neutral-500">{business.town}</span>
             </div>
             <div className="bg-white/10 px-4 py-2 rounded-full backdrop-blur-sm border border-white/10">
-              <span className="text-xs font-bold uppercase tracking-widest text-neutral-300">{business.task}</span>
+              <span className="text-xs font-bold uppercase tracking-widest text-neutral-500">{business.task}</span>
             </div>
           </div>
 

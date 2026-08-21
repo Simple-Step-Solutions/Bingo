@@ -176,7 +176,7 @@ export const AdminMenu: React.FC<AdminMenuProps> = ({ users, businesses, current
             placeholder="Search by name, email, town, or role..."
             value={userSearch}
             onChange={e => { setUserSearch(e.target.value); setUserPage(0); }}
-            className="flex-1 bg-transparent text-sm font-medium outline-none placeholder:text-neutral-300"
+            className="flex-1 bg-transparent text-sm font-medium outline-none placeholder:text-neutral-500"
           />
           <span className="text-[10px] text-neutral-400 font-bold uppercase tracking-widest shrink-0">
             {filteredUsers.length} of {isAdmin ? users.length : users.filter(u => u.role !== 'admin').length}

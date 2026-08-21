@@ -4,6 +4,7 @@ import { doc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { provisionBusinessCode, setBusinessNfc } from '../services/api';
 import { newDocId } from '../lib/utils';
+import { geocodeAddress } from '../lib/geocoding';
 import { Upload, CheckCircle2, Loader2, AlertCircle, Download } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -13,21 +14,6 @@ interface CSVImportProps {
 
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
-async function geocodeAddress(address: string): Promise<{ lat: number; lng: number } | null> {
-  try {
-    const res = await fetch(
-      `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address)}&format=json&limit=1`,
-      { headers: { 'User-Agent': 'ChamberBingo/1.0' } }
-    );
-    const data = await res.json();
-    if (data.length > 0) {
-      return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
-    }
-  } catch (err) {
-    console.error('Geocoding failed for:', address, err);
-  }
-  return null;
-}
 
 const SAMPLE_CSV = [
   ['name', 'town', 'task', 'address', 'description', 'website', 'nfcId'],

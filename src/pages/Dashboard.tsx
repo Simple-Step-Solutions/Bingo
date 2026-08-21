@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { UserProfile, Business, Completion, AppSettings, Town } from '../types';
 import { collection, onSnapshot, query, where, doc } from 'firebase/firestore';
 import { db } from '../firebase';
@@ -9,6 +9,7 @@ import { checkBingo, boardIsIncomplete } from '../services/bingoService';
 import { Link } from 'react-router-dom';
 import { Html5Qrcode } from 'html5-qrcode';
 import { Onboarding } from '../components/Onboarding';
+import { useModalA11y, prefersReducedMotion } from '../lib/a11y';
 import { verifyVisit, ensureBoard, regenerateBoard as regenerateBoardCall, errorMessage, isExpectedError } from '../services/api';
 
 interface DashboardProps {
@@ -27,6 +28,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, towns, s
   const [scanning, setScanning] = useState(false);
   const [nfcScanning, setNfcScanning] = useState(false);
   const [selectedBusiness, setSelectedBusiness] = useState<Business | null>(null);
+  const closeBusiness = useCallback(() => setSelectedBusiness(null), []);
+  const businessModalRef = useModalA11y(selectedBusiness !== null, closeBusiness);
   const [showBingoFanfare, setShowBingoFanfare] = useState(false);
   const [hasShownFanfare, setHasShownFanfare] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -102,12 +105,20 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, towns, s
   const incomplete = boardIsIncomplete(board);
   const emptyCount = board.filter(c => c === 'EMPTY').length;
 
+  // hasShownFanfare was component state, so the celebration modal reappeared
+  // on every single reload once a player had a bingo. The win itself is now
+  // recorded server-side in wins/{uid}; this only tracks whether this device
+  // has already shown the animation.
+  const fanfareKey = `bingoFanfareShown:${user.uid}`;
+
   useEffect(() => {
-    if (hasBingo && !hasShownFanfare) {
-      setShowBingoFanfare(true);
-      setHasShownFanfare(true);
-    }
-  }, [hasBingo, hasShownFanfare]);
+    if (!hasBingo || hasShownFanfare) return;
+    let alreadySeen = false;
+    try { alreadySeen = localStorage.getItem(fanfareKey) === '1'; } catch { /* private mode */ }
+    if (!alreadySeen) setShowBingoFanfare(true);
+    setHasShownFanfare(true);
+    try { localStorage.setItem(fanfareKey, '1'); } catch { /* private mode */ }
+  }, [hasBingo, hasShownFanfare, fanfareKey]);
 
   useEffect(() => {
     const unsubscribeCompletions = onSnapshot(
@@ -169,12 +180,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, towns, s
         ...(pos ? { lat: pos.lat, lng: pos.lng } : {}),
       });
 
-      confetti({
-        particleCount: result.bingo ? 220 : 100,
-        spread: result.bingo ? 100 : 70,
-        origin: { y: 0.6 },
-        colors: ['#141414', '#F27D26', '#FFFFFF'],
-      });
+      if (!prefersReducedMotion()) {
+        confetti({
+          particleCount: result.bingo ? 220 : 100,
+          spread: result.bingo ? 100 : 70,
+          origin: { y: 0.6 },
+          colors: ['#141414', '#F27D26', '#FFFFFF'],
+        });
+      }
       setManualCode('');
       setShowManual(false);
       stopScanning();
@@ -275,7 +288,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, towns, s
   const verifyContent = (
     <div className="flex flex-col gap-6">
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-2xl px-4 py-3">
+        <div role="alert" className="bg-red-50 border border-red-200 rounded-2xl px-4 py-3">
           <p className="text-red-600 text-xs font-bold uppercase tracking-widest">{error}</p>
         </div>
       )}
@@ -284,7 +297,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, towns, s
         <h3 className="font-bold uppercase tracking-widest text-[10px] md:text-xs mb-4 flex items-center justify-between">
           Scan to Verify
           <a href={window.location.href} target="_blank" rel="noopener noreferrer"
-            className="text-[8px] text-neutral-400 hover:text-neutral-900 transition-colors flex items-center gap-1">
+            className="text-[10px] text-neutral-400 hover:text-neutral-900 transition-colors flex items-center gap-1">
             <ExternalLink size={10} /> Open in New Tab
           </a>
         </h3>
@@ -352,7 +365,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, towns, s
           <p className="text-[9px] md:text-xs text-neutral-400 uppercase tracking-[0.2em] font-bold flex items-center gap-2">
             <MapPin size={10} /> {user.town || 'Global'} Edition
             {completions.length > 0 && (
-              <span className="bg-neutral-100 text-neutral-600 px-2 py-0.5 rounded-full text-[8px] font-black normal-case tracking-normal">{completions.length} done</span>
+              <span className="bg-neutral-100 text-neutral-600 px-2 py-0.5 rounded-full text-[10px] font-black normal-case tracking-normal">{completions.length} done</span>
             )}
           </p>
         </div>
@@ -390,6 +403,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, towns, s
       {/* Board */}
       <div className="flex-1 min-h-0 flex items-center justify-center relative">
         <div
+          role="grid"
+          aria-label={`Bingo board, ${size} by ${size}. ${completions.length} of ${board.filter(c => c !== 'FREE' && c !== 'EMPTY').length} businesses visited.`}
           className="grid gap-1.5 md:gap-3"
           style={{
             gridTemplateColumns: `repeat(${size}, 1fr)`,
@@ -402,11 +417,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, towns, s
             if (bizId === 'FREE') {
               return (
                 <div key="free"
+                  role="gridcell"
+                  aria-label={`Free space: ${settings.freeSpaceName}. Already counted.`}
                   className="bg-orange-50 border-2 border-orange-200 rounded-xl md:rounded-3xl flex flex-col items-center justify-center text-center p-1 shadow-sm relative overflow-hidden group">
-                  <div className="absolute inset-0 bg-orange-100/50 opacity-0 group-hover:opacity-100 transition-opacity" />
-                  <Trophy className="text-orange-500 mb-1 relative z-10 w-5 h-5 md:w-8 md:h-8" />
+                  <div className="absolute inset-0 bg-orange-100/50 opacity-0 group-hover:opacity-100 transition-opacity" aria-hidden="true" />
+                  <Trophy className="text-orange-500 mb-1 relative z-10 w-5 h-5 md:w-8 md:h-8" aria-hidden="true" />
                   <p className="text-[9px] md:text-sm font-black text-orange-900 uppercase tracking-tighter relative z-10 leading-none px-1">{settings.freeSpaceName}</p>
-                  <p className="text-[7px] md:text-[10px] text-orange-600 font-bold uppercase tracking-widest mt-0.5 relative z-10 opacity-60 px-1 leading-tight hidden sm:block">{settings.freeSpaceTask}</p>
+                  <p className="text-[10px] md:text-[10px] text-orange-600 font-bold uppercase tracking-widest mt-0.5 relative z-10 opacity-60 px-1 leading-tight hidden sm:block">{settings.freeSpaceTask}</p>
                 </div>
               );
             }
@@ -415,8 +432,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, towns, s
               return (
                 <div
                   key={idx}
+                  role="gridcell"
                   className="rounded-xl md:rounded-3xl bg-neutral-50 border border-dashed border-neutral-300 flex items-center justify-center p-1"
-                  aria-label="Empty square, no business assigned yet"
+                  aria-label="Empty square. Not enough businesses in your town to fill this one, so it cannot be completed."
                 >
                   <span className="text-[10px] md:text-xs text-neutral-500 font-bold uppercase tracking-wider text-center leading-tight">
                     Coming<br />soon
@@ -429,27 +447,37 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, towns, s
             const isDone = completions.some(c => c.businessId === bizId);
 
             return (
-              <div key={idx}
+              <button
+                key={idx}
+                type="button"
+                role="gridcell"
+                aria-pressed={isDone}
+                disabled={!biz}
+                aria-label={
+                  biz
+                    ? `${biz.name}, ${biz.town}. ${isDone ? 'Visited.' : 'Not visited yet.'} Open details.`
+                    : 'Loading business'
+                }
                 onClick={() => {
                   if (biz) { setSelectedBusiness(biz); }
                 }}
-                className={`rounded-xl md:rounded-3xl flex flex-col items-center justify-center text-center transition-all relative overflow-hidden group cursor-pointer p-1 md:p-3 ${
+                className={`rounded-xl md:rounded-3xl flex flex-col items-center justify-center text-center transition-all relative overflow-hidden group cursor-pointer p-1 md:p-3 focus:outline-none focus-visible:ring-4 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-2 ${
                   isDone ? 'bg-neutral-900 text-white shadow-lg' : 'bg-white border border-neutral-100 text-neutral-900 hover:border-neutral-300 hover:shadow-sm shadow-sm'
                 }`}
               >
                 {isDone ? (
                   <>
-                    <CheckCircle2 className="text-orange-500 mb-1 w-5 h-5 md:w-8 md:h-8 shrink-0" />
+                    <CheckCircle2 className="text-orange-500 mb-1 w-5 h-5 md:w-8 md:h-8 shrink-0" aria-hidden="true" />
                     <p className="text-[9px] md:text-sm font-bold uppercase tracking-tighter leading-tight line-clamp-2 px-1">{biz?.name || 'Unknown'}</p>
                   </>
                 ) : (
                   <>
-                    <Store className="text-neutral-200 mb-1 group-hover:text-neutral-400 transition-colors w-5 h-5 md:w-8 md:h-8 shrink-0" />
+                    <Store className="text-neutral-200 mb-1 group-hover:text-neutral-400 transition-colors w-5 h-5 md:w-8 md:h-8 shrink-0" aria-hidden="true" />
                     <p className="text-[9px] md:text-sm font-bold uppercase tracking-tighter leading-tight line-clamp-2 px-1">{biz?.name || '...'}</p>
-                    <p className="text-[7px] md:text-[10px] text-neutral-400 font-medium uppercase tracking-widest mt-0.5 hidden sm:block">{biz?.town}</p>
+                    <p className="text-[10px] md:text-[10px] text-neutral-500 font-medium uppercase tracking-widest mt-0.5 hidden sm:block">{biz?.town}</p>
                   </>
                 )}
-              </div>
+              </button>
             );
           })}
         </div>
@@ -514,8 +542,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, towns, s
             onClick={() => setSelectedBusiness(null)}
           >
             <motion.div
+              ref={businessModalRef}
+              role="dialog"
+              aria-modal="true"
+              aria-label={selectedBusiness.name}
+              tabIndex={-1}
               initial={{ y: 60, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 60, opacity: 0 }}
-              className="bg-white w-full max-w-2xl rounded-t-[2.5rem] md:rounded-[3rem] overflow-hidden shadow-2xl relative"
+              className="bg-white w-full max-w-2xl rounded-t-[2.5rem] md:rounded-[3rem] overflow-hidden shadow-2xl relative focus:outline-none"
               style={{ maxHeight: '90dvh' }}
               onClick={e => e.stopPropagation()}
             >
@@ -666,7 +699,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, towns, s
       )}
 
       <footer className="hidden md:block mt-16 pt-10 border-t border-neutral-200">
-        <p className="text-center text-[10px] text-neutral-300 uppercase tracking-[0.3em] font-bold">
+        <p className="text-center text-[10px] text-neutral-500 uppercase tracking-[0.3em] font-bold">
           {settings?.chamberName || 'Hudson Valley Gateway Chamber of Commerce'}
         </p>
       </footer>

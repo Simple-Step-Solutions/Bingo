@@ -198,7 +198,7 @@ function App() {
               Sign out
             </button>
           </div>
-          <p className="text-[9px] text-neutral-300 uppercase tracking-widest mt-6">This page will update automatically once verified</p>
+          <p className="text-[9px] text-neutral-500 uppercase tracking-widest mt-6">This page will update automatically once verified</p>
         </div>
       </div>
     );
@@ -255,10 +255,10 @@ function App() {
               <p className="text-[10px] text-neutral-400 uppercase tracking-widest font-bold">
                 {settings?.chamberName || 'Hudson Valley Gateway Chamber of Commerce'}
               </p>
-              <p className="text-[10px] text-neutral-300 uppercase tracking-widest font-bold">
+              <p className="text-[10px] text-neutral-500 uppercase tracking-widest font-bold">
                 &copy; 2026 All Rights Reserved
               </p>
-              <p className="text-[9px] text-neutral-300 uppercase tracking-widest font-bold">
+              <p className="text-[9px] text-neutral-500 uppercase tracking-widest font-bold">
                 v{__APP_VERSION__}
               </p>
             </div>

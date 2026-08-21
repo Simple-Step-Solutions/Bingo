@@ -173,7 +173,7 @@ export const GameMaster: React.FC<GameMasterProps> = ({ settings, user }) => {
               </div>
               <button
                 onClick={() => updateSettings('gamePaused', !val('gamePaused'), true)}
-                className={`flex items-center gap-2 transition-colors ${val('gamePaused') ? 'text-red-500' : 'text-neutral-300'}`}
+                className={`flex items-center gap-2 transition-colors ${val('gamePaused') ? 'text-red-500' : 'text-neutral-500'}`}
               >
                 {val('gamePaused') ? <ToggleRight size={32} /> : <ToggleLeft size={32} />}
               </button>
@@ -189,7 +189,7 @@ export const GameMaster: React.FC<GameMasterProps> = ({ settings, user }) => {
                 </div>
                 <button
                   onClick={() => updateSettings('showRealtimeMapToChamber', !val('showRealtimeMapToChamber'), true)}
-                  className={`flex items-center gap-2 transition-colors ${val('showRealtimeMapToChamber') ? 'text-neutral-900' : 'text-neutral-300'}`}
+                  className={`flex items-center gap-2 transition-colors ${val('showRealtimeMapToChamber') ? 'text-neutral-900' : 'text-neutral-500'}`}
                 >
                   {val('showRealtimeMapToChamber') ? <ToggleRight size={32} /> : <ToggleLeft size={32} />}
                 </button>
@@ -210,7 +210,7 @@ export const GameMaster: React.FC<GameMasterProps> = ({ settings, user }) => {
           </div>
           <button 
             onClick={() => updateSettings('raffleEnabled', !val('raffleEnabled'), true)}
-            className={`flex items-center gap-2 transition-colors ${val('raffleEnabled') ? 'text-green-600' : 'text-neutral-300'}`}
+            className={`flex items-center gap-2 transition-colors ${val('raffleEnabled') ? 'text-green-600' : 'text-neutral-500'}`}
           >
             {val('raffleEnabled') ? <ToggleRight size={32} /> : <ToggleLeft size={32} />}
           </button>

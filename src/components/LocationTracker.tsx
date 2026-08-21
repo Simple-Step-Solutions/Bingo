@@ -44,8 +44,19 @@ export const LocationTracker: React.FC<LocationTrackerProps> = ({ user }) => {
       }
     };
 
-    // GPS is only relevant for on-site verification -- skip on desktop
-    if (!/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) return;
+    // GPS is only relevant for on-site verification, so skip real desktops.
+    //
+    // The old check was a user-agent regex for Android|iPhone|iPad|iPod, which
+    // missed Android tablets entirely and missed iPadOS, which reports itself
+    // as a Mac. Those users got no location at all and then failed every
+    // verification with "Location required" and no way to work out why.
+    //
+    // Touch capability plus a coarse pointer is the property that actually
+    // matters, and it does not need updating when a new device ships.
+    const isLikelyMobile =
+      navigator.maxTouchPoints > 0
+      || window.matchMedia('(pointer: coarse)').matches;
+    if (!isLikelyMobile) return;
 
     if (!('geolocation' in navigator)) return;
 

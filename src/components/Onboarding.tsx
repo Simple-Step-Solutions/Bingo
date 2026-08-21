@@ -186,7 +186,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ user, towns, businesses,
                     className="w-full p-5 rounded-2xl border-2 border-neutral-100 hover:border-[var(--color-primary)] hover:bg-[var(--color-primary)]/5 transition-all font-bold text-sm flex items-center justify-between group disabled:opacity-50"
                   >
                     <span>{town.name}</span>
-                    <ChevronRight size={16} className="text-neutral-300 group-hover:text-[var(--color-primary)] transition-colors" />
+                    <ChevronRight size={16} className="text-neutral-500 group-hover:text-[var(--color-primary)] transition-colors" />
                   </button>
                 )) : (
                   <div className="p-8 bg-neutral-50 rounded-2xl border border-dashed border-neutral-200 text-center">

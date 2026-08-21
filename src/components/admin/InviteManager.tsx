@@ -217,7 +217,7 @@ export const InviteManager: React.FC<InviteManagerProps> = ({ businesses, curren
                     <span className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-widest shrink-0 ${statusStyles[status]}`}>
                       {status}
                     </span>
-                    <span className="text-[9px] text-neutral-300 font-medium shrink-0">
+                    <span className="text-[9px] text-neutral-500 font-medium shrink-0">
                       {status === 'used'
                         ? `Used ${invite.usedAt ? new Date(invite.usedAt).toLocaleDateString() : ''}`
                         : `Expires ${expires.toLocaleDateString()}`}

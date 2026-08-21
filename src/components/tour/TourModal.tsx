@@ -45,7 +45,7 @@ export const TourModal: React.FC<TourModalProps> = ({
             <div className="flex justify-end mb-6">
               <button
                 onClick={onSkip}
-                className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-neutral-300 hover:text-neutral-500 transition-colors"
+                className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-neutral-500 hover:text-neutral-500 transition-colors"
               >
                 <X size={12} /> Skip Tour
               </button>

@@ -28,7 +28,10 @@ export const QRModal: React.FC<QRModalProps> = ({ isOpen, onClose, value, title 
       downloadLink.href = pngFile;
       downloadLink.click();
     };
-    img.src = 'data:image/svg+xml;base64,' + btoa(svgData);
+    // btoa throws on any code point above U+00FF, so a business with an
+    // accented or non-Latin name made Save silently fail. Percent-encoding
+    // handles the full range.
+    img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgData)}`;
   };
 
   return (
