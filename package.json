@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
-    "test:rules": "npx --yes firebase-tools@14 emulators:exec --only firestore --project sss-hvgcc-bingo-rules-test \"node --import tsx --test rules-tests/firestore.test.ts\""
+    "test:rules": "npx --yes firebase-tools@14 emulators:exec --only firestore --project sss-hvgcc-bingo-rules-test \"node --import tsx --test rules-tests/firestore.test.ts\"",
+    "test:functions": "node --test \"functions/test/**/*.test.js\""
   },
   "dependencies": {
     "@fontsource-variable/lora": "^5.3.0",
