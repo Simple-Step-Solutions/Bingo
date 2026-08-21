@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { doc, setDoc } from 'firebase/firestore';
-import { db } from '../firebase';
+import { db, auth } from '../firebase';
 import { AppSettings } from '../types';
 import { LayoutGrid, Loader2, Sparkles } from 'lucide-react';
+import { bootstrapAdmin, errorMessage, isExpectedError } from '../services/api';
 
 const DEFAULTS: AppSettings = {
   freeSpaceName: 'FREE',
@@ -100,16 +101,59 @@ export const SetupWizard: React.FC = () => {
   );
 };
 
-export const SetupPending: React.FC = () => (
-  <div className="min-h-screen flex items-center justify-center p-6 bg-[#F5F5F0]">
-    <div className="max-w-sm w-full text-center">
-      <div className="inline-block bg-[var(--color-primary,#1695B2)] p-4 rounded-3xl mb-6 shadow-2xl">
-        <LayoutGrid className="text-white" size={48} />
+/**
+ * Shown to everyone before the chamber has run setup.
+ *
+ * The administrator claim used to be a hardcoded email compared in the client
+ * and again in the security rules. It is now a server-side check against a
+ * function parameter, requiring a verified email and refusing once an admin
+ * exists. So this button is safe to show to anyone: pressing it does nothing
+ * unless you are the configured address.
+ */
+export const SetupPending: React.FC = () => {
+  const [claiming, setClaiming] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const claimAdmin = async () => {
+    setClaiming(true);
+    setError(null);
+    try {
+      await bootstrapAdmin({});
+      // The admin claim has to be on the token before the wizard's writes run.
+      await auth.currentUser?.getIdToken(true);
+    } catch (err) {
+      if (!isExpectedError(err)) console.error('bootstrapAdmin failed:', err);
+      setError(errorMessage(err, 'This account cannot set up the app.'));
+    } finally {
+      setClaiming(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen flex items-center justify-center p-6 bg-[#F5F5F0]">
+      <div className="max-w-sm w-full text-center">
+        <div className="inline-block bg-[var(--color-primary,#1695B2)] p-4 rounded-3xl mb-6 shadow-2xl">
+          <LayoutGrid className="text-white" size={48} aria-hidden="true" />
+        </div>
+        <h1 className="font-serif italic text-4xl mb-3">Coming Soon</h1>
+        <p className="text-neutral-500 text-sm leading-relaxed">
+          The Hudson Valley Gateway Chamber Bingo app is being set up. Check back shortly.
+        </p>
+
+        {error && (
+          <div role="alert" className="mt-6 bg-red-50 border border-red-200 rounded-2xl px-4 py-3">
+            <p className="text-red-600 text-xs font-bold">{error}</p>
+          </div>
+        )}
+
+        <button
+          onClick={claimAdmin}
+          disabled={claiming}
+          className="mt-8 text-[10px] font-bold uppercase tracking-widest text-neutral-400 hover:text-neutral-700 transition-colors disabled:opacity-50"
+        >
+          {claiming ? 'Checking...' : 'I am the administrator'}
+        </button>
       </div>
-      <h1 className="font-serif italic text-4xl mb-3">Coming Soon</h1>
-      <p className="text-neutral-500 text-sm leading-relaxed">
-        The Hudson Valley Gateway Chamber Bingo app is being set up. Check back shortly.
-      </p>
     </div>
-  </div>
-);
+  );
+};

@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { UserProfile, Business, Town, RaffleEntry, AppSettings, Completion, Winner, AuditLog } from '../types';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
-import { UserIcon, ShieldCheck, Gamepad2, Settings as SettingsIcon, Loader2, BarChart3, Clock } from 'lucide-react';
+import { UserIcon, ShieldCheck, Gamepad2, Settings as Loader2, BarChart3, Clock } from 'lucide-react';
 import { AdminMenu } from '../components/admin/AdminMenu';
 import { GameMaster } from '../components/admin/GameMaster';
 import { ChamberManager } from '../components/admin/ChamberManager';

@@ -6,6 +6,7 @@ import {
   persistentMultipleTabManager,
 } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
+import { getFunctions } from 'firebase/functions';
 import { getMessaging, isSupported } from 'firebase/messaging';
 
 const firebaseConfig = {
@@ -47,5 +48,12 @@ export const auth = initializeAuth(app, {
   persistence: browserLocalPersistence,
   popupRedirectResolver: browserPopupRedirectResolver,
 });
+/**
+ * Callables live in us-east1. This region argument is not optional: the default
+ * is us-central1, and calling a function that is not there fails with a bare
+ * 404 that looks like the function does not exist at all.
+ */
+export const functions = getFunctions(app, 'us-east1');
+
 export const storage = getStorage(app);
 export const messaging = isSupported().then(yes => yes ? getMessaging(app) : null);

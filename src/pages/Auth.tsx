@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import {
   signInWithPopup,
   GoogleAuthProvider,
-  OAuthProvider,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   updateProfile,
@@ -17,7 +16,7 @@ interface AuthProps {
   onAuthSuccess: () => void;
 }
 
-export const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
+export const Auth: React.FC<AuthProps> = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [authMode, setAuthMode] = useState<'social' | 'email-signin' | 'email-signup' | 'forgot-password' | 'verify-email'>('social');
@@ -53,19 +52,6 @@ export const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
     } catch (err: any) {
       console.error('Google Auth error:', err);
       setError(err.message || 'Failed to sign in with Google.');
-      setLoading(false);
-    }
-  };
-
-  const signInWithMicrosoft = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const provider = new OAuthProvider('microsoft.com');
-      await signInWithPopup(auth, provider);
-    } catch (err: any) {
-      console.error('Microsoft Auth error:', err);
-      setError(err.message || 'Failed to sign in with Microsoft.');
       setLoading(false);
     }
   };

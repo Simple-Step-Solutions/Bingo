@@ -4,7 +4,7 @@ import { doc, setDoc, deleteDoc, addDoc, collection } from 'firebase/firestore';
 import { db, storage } from '../../firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { Store, Trash2, Plus, Nfc, QrCode, Search, Users, Ticket, Pencil, Trophy, Sparkles, Loader2, ChevronLeft, ChevronRight, Palette, ImagePlus, Download } from 'lucide-react';
-import { createInvite } from '../../services/inviteService';
+import { provisionBusinessCode, setBusinessNfc, createInvite, errorMessage, isExpectedError } from '../../services/api';
 import { shuffle } from '../../services/bingoService';
 import { logAudit } from '../../services/auditService';
 
@@ -154,13 +154,26 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
     }
 
     const id = editingId || newDocId();
+
+    // The business document no longer carries a code or an NFC serial. The code
+    // is provisioned server-side into business_secrets, and the NFC serial is
+    // registered in the code index, so neither is readable by a player.
+    const { nfcId, ...publicFields } = newBiz;
     await setDoc(doc(db, 'businesses', id), {
-      ...newBiz,
+      ...publicFields,
       lat: finalLat,
       lng: finalLng,
       id,
-      qrCode: editingId ? businesses.find(b => b.id === editingId)?.qrCode : `CHAMBER_${id}`
     });
+
+    try {
+      // Idempotent: returns the existing code when there already is one.
+      await provisionBusinessCode({ businessId: id });
+      await setBusinessNfc({ businessId: id, nfcId: nfcId?.trim() || null });
+    } catch (err) {
+      if (!isExpectedError(err)) console.error('Code provisioning failed:', err);
+      setSaveError(errorMessage(err, 'The business was saved but its code could not be issued.'));
+    }
     setNewBiz({ 
       name: '', 
       town: 'Yorktown', 
@@ -176,6 +189,22 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
       email: ''
     });
     setEditingId(null);
+  };
+
+  /**
+   * Codes are not on the business document any more, so the QR dialog fetches
+   * one. provisionBusinessCode is idempotent and returns the existing code, so
+   * this also quietly backfills a business created before the split.
+   */
+  const showQrFor = async (biz: Business) => {
+    setSaveError(null);
+    try {
+      const { code } = await provisionBusinessCode({ businessId: biz.id });
+      setSelectedQR({ value: code, title: biz.name });
+    } catch (err) {
+      if (!isExpectedError(err)) console.error('provisionBusinessCode failed:', err);
+      setSaveError(errorMessage(err, 'Could not load the code for that business.'));
+    }
   };
 
   const editBusiness = (biz: Business) => {
@@ -208,7 +237,12 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
     try {
       const rows = await Promise.all(
         bizWithEmail.map(async (biz: Business) => {
-          const token = await createInvite('system', 'business', biz.id, biz.name, biz.email);
+          const { token } = await createInvite({
+            role: 'business',
+            businessId: biz.id,
+            businessName: biz.name,
+            ...(biz.email ? { emailHint: biz.email } : {}),
+          });
           const url = `${window.location.origin}/?invite=${token}`;
           return [biz.name, biz.email ?? '', url];
         })
@@ -431,7 +465,7 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
                     <Pencil size={15} />
                   </button>
                   <button
-                    onClick={() => setSelectedQR({ value: biz.qrCode, title: biz.name })}
+                    onClick={() => showQrFor(biz)}
                     className="p-2 bg-white border border-neutral-200 rounded-xl text-neutral-400 hover:text-neutral-900 hover:border-neutral-900 transition-all shadow-sm"
                     title="QR Code"
                   >

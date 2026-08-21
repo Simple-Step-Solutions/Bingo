@@ -1,15 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { UserProfile, Business, Completion, AppSettings, Town } from '../types';
-import { collection, onSnapshot, query, where, addDoc, setDoc, doc } from 'firebase/firestore';
+import { collection, onSnapshot, query, where, doc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { motion, AnimatePresence } from 'motion/react';
 import confetti from 'canvas-confetti';
 import { Trophy, CheckCircle2, MapPin, Store, RefreshCw, Loader2, ExternalLink, Ticket, QrCode, Radio, X, Navigation, Globe, Info, Star } from 'lucide-react';
-import { generateBingoBoard, checkBingo, boardIsIncomplete } from '../services/bingoService';
+import { checkBingo, boardIsIncomplete } from '../services/bingoService';
 import { Link } from 'react-router-dom';
 import { Html5Qrcode } from 'html5-qrcode';
-import { calculateDistance } from '../lib/utils';
 import { Onboarding } from '../components/Onboarding';
+import { verifyVisit, ensureBoard, regenerateBoard as regenerateBoardCall, errorMessage, isExpectedError } from '../services/api';
 
 interface DashboardProps {
   user: UserProfile;
@@ -47,8 +47,51 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, towns, s
     return () => mq.removeEventListener('change', onChange);
   }, []);
 
-  const size = user.boardSize || settings?.boardSize || 3;
-  const board = user.bingoBoard || [];
+  // The board now lives in boards/{uid}, written only by Cloud Functions. A
+  // player who could rewrite their own board picked nine businesses in one
+  // strip mall and finished without leaving the parking lot.
+  //
+  // users/{uid}.bingoBoard is still read as a fallback so a player mid-game
+  // sees their squares during the one release where both shapes exist.
+  const [serverBoard, setServerBoard] = useState<{ cells: string[]; size: number; incomplete: boolean } | null>(null);
+  const [boardLoaded, setBoardLoaded] = useState(false);
+  const ensuringRef = useRef(false);
+
+  useEffect(() => {
+    const unsub = onSnapshot(
+      doc(db, 'boards', user.uid),
+      (snap) => {
+        if (snap.exists()) {
+          const d = snap.data();
+          setServerBoard({
+            cells: Array.isArray(d.cells) ? d.cells : [],
+            size: d.size || 3,
+            incomplete: !!d.incomplete,
+          });
+        } else {
+          setServerBoard(null);
+        }
+        setBoardLoaded(true);
+      },
+      (err) => { console.error('Board snapshot error:', err); setBoardLoaded(true); },
+    );
+    return unsub;
+  }, [user.uid]);
+
+  // Ask the server for a board once, when there genuinely is not one.
+  useEffect(() => {
+    if (!boardLoaded || serverBoard || ensuringRef.current || !user.town) return;
+    ensuringRef.current = true;
+    ensureBoard({})
+      .catch((err) => {
+        console.error('ensureBoard failed:', err);
+        setError(errorMessage(err, 'Could not generate your board. Please refresh.'));
+      })
+      .finally(() => { ensuringRef.current = false; });
+  }, [boardLoaded, serverBoard, user.town]);
+
+  const size = serverBoard?.size || user.boardSize || settings?.boardSize || 3;
+  const board = serverBoard?.cells || user.bingoBoard || [];
 
   const hasBingo = checkBingo(board, completions, size);
 
@@ -81,61 +124,66 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, towns, s
     };
   }, [user.uid]);
 
-  useEffect(() => {
-    if (!loading && settings && businesses.length > 0 && user.town && (!user.bingoBoard || user.bingoBoard.length === 0)) {
-      const newBoard = generateBingoBoard(businesses, settings, user.town);
-      setDoc(doc(db, 'users', user.uid), { bingoBoard: newBoard, boardSize: settings.boardSize || 3 }, { merge: true })
-        .catch(err => { console.error('Failed to save bingo board:', err); setError('Could not generate your board. Please refresh.'); });
-    }
-  }, [loading, settings, businesses, user.bingoBoard, user.uid, user.town]);
-
   // The QR callback fires at 10fps for as long as the code stays in frame.
   // setVerifying is async, so without a synchronous lock a single scan wrote
   // several duplicate completions before the first one finished.
   const verifyLockRef = useRef(false);
 
-  const handleVerify = async (code: string) => {
+  /**
+   * Fresh fix rather than the cached user.currentLocation, which LocationTracker
+   * only refreshes once a minute and only after 30m of movement. Walking into a
+   * shop and scanning immediately would otherwise be judged against a position
+   * from a block away.
+   */
+  const currentPosition = (): Promise<{ lat: number; lng: number } | null> =>
+    new Promise((resolve) => {
+      if (!('geolocation' in navigator)) return resolve(user.currentLocation ?? null);
+      navigator.geolocation.getCurrentPosition(
+        (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+        () => resolve(user.currentLocation ?? null),
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 },
+      );
+    });
+
+  /**
+   * Verification is now entirely server-side.
+   *
+   * The client no longer resolves the code, checks for duplicates, runs the
+   * geofence, or reads the pause switch. It hands the scanned string to
+   * verifyVisit and shows whatever comes back.
+   *
+   * There is deliberately no fallback to the old addDoc path. A fallback would
+   * keep the hole open for the entire overlap window, which is the opposite of
+   * the point.
+   */
+  const handleVerify = async (code: string, method: 'qr' | 'nfc' | 'manual' = 'manual') => {
     if (verifyLockRef.current) return;
     verifyLockRef.current = true;
     setVerifying(true);
     setError(null);
     try {
-      if (settings?.gamePaused) {
-        setError('The game is currently paused by the Chamber. Please try again later.');
-        setVerifying(false);
-        return;
-      }
-      const biz = businesses.find(b => b.qrCode === code || b.nfcId === code);
-      if (!biz) { setError('Invalid code. Please try again.'); stopScanning(); return; }
-
-      if (completions.some(c => c.businessId === biz.id)) {
-        setError(`You already completed ${biz.name}!`); stopScanning(); return;
-      }
-
-      if (biz.lat && biz.lng) {
-        if (!user.currentLocation) {
-          setError('Location required. Enable GPS and wait a moment, then try again.'); stopScanning(); return;
-        }
-        const distance = calculateDistance(user.currentLocation.lat, user.currentLocation.lng, biz.lat, biz.lng);
-        if (distance > 500) {
-          setError(`You need to be at ${biz.name} to verify. You are ${Math.round(distance)}m away.`); stopScanning(); return;
-        }
-      }
-
-      await addDoc(collection(db, 'completions'), {
-        userId: user.uid,
-        businessId: biz.id,
-        timestamp: new Date().toISOString(),
-        town: biz.town,
-        userName: user.displayName || '',
+      const pos = await currentPosition();
+      const result = await verifyVisit({
+        code,
+        method,
+        ...(pos ? { lat: pos.lat, lng: pos.lng } : {}),
       });
-      confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 }, colors: ['#141414', '#F27D26', '#FFFFFF'] });
+
+      confetti({
+        particleCount: result.bingo ? 220 : 100,
+        spread: result.bingo ? 100 : 70,
+        origin: { y: 0.6 },
+        colors: ['#141414', '#F27D26', '#FFFFFF'],
+      });
       setManualCode('');
       setShowManual(false);
       stopScanning();
     } catch (err) {
-      console.error(err);
-      setError('Verification failed. Please try again.');
+      // Server messages are written for the player ("You are 1,240m away"), so
+      // show them rather than replacing them with something generic.
+      setError(errorMessage(err, 'Verification failed. Please try again.'));
+      if (!isExpectedError(err)) console.error('verifyVisit failed:', err);
+      stopScanning();
     } finally {
       verifyLockRef.current = false;
       setVerifying(false);
@@ -156,7 +204,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, towns, s
         await scanner.start(
           { facingMode: 'environment' },
           { fps: 10, qrbox: { width: 220, height: 220 } },
-          (decodedText) => { handleVerifyRef.current(decodedText); },
+          (decodedText) => { handleVerifyRef.current(decodedText, 'qr'); },
           () => {}
         );
       } catch (err) {
@@ -184,7 +232,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, towns, s
       const ndef = new (window as any).NDEFReader();
       await ndef.scan();
       ndef.onreading = (event: any) => {
-        handleVerifyRef.current(event.serialNumber);
+        handleVerifyRef.current(event.serialNumber, 'nfc');
         setNfcScanning(false);
       };
     } catch (err) {
@@ -194,10 +242,22 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, towns, s
     }
   };
 
+  const [regenerating, setRegenerating] = useState(false);
+
   const regenerateBoard = async () => {
-    if (!settings) return;
-    const newBoard = generateBingoBoard(businesses, settings, user.town);
-    await setDoc(doc(db, 'users', user.uid), { bingoBoard: newBoard, boardSize: settings.boardSize || 3 }, { merge: true });
+    setRegenerating(true);
+    setError(null);
+    try {
+      await regenerateBoardCall({});
+    } catch (err) {
+      // The server refuses a self-reroll once completions exist, which used to
+      // be possible and let a player abandon a hard board while keeping credit
+      // for the businesses they had already visited.
+      setError(errorMessage(err, 'Could not regenerate your board.'));
+      if (!isExpectedError(err)) console.error('regenerateBoard failed:', err);
+    } finally {
+      setRegenerating(false);
+    }
   };
 
   if (loading || !settings) return (
@@ -263,7 +323,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, towns, s
             onChange={e => setManualCode(e.target.value)}
             className="w-full p-4 bg-neutral-50 border border-neutral-100 rounded-2xl text-xs font-medium focus:ring-2 focus:ring-neutral-900 transition-all outline-none"
           />
-          <button onClick={() => handleVerify(manualCode)} disabled={verifying || !manualCode}
+          <button onClick={() => handleVerify(manualCode, 'manual')} disabled={verifying || !manualCode}
             className="bg-neutral-900 text-white p-4 rounded-2xl font-bold text-xs hover:bg-neutral-800 transition-all disabled:opacity-50 flex items-center justify-center gap-2">
             {verifying ? <Loader2 className="animate-spin" size={16} /> : 'Verify Code'}
           </button>
@@ -307,8 +367,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, towns, s
           </button>
           {(user.role === 'admin' || user.role === 'chamber') && (
             <button onClick={regenerateBoard}
-              className="bg-white border border-neutral-200 text-neutral-900 p-2.5 rounded-2xl hover:border-neutral-900 transition-all shadow-sm">
-              <RefreshCw size={14} />
+              disabled={regenerating}
+              aria-label="Generate a new board"
+              title="Generate a new board"
+              className="bg-white border border-neutral-200 text-neutral-900 p-2.5 rounded-2xl hover:border-neutral-900 transition-all shadow-sm disabled:opacity-50">
+              <RefreshCw size={14} className={regenerating ? 'animate-spin' : undefined} aria-hidden="true" />
             </button>
           )}
         </div>

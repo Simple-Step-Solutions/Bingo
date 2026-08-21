@@ -37,7 +37,6 @@ export const Analytics: React.FC<AnalyticsProps> = ({ users, completions, busine
   useEffect(() => { applyLeafletDefaultIcons(); }, []);
 
   const canSeeMap = currentUser.role === 'admin' || settings.showRealtimeMapToChamber;
-  const isAdmin = currentUser.role === 'admin';
 
   const players = users.filter(u => u.role === 'player' || u.bingoBoard?.length);
   const bingoFinishers = players.filter(u => {

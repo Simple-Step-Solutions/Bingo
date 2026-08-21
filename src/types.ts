@@ -25,7 +25,15 @@ export interface Business {
   town: string;
   task: string;
   category?: string;
-  qrCode: string;
+  /**
+   * Legacy. Codes moved to business_secrets/{id} because CHAMBER_<documentId>
+   * was derivable from the public collection by any player. Still present on
+   * documents created before the migration; nothing should read it.
+   *
+   * @deprecated Use useBusinessSecret(businessId).
+   */
+  qrCode?: string;
+  /** @deprecated Lives on business_secrets/{id} now. */
   nfcId?: string;
   address: string;
   lat?: number;
@@ -124,8 +132,15 @@ export interface Activity {
 
 export interface Invite {
   id: string;
-  token: string;
+  /**
+   * Deliberately absent on stored invites. Documents are keyed by
+   * sha256(token) and the plaintext is returned exactly once, by createInvite.
+   * There is no way to recover a link later, which is why the UI offers Revoke
+   * and Reissue rather than Copy for historical invites.
+   */
+  token?: never;
   role: 'player' | 'chamber' | 'business';
+  revoked?: boolean;
   businessId?: string;
   businessName?: string;
   emailHint?: string;

@@ -2,10 +2,11 @@ import React, { useState, useMemo } from 'react';
 import { UserProfile, Business, AppSettings } from '../../types';
 import { doc, setDoc, collection, query, where, getDocs, deleteDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
-import { RefreshCw, Trash2, RotateCcw, UserMinus, Gamepad2, MapPin, Store, Search, ChevronLeft, ChevronRight, LayoutGrid, AlertTriangle } from 'lucide-react';
+import { RefreshCw, Trash2, RotateCcw, Gamepad2, MapPin, Search, ChevronLeft, ChevronRight, LayoutGrid, AlertTriangle } from 'lucide-react';
 import { BoardImpersonation } from './BoardImpersonation';
 import { InviteManager } from './InviteManager';
 import { logAudit } from '../../services/auditService';
+import { setUserRole, errorMessage, isExpectedError } from '../../services/api';
 
 const USER_PAGE_SIZE = 25;
 
@@ -44,24 +45,41 @@ export const AdminMenu: React.FC<AdminMenuProps> = ({ users, businesses, current
   const userPageCount = Math.ceil(filteredUsers.length / USER_PAGE_SIZE);
   const pagedUsers = filteredUsers.slice(userPage * USER_PAGE_SIZE, (userPage + 1) * USER_PAGE_SIZE);
 
+  const [roleError, setRoleError] = useState<string | null>(null);
+
+  /**
+   * Role changes are admin-only and go through a callable.
+   *
+   * Two reasons this is no longer a direct write. The rules refuse role edits
+   * from every client, because a self-write was the original privilege
+   * escalation. And the custom claim has to move in the same operation, or the
+   * token and the document disagree until the token happens to refresh.
+   *
+   * The server also refuses to remove the last admin and revokes refresh tokens
+   * on demotion, which rules cannot do.
+   */
   const updateUserRole = async (u: UserProfile, role: string) => {
-    const updates: any = { role };
-    if (role !== 'business') {
-      updates.businessId = null;
+    setRoleError(null);
+    try {
+      await setUserRole({
+        uid: u.uid,
+        role: role as 'player' | 'business' | 'chamber' | 'admin',
+        ...(role === 'business' && u.businessId ? { businessId: u.businessId } : {}),
+      });
+    } catch (err) {
+      if (!isExpectedError(err)) console.error('setUserRole failed:', err);
+      setRoleError(errorMessage(err, 'Could not change that role.'));
     }
-    await setDoc(doc(db, 'users', u.uid), updates, { merge: true });
-    await logAudit(
-      currentUser.uid,
-      currentUser.email,
-      'change_role',
-      u.uid,
-      u.email,
-      { previousRole: u.role, newRole: role }
-    );
   };
 
   const updateBusinessId = async (uid: string, businessId: string) => {
-    await setDoc(doc(db, 'users', uid), { businessId }, { merge: true });
+    setRoleError(null);
+    try {
+      await setUserRole({ uid, role: 'business', businessId });
+    } catch (err) {
+      if (!isExpectedError(err)) console.error('setUserRole failed:', err);
+      setRoleError(errorMessage(err, 'Could not assign that business.'));
+    }
   };
 
   const handleReset = async (u: UserProfile, type: 'town' | 'progress' | 'board' | 'everything') => {
@@ -210,6 +228,12 @@ export const AdminMenu: React.FC<AdminMenuProps> = ({ users, businesses, current
             </button>
           ))}
         </div>
+
+        {roleError && (
+          <div role="alert" className="mb-4 bg-red-50 border border-red-200 rounded-2xl px-4 py-3">
+            <p className="text-red-600 text-xs font-bold">{roleError}</p>
+          </div>
+        )}
 
         <div className="divide-y divide-neutral-100">
           {pagedUsers.map(u => (

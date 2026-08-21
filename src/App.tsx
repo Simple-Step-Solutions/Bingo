@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { onAuthStateChanged, sendEmailVerification } from 'firebase/auth';
 import { doc, collection, onSnapshot, setDoc } from 'firebase/firestore';
@@ -208,9 +208,10 @@ function App() {
 
   // Settings doc missing -- admin sees setup wizard, everyone else sees holding screen
   if (settingsExist === false) {
-    return (user.role === 'admin' || user.email === 'logan@simplestepsolutions.com')
-      ? <SetupWizard />
-      : <SetupPending />;
+    // The hardcoded email is gone. Admin is a real role now, granted by the
+    // bootstrapAdmin callable, which checks the address server-side against a
+    // function parameter and requires a verified email.
+    return user.role === 'admin' ? <SetupWizard /> : <SetupPending />;
   }
 
   // New user hasn't selected their role yet

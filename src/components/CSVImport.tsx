@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import Papa from 'papaparse';
 import { doc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
+import { provisionBusinessCode, setBusinessNfc } from '../services/api';
 import { newDocId } from '../lib/utils';
 import { Upload, CheckCircle2, Loader2, AlertCircle, Download } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -92,15 +93,18 @@ export const CSVImport: React.FC<CSVImportProps> = ({ onComplete }) => {
               name: row.name || 'Unknown',
               town: row.town || '',
               task: row.task || 'Support Local!',
-              qrCode: `CHAMBER_${id}`,
               address,
               lat,
               lng,
-              nfcId: row.nfcId || '',
               description: row.description || '',
               image: row.image || '',
               website: row.website || '',
             });
+
+            // Codes and NFC serials are provisioned server-side and never
+            // written into the public business document.
+            await provisionBusinessCode({ businessId: id });
+            if (row.nfcId) await setBusinessNfc({ businessId: id, nfcId: String(row.nfcId).trim() });
           }
 
           setGeocodeStatus(null);
