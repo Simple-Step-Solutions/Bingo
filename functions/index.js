@@ -6,7 +6,10 @@ const { getMessaging } = require('firebase-admin/messaging');
 
 initializeApp();
 
-const databaseId = defineString('FIRESTORE_DATABASE_ID', { default: '(default)' });
+// No default, on purpose. A default of '(default)' means a missing value
+// deploys functions that read and write an empty database, succeed, and log
+// nothing. Failing the deploy is enormously preferable to that.
+const databaseId = defineString('FIRESTORE_DATABASE_ID');
 
 const TYPE_TITLES = {
   info: 'Chamber Bingo',
