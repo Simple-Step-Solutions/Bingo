@@ -2,18 +2,42 @@ rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
 
+    // ===============================================================
+    // KNOWN ISSUE, fixed in Phase 2.
+    //
+    // Storage rules can only reach the (default) Firestore database.
+    // This project stores user documents in a NAMED database
+    // (VITE_FIREBASE_DATABASE_ID), so the lookup below cannot find
+    // them and every write is denied. Chamber logo and business image
+    // uploads are broken today.
+    //
+    // Phase 2 replaces this with request.auth.token.role, a custom
+    // claim, which needs no cross-service lookup at all. Do not
+    // "fix" this by loosening the rule to request.auth != null:
+    // that would let any signed-in player overwrite the chamber logo.
+    // ===============================================================
+
+    function isChamberViaFirestore() {
+      return request.auth != null &&
+        firestore.get(/databases/(default)/documents/users/$(request.auth.uid))
+          .data.role in ['admin', 'chamber'];
+    }
+
+    function isSaneImage() {
+      return request.resource.size < 5 * 1024 * 1024 &&
+        request.resource.contentType.matches('image/.*');
+    }
+
     // Chamber branding assets (logo upload)
     match /branding/{file} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null &&
-        firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role in ['admin', 'chamber'];
+      allow read:  if request.auth != null;
+      allow write: if isChamberViaFirestore() && isSaneImage();
     }
 
     // Business images uploaded by chamber/admin
     match /businesses/{businessId}/{file} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null &&
-        firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role in ['admin', 'chamber'];
+      allow read:  if request.auth != null;
+      allow write: if isChamberViaFirestore() && isSaneImage();
     }
 
     // Deny everything else

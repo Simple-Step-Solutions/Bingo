@@ -3,6 +3,7 @@ import { UserProfile, Business } from '../types';
 import { MapPin, Store, Navigation } from 'lucide-react';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
+import { trackActivity } from '../services/activityService';
 import 'leaflet/dist/leaflet.css';
 
 interface MapProps {

@@ -8,7 +8,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "test:rules": "npx --yes firebase-tools@14 emulators:exec --only firestore --project sss-hvgcc-bingo-rules-test \"node --import tsx --test rules-tests/firestore.test.ts\""
   },
   "dependencies": {
     "@tailwindcss/vite": "4.2.2",
@@ -35,6 +36,7 @@
     "workbox-window": "7.4.1"
   },
   "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.2",
     "@types/node": "22.19.15",
     "autoprefixer": "10.4.27",
     "tailwindcss": "4.2.2",
