@@ -1,12 +1,11 @@
 import React, { useState, useMemo } from 'react';
 import { UserProfile, Business, AppSettings } from '../../types';
-import { doc, setDoc, collection, query, where, getDocs, deleteDoc } from 'firebase/firestore';
+import { collection, getDocs, deleteDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { RefreshCw, Trash2, RotateCcw, Gamepad2, MapPin, Search, ChevronLeft, ChevronRight, LayoutGrid, AlertTriangle } from 'lucide-react';
 import { BoardImpersonation } from './BoardImpersonation';
 import { InviteManager } from './InviteManager';
-import { logAudit } from '../../services/auditService';
-import { setUserRole, errorMessage, isExpectedError } from '../../services/api';
+import { setUserRole, adminResetUser, adminGlobalReset, errorMessage, isExpectedError } from '../../services/api';
 
 const USER_PAGE_SIZE = 25;
 
@@ -89,36 +88,16 @@ export const AdminMenu: React.FC<AdminMenuProps> = ({ users, businesses, current
       return;
     }
 
+    // Resets are a callable now. The board moved to boards/{uid}, which no
+    // client can write, so clearing users/{uid}.bingoBoard from here stopped
+    // actually resetting anything while still appearing to succeed. The server
+    // also deletes completions in batches and writes its own audit entry.
+    setRoleError(null);
     try {
-      if (type === 'progress' || type === 'everything') {
-        const q = query(collection(db, 'completions'), where('userId', '==', u.uid));
-        const snapshot = await getDocs(q);
-        const deletes = snapshot.docs.map(d => deleteDoc(doc(db, 'completions', d.id)));
-        await Promise.all(deletes);
-      }
-
-      if (type === 'board' || type === 'everything' || type === 'town') {
-        const updates: any = {
-          bingoBoard: [],
-          boardSize: 0
-        };
-        if (type === 'town' || type === 'everything') {
-          updates.town = '';
-          updates.onboardingComplete = false;
-        }
-        await setDoc(doc(db, 'users', u.uid), updates, { merge: true });
-      }
-
-      await logAudit(
-        currentUser.uid,
-        currentUser.email,
-        `reset_${type}`,
-        u.uid,
-        u.email,
-        { resetType: type }
-      );
+      await adminResetUser({ userId: u.uid, type });
     } catch (err) {
-      console.error('Error resetting user:', err);
+      if (!isExpectedError(err)) console.error('adminResetUser failed:', err);
+      setRoleError(errorMessage(err, 'Could not reset that player.'));
     }
 
     setConfirmAction(null);
@@ -131,7 +110,11 @@ export const AdminMenu: React.FC<AdminMenuProps> = ({ users, businesses, current
     setClearing(true);
     setClearConfirm(false);
     try {
-      const collections = ['completions', 'raffle_entries', 'winners', 'notifications'];
+      // completions, boards, wins and verification_attempts are server-written
+      // and closed to every client, so the callable clears those first.
+      await adminGlobalReset({});
+
+      const collections = ['raffle_entries', 'winners', 'notifications'];
       for (const col of collections) {
         const snap = await getDocs(collection(db, col));
         await Promise.all(snap.docs.map(d => deleteDoc(d.ref)));
@@ -154,23 +137,11 @@ export const AdminMenu: React.FC<AdminMenuProps> = ({ users, businesses, current
     if (!window.confirm("DANGER: This will reset town, board, and progress for ALL users. Continue?")) return;
 
     try {
-      const userPromises = users.map(u =>
-        setDoc(doc(db, 'users', u.uid), {
-          town: '',
-          bingoBoard: [],
-          boardSize: 0,
-          onboardingComplete: false
-        }, { merge: true })
-      );
-
-      const completionsSnapshot = await getDocs(collection(db, 'completions'));
-      const completionDeletes = completionsSnapshot.docs.map(d => deleteDoc(doc(db, 'completions', d.id)));
-
-      await Promise.all([...userPromises, ...completionDeletes]);
-      alert("System-wide reset complete.");
+      const res = await adminGlobalReset({});
+      alert(`System-wide reset complete. ${res.users} players, ${res.completions} completions, ${res.boards} boards cleared.`);
     } catch (err) {
-      console.error(err);
-      alert("Error during global reset.");
+      if (!isExpectedError(err)) console.error('adminGlobalReset failed:', err);
+      alert(errorMessage(err, 'Error during global reset.'));
     }
   };
 

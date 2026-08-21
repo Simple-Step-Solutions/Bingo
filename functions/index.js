@@ -216,3 +216,5 @@ exports.setUserRole = admin.setUserRole;
 exports.drawRaffleWinner = admin.drawRaffleWinner;
 exports.redeemWin = admin.redeemWin;
 exports.reviewSuspiciousActivity = admin.reviewSuspiciousActivity;
+exports.adminResetUser = admin.adminResetUser;
+exports.adminGlobalReset = admin.adminGlobalReset;

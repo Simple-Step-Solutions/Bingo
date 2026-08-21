@@ -128,6 +128,16 @@ export const drawRaffleWinner = call<
 
 export const redeemWin = call<{ userId: string; notes?: string }, { ok: true }>('redeemWin');
 
+export const adminResetUser = call<
+  { userId: string; type: 'town' | 'progress' | 'board' | 'everything' },
+  { ok: true; deletedCompletions: number }
+>('adminResetUser');
+
+export const adminGlobalReset = call<
+  Record<string, never>,
+  { ok: true; users: number; completions: number; boards: number }
+>('adminGlobalReset');
+
 export interface SuspicionFlag {
   type: 'impossible_travel' | 'burst' | 'no_app_check' | 'near_geofence_boundary' | 'shared_ip';
   userId?: string;
