@@ -2,14 +2,13 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { doc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
-import { Town, AppSettings, Business, UserProfile } from '../types';
-import { generateBingoBoard } from '../services/bingoService';
+import { ensureBoard, errorMessage, isExpectedError } from '../services/api';
+import { Town, AppSettings, UserProfile } from '../types';
 import { MapPin, QrCode, Trophy, Store, ChevronRight, CheckCircle2 } from 'lucide-react';
 
 interface OnboardingProps {
   user: UserProfile;
   towns: Town[];
-  businesses: Business[];
   settings: AppSettings;
   onComplete: () => void;
 }
@@ -17,9 +16,10 @@ interface OnboardingProps {
 const STEPS = ['welcome', 'howtoplay', 'town'] as const;
 type Step = typeof STEPS[number];
 
-export const Onboarding: React.FC<OnboardingProps> = ({ user, towns, businesses, settings, onComplete }) => {
+export const Onboarding: React.FC<OnboardingProps> = ({ user, towns, settings, onComplete }) => {
   const [step, setStep] = useState<Step>('welcome');
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const currentIndex = STEPS.indexOf(step);
 
@@ -30,23 +30,41 @@ export const Onboarding: React.FC<OnboardingProps> = ({ user, towns, businesses,
 
   const selectTown = async (townName: string) => {
     setSaving(true);
+    setError(null);
     try {
-      const newBoard = generateBingoBoard(businesses, settings, townName);
+      // The town has to land before the board is asked for, because the server
+      // reads it to decide which businesses are local.
       await setDoc(doc(db, 'users', user.uid), {
         town: townName,
-        bingoBoard: newBoard,
-        boardSize: settings.boardSize || 3,
         onboardingComplete: true,
       }, { merge: true });
+
+      // Boards are generated server-side now. Writing bingoBoard from here
+      // would be ignored: the game reads boards/{uid}, which no client can
+      // write, so a locally generated board would simply never appear.
+      await ensureBoard({});
       onComplete();
     } catch (err) {
-      console.error('Error completing onboarding:', err);
+      // This used to only console.log, leaving the button dead and the player
+      // stuck on the town step with no idea what had happened.
+      if (!isExpectedError(err)) console.error('Onboarding failed:', err);
+      setError(errorMessage(err, 'Could not set up your board. Check your connection and try again.'));
       setSaving(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-neutral-900/95 backdrop-blur-xl overflow-y-auto">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Welcome to Chamber Bingo"
+      className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-neutral-900/95 backdrop-blur-xl overflow-y-auto"
+    >
+      {error && (
+        <div role="alert" className="fixed top-6 inset-x-6 z-[81] bg-red-50 border border-red-200 rounded-2xl px-4 py-3 max-w-md mx-auto">
+          <p className="text-red-600 text-xs font-bold">{error}</p>
+        </div>
+      )}
       <AnimatePresence mode="wait">
 
         {step === 'welcome' && (

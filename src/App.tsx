@@ -23,6 +23,7 @@ import { InstallPrompt } from './components/InstallPrompt';
 import { ChamberTour } from './components/tour/ChamberTour';
 import { BusinessTour } from './components/tour/BusinessTour';
 import { RoleSelector } from './components/RoleSelector';
+import { Onboarding } from './components/Onboarding';
 import { usePushNotifications } from './hooks/usePushNotifications';
 
 const DEFAULT_PRIMARY = '#1695B2';
@@ -219,6 +220,21 @@ function App() {
     return <RoleSelector user={user} />;
   }
 
+  // Onboarding used to render inside Dashboard, so a player who followed a QR
+  // deep link straight to /map never saw it, never picked a town, and ended up
+  // with an empty board and no way to fix it. It is a route-independent gate
+  // now: no route renders until a player has a town.
+  if (settings && user.role === 'player' && !user.onboardingComplete) {
+    return (
+      <Onboarding
+        user={user}
+        towns={towns}
+        settings={settings}
+        onComplete={() => { /* the profile snapshot re-renders past this gate */ }}
+      />
+    );
+  }
+
   return (
     <Router>
       <div className="min-h-screen bg-[#F5F5F0] pb-24 md:pb-0 md:pt-20">
@@ -227,7 +243,7 @@ function App() {
 
         <main className="container mx-auto px-4 py-8">
           <Routes>
-            <Route path="/" element={<Dashboard user={user} businesses={businesses} towns={towns} settings={settings} />} />
+            <Route path="/" element={<Dashboard user={user} businesses={businesses} settings={settings} />} />
             <Route path="/map" element={<Map user={user} businesses={businesses} />} />
             {settings?.raffleEnabled && (
               <Route path="/raffle" element={<Raffle user={user} />} />

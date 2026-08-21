@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { UserProfile, Business, Completion, AppSettings, Town } from '../types';
+import { UserProfile, Business, Completion, AppSettings } from '../types';
 import { collection, onSnapshot, query, where, doc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { motion, AnimatePresence } from 'motion/react';
@@ -8,18 +8,16 @@ import { Trophy, CheckCircle2, MapPin, Store, RefreshCw, Loader2, ExternalLink, 
 import { checkBingo, boardIsIncomplete } from '../services/bingoService';
 import { Link } from 'react-router-dom';
 import { Html5Qrcode } from 'html5-qrcode';
-import { Onboarding } from '../components/Onboarding';
 import { useModalA11y, prefersReducedMotion } from '../lib/a11y';
 import { verifyVisit, ensureBoard, regenerateBoard as regenerateBoardCall, errorMessage, isExpectedError } from '../services/api';
 
 interface DashboardProps {
   user: UserProfile;
   businesses: Business[];
-  towns: Town[];
   settings: AppSettings | null;
 }
 
-export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, towns, settings }) => {
+export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, settings }) => {
   const [completions, setCompletions] = useState<Completion[]>([]);
   const [loading, setLoading] = useState(true);
   const [verifying, setVerifying] = useState(false);
@@ -676,10 +674,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, towns, s
           </motion.div>
         )}
       </AnimatePresence>
-
-      {!loading && settings && !user.onboardingComplete && (
-        <Onboarding user={user} towns={towns} businesses={businesses} settings={settings} onComplete={() => {}} />
-      )}
 
       {/* Bingo raffle banner -- fixed so it never pushes layout */}
       {hasBingo && settings.raffleEnabled && (
