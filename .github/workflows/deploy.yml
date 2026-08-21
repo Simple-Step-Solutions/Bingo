@@ -165,8 +165,12 @@ jobs:
           --project sss-hvgcc-bingo --non-interactive
 
   # Pure-logic tests for the callables: code normalisation, board generation,
-  # win detection, geofence maths. No emulator and no credentials needed, so
-  # this is fast and runs on every PR that touches functions/.
+  # win detection, event windows, geofence maths. No emulator and no credentials
+  # needed, so this is fast and runs on every PR that touches functions/.
+  #
+  # npm ci is required even though the tests exercise pure logic: lib/events
+  # imports lib/db for the Firestore handle, and lib/db imports
+  # firebase-functions/params at module load.
   test-functions:
     needs: changes
     if: needs.changes.outputs.functions == 'true'
@@ -176,6 +180,10 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 24
+          cache: npm
+          cache-dependency-path: functions/package-lock.json
+      - run: npm ci
+        working-directory: functions
       - run: npm test
         working-directory: functions
 
