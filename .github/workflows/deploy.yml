@@ -70,7 +70,7 @@ jobs:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: 24
+          node-version: 22
           cache: npm
       - run: npm ci
       - run: npm run lint
@@ -84,7 +84,7 @@ jobs:
 
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: 24
+          node-version: 22
           cache: npm
 
       - name: Install dependencies
@@ -120,7 +120,7 @@ jobs:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: 24
+          node-version: 22
           cache: npm
       # The Firestore emulator is a Java process.
       - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
@@ -153,12 +153,19 @@ jobs:
 
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: 24
+          node-version: 22
 
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed # v2
         with:
           credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+
+      # Prints which identity is actually deploying. A service account email is
+      # not a secret, and without this a 403 leaves you guessing which of the
+      # project's service accounts to grant roles to -- the one in the secret is
+      # often not the one you assume.
+      - name: Show deploying identity
+        run: node -e "console.log('deploying as:', JSON.parse(require('fs').readFileSync(process.env.GOOGLE_APPLICATION_CREDENTIALS,'utf8')).client_email)"
 
       - name: Deploy Firestore and Storage rules
         run: >
@@ -181,7 +188,7 @@ jobs:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: 24
+          node-version: 22
           cache: npm
           cache-dependency-path: functions/package-lock.json
       - run: npm ci
@@ -198,13 +205,20 @@ jobs:
 
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: 24
+          node-version: 22
           cache: npm
 
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed # v2
         with:
           credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+
+      # Prints which identity is actually deploying. A service account email is
+      # not a secret, and without this a 403 leaves you guessing which of the
+      # project's service accounts to grant roles to -- the one in the secret is
+      # often not the one you assume.
+      - name: Show deploying identity
+        run: node -e "console.log('deploying as:', JSON.parse(require('fs').readFileSync(process.env.GOOGLE_APPLICATION_CREDENTIALS,'utf8')).client_email)"
 
       - name: Install function dependencies
         run: npm ci
