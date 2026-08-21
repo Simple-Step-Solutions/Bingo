@@ -3,11 +3,17 @@ name: Deploy to Firebase
 on:
   push:
     branches: [main]
-  # Runs the gates (lint, rules tests) without deploying anything, so a broken
-  # rules test surfaces on the PR instead of silently skipping deploy-rules
-  # after the merge -- which would look like a green build with stale rules.
+  # Runs the gates (lint, rules tests, function tests) without deploying
+  # anything, so a broken test surfaces on the PR instead of silently skipping
+  # deploy-rules after the merge -- which would look like a green build with
+  # stale rules.
+  #
+  # Deliberately NOT filtered to base: main. Security work ships as a stack of
+  # PRs that target each other, and a base filter meant none of them ran any
+  # gate at all -- the branch that finally targets main would be the first
+  # thing ever tested. Deploy jobs are gated on event_name instead, so running
+  # here is safe regardless of base.
   pull_request:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
