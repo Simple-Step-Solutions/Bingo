@@ -214,11 +214,30 @@ export const Onboarding: React.FC<OnboardingProps> = ({ user, towns, settings, o
               </div>
 
               <div className="flex items-start gap-3 p-4 bg-amber-50 rounded-2xl border border-amber-100">
-                <CheckCircle2 size={16} className="text-amber-500 shrink-0 mt-0.5" />
+                <CheckCircle2 size={16} className="text-amber-500 shrink-0 mt-0.5" aria-hidden="true" />
                 <p className="text-[10px] text-amber-700 font-bold uppercase tracking-widest leading-relaxed">
                   Your town selection is permanent. Your board will be filled with businesses from that area.
                 </p>
               </div>
+
+              {/*
+                The app collects a consumer's email and their continuous
+                location, and shows a live player map to chamber staff. Saying
+                so before they commit is the minimum, and it is far cheaper to
+                say it here than to explain it after someone notices.
+              */}
+              <p className="text-[11px] text-neutral-500 leading-relaxed mt-6 text-center">
+                By continuing you agree that the Chamber can see your name, email,
+                visits, and location while you play.{' '}
+                <a
+                  href="/privacy"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-bold text-[var(--color-primary)] underline underline-offset-2"
+                >
+                  What we collect
+                </a>
+              </p>
             </div>
           </motion.div>
         )}

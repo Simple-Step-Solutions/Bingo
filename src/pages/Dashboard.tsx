@@ -147,6 +147,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, settings
   // several duplicate completions before the first one finished.
   const verifyLockRef = useRef(false);
 
+  const stopScanning = async (e?: React.MouseEvent) => {
+    if (e) e.preventDefault();
+    if (qrScannerRef.current) {
+      try { await qrScannerRef.current.stop(); qrScannerRef.current = null; } catch (err) { console.error(err); }
+    }
+    setScanning(false);
+  };
+
   /**
    * Fresh fix rather than the cached user.currentLocation, which LocationTracker
    * only refreshes once a minute and only after 30m of movement. Walking into a
@@ -210,8 +218,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, settings
     }
   };
 
+  // The latest-ref pattern: the QR and NFC callbacks are registered once, when
+  // the scanner starts, and must not capture a stale closure. No dependency
+  // array on purpose -- this should run after every render, which is precisely
+  // what keeps the ref current.
   const handleVerifyRef = useRef(handleVerify);
-  useEffect(() => { handleVerifyRef.current = handleVerify; }, [handleVerify]);
+  useEffect(() => { handleVerifyRef.current = handleVerify; });
 
   const startScanning = async (e?: React.MouseEvent) => {
     if (e) e.preventDefault();
@@ -233,14 +245,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, settings
         setScanning(false);
       }
     }, 300);
-  };
-
-  const stopScanning = async (e?: React.MouseEvent) => {
-    if (e) e.preventDefault();
-    if (qrScannerRef.current) {
-      try { await qrScannerRef.current.stop(); qrScannerRef.current = null; } catch (err) { console.error(err); }
-    }
-    setScanning(false);
   };
 
   const startNfcScan = async (e?: React.MouseEvent) => {
@@ -410,7 +414,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, settings
       {/* Board */}
       <div className="flex-1 min-h-0 flex items-center justify-center relative">
         <div
-          role="grid"
+          role="group"
           aria-label={`Bingo board, ${size} by ${size}. ${completions.length} of ${board.filter(c => c !== 'FREE' && c !== 'EMPTY').length} businesses visited.`}
           className="grid gap-1.5 md:gap-3"
           style={{
@@ -424,7 +428,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, settings
             if (bizId === 'FREE') {
               return (
                 <div key="free"
-                  role="gridcell"
                   aria-label={`Free space: ${settings.freeSpaceName}. Already counted.`}
                   className="bg-orange-50 border-2 border-orange-200 rounded-xl md:rounded-3xl flex flex-col items-center justify-center text-center p-1 shadow-sm relative overflow-hidden group">
                   <div className="absolute inset-0 bg-orange-100/50 opacity-0 group-hover:opacity-100 transition-opacity" aria-hidden="true" />
@@ -439,7 +442,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, settings
               return (
                 <div
                   key={idx}
-                  role="gridcell"
                   className="rounded-xl md:rounded-3xl bg-neutral-50 border border-dashed border-neutral-300 flex items-center justify-center p-1"
                   aria-label="Empty square. Not enough businesses in your town to fill this one, so it cannot be completed."
                 >
@@ -457,7 +459,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, settings
               <button
                 key={idx}
                 type="button"
-                role="gridcell"
                 aria-pressed={isDone}
                 disabled={!biz}
                 aria-label={

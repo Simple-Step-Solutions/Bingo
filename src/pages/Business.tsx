@@ -128,6 +128,15 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ user }) =>
     return () => unsubscribe();
   }, [business]);
 
+  // The code is no longer on the business document. It comes from
+  // business_secrets, which only the chamber and this owner can read.
+  //
+  // Declared above the loading early-return on purpose: a hook after a
+  // conditional return runs in a different order once loading flips, which is
+  // exactly the mismatch React refuses to recover from.
+  const { secret, error: secretError } = useBusinessSecret(business?.id);
+  const manualCode = secret?.code ?? '';
+
   if (loading) return (
     <div className="flex items-center justify-center min-h-[60vh]">
       <Loader2 className="animate-spin text-neutral-400" size={32} />
@@ -143,10 +152,6 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ user }) =>
    * its visitor list. The server resolves the code from a hash index the client
    * cannot read, and refuses a business that already has an owner.
    */
-  // The code is no longer on the business document. It comes from
-  // business_secrets, which only the chamber and this owner can read.
-  const { secret, error: secretError } = useBusinessSecret(business?.id);
-  const manualCode = secret?.code ?? '';
 
   const handleClaim = async (e: React.FormEvent) => {
     e.preventDefault();

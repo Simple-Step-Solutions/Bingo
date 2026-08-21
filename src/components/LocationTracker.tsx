@@ -72,6 +72,11 @@ export const LocationTracker: React.FC<LocationTrackerProps> = ({ user }) => {
     );
 
     return () => navigator.geolocation.clearWatch(watchId);
+    // Deliberately keyed on the uid alone. writeLocation updates users/{uid},
+    // which produces a new `user` object, which would tear down and restart the
+    // geolocation watch on every single write. Only a different player should
+    // restart it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.uid]);
 
   return null;

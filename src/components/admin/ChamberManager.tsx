@@ -306,9 +306,11 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
           {/* Logo */}
           <div className="flex flex-col gap-3">
             <label className="block text-[10px] text-neutral-400 uppercase tracking-widest font-bold">Chamber Logo</label>
-            <div
+            <button
+              type="button"
               onClick={() => logoInputRef.current?.click()}
-              className="relative flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-neutral-200 p-6 cursor-pointer hover:border-neutral-400 transition-all bg-neutral-50"
+              aria-label="Upload a chamber logo"
+              className="relative flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-neutral-200 p-6 cursor-pointer hover:border-neutral-400 transition-all bg-neutral-50 w-full focus:outline-none focus-visible:ring-4 focus-visible:ring-[var(--color-primary)]"
             >
               {logoUploading ? (
                 <Loader2 className="animate-spin text-neutral-400" size={24} />
@@ -320,7 +322,7 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
               <span className="text-[10px] font-bold uppercase tracking-widest text-neutral-400">
                 {settings.chamberLogoUrl ? 'Replace' : 'Upload Logo'}
               </span>
-            </div>
+            </button>
             <input
               ref={logoInputRef}
               type="file"

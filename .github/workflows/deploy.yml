@@ -49,8 +49,10 @@ jobs:
               - 'package.json'
               - 'package-lock.json'
               - 'tsconfig.json'
+              - 'eslint.config.js'
             functions:
               - 'functions/**'
+              - 'firebase.json'
             rules:
               - 'firestore.rules'
               - 'storage.rules'

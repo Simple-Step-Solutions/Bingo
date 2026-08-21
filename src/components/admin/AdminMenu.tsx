@@ -39,7 +39,7 @@ export const AdminMenu: React.FC<AdminMenuProps> = ({ users, businesses, current
       (u.town || '').toLowerCase().includes(q) ||
       (u.role || '').toLowerCase().includes(q)
     );
-  }, [users, userSearch, roleFilter]);
+  }, [users, userSearch, roleFilter, isAdmin]);
 
   const userPageCount = Math.ceil(filteredUsers.length / USER_PAGE_SIZE);
   const pagedUsers = filteredUsers.slice(userPage * USER_PAGE_SIZE, (userPage + 1) * USER_PAGE_SIZE);

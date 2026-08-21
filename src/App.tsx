@@ -24,6 +24,7 @@ import { ChamberTour } from './components/tour/ChamberTour';
 import { BusinessTour } from './components/tour/BusinessTour';
 import { RoleSelector } from './components/RoleSelector';
 import { Onboarding } from './components/Onboarding';
+import { Privacy } from './pages/Privacy';
 import { usePushNotifications } from './hooks/usePushNotifications';
 
 const DEFAULT_PRIMARY = '#1695B2';
@@ -165,7 +166,7 @@ function App() {
     if (user?.roleSelected && (user.role === 'chamber' || user.role === 'business') && !user.tourCompleted) {
       setShowTour(true);
     }
-  }, [user?.roleSelected]);
+  }, [user?.roleSelected, user?.role, user?.tourCompleted]);
 
   if (loading) return <LoadingScreen />;
 
@@ -259,6 +260,7 @@ function App() {
             )}
 
             <Route path="/profile" element={<Profile user={user} />} />
+            <Route path="/privacy" element={<Privacy settings={settings} />} />
 
             {/* Fallback */}
             <Route path="*" element={<Navigate to="/" replace />} />
