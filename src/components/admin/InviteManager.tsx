@@ -3,12 +3,15 @@ import { collection, onSnapshot, query, orderBy, limit } from 'firebase/firestor
 import { db } from '../../firebase';
 import { Business, UserProfile, Invite } from '../../types';
 import { createInvite } from '../../services/inviteService';
-import { Link2, Copy, Check, Loader2, ExternalLink } from 'lucide-react';
+import { Link2, Copy, Check, Loader2 } from 'lucide-react';
 
 interface InviteManagerProps {
   businesses: Business[];
   currentUser: UserProfile;
 }
+
+const INPUT_CLS = 'w-full px-4 py-3 bg-neutral-50 border border-neutral-200 rounded-2xl text-sm focus:ring-2 focus:ring-[var(--color-primary)] outline-none transition-all';
+const LABEL_CLS = 'block text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-2';
 
 export const InviteManager: React.FC<InviteManagerProps> = ({ businesses, currentUser }) => {
   const [role, setRole] = useState<'chamber' | 'business' | 'player'>('player');
@@ -88,11 +91,11 @@ export const InviteManager: React.FC<InviteManagerProps> = ({ businesses, curren
 
       <div className="space-y-4 mb-6">
         <div>
-          <label className="block text-[10px] font-bold uppercase tracking-widest text-neutral-400 mb-2">Role</label>
+          <label className={LABEL_CLS}>Role</label>
           <select
             value={role}
             onChange={e => { setRole(e.target.value as 'chamber' | 'business' | 'player'); setBusinessId(''); }}
-            className="w-full border border-neutral-200 rounded-xl px-4 py-3 text-sm font-medium bg-neutral-50 outline-none focus:ring-2 focus:ring-neutral-900 transition-all"
+            className={INPUT_CLS}
           >
             <option value="player">Player</option>
             <option value="chamber">Chamber Staff</option>
@@ -102,11 +105,11 @@ export const InviteManager: React.FC<InviteManagerProps> = ({ businesses, curren
 
         {role === 'business' && (
           <div>
-            <label className="block text-[10px] font-bold uppercase tracking-widest text-neutral-400 mb-2">Business (optional)</label>
+            <label className={LABEL_CLS}>Business (optional)</label>
             <select
               value={businessId}
               onChange={e => setBusinessId(e.target.value)}
-              className="w-full border border-neutral-200 rounded-xl px-4 py-3 text-sm font-medium bg-neutral-50 outline-none focus:ring-2 focus:ring-neutral-900 transition-all"
+              className={INPUT_CLS}
             >
               <option value="">Select a business...</option>
               {businesses.map(b => (
@@ -117,13 +120,13 @@ export const InviteManager: React.FC<InviteManagerProps> = ({ businesses, curren
         )}
 
         <div>
-          <label className="block text-[10px] font-bold uppercase tracking-widest text-neutral-400 mb-2">Email hint (optional)</label>
+          <label className={LABEL_CLS}>Email hint (optional)</label>
           <input
             type="email"
             placeholder="person@example.com"
             value={emailHint}
             onChange={e => setEmailHint(e.target.value)}
-            className="w-full border border-neutral-200 rounded-xl px-4 py-3 text-sm font-medium bg-neutral-50 outline-none focus:ring-2 focus:ring-neutral-900 transition-all"
+            className={INPUT_CLS}
           />
         </div>
 
@@ -137,54 +140,62 @@ export const InviteManager: React.FC<InviteManagerProps> = ({ businesses, curren
         </button>
       </div>
 
+      {/* Generated invite URL -- prominent code block */}
       {inviteUrl && (
-        <div className="mb-8 p-4 bg-neutral-50 border border-neutral-200 rounded-2xl">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-neutral-400 mb-2">Shareable Link</p>
-          <code className="block text-xs text-neutral-700 break-all mb-3 font-mono leading-relaxed">{inviteUrl}</code>
-          <button
-            onClick={handleCopy}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all ${
-              copied
-                ? 'bg-green-50 text-green-700 border border-green-200'
-                : 'bg-white border border-neutral-200 text-neutral-700 hover:border-neutral-900'
-            }`}
-          >
-            {copied ? <Check size={12} /> : <Copy size={12} />}
-            {copied ? 'Copied!' : 'Copy Link'}
-          </button>
+        <div className="mb-8 rounded-2xl border border-[var(--color-primary)]/20 bg-[var(--color-primary)]/5 overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-2 bg-[var(--color-primary)]/10 border-b border-[var(--color-primary)]/10">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--color-primary)]">Shareable Link</p>
+            <button
+              onClick={handleCopy}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all ${
+                copied
+                  ? 'bg-green-50 text-green-700 border border-green-200'
+                  : 'bg-white border border-neutral-200 text-neutral-700 hover:border-neutral-900'
+              }`}
+            >
+              {copied ? <Check size={11} /> : <Copy size={11} />}
+              {copied ? 'Copied!' : 'Copy'}
+            </button>
+          </div>
+          <code className="block text-xs text-neutral-700 font-mono leading-relaxed p-4 break-all select-all">
+            {inviteUrl}
+          </code>
         </div>
       )}
 
+      {/* Recent invites */}
       {invites.length > 0 && (
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-widest text-neutral-400 mb-4">Recent Invites</p>
-          <div className="space-y-3">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-neutral-400 mb-3">Recent Invites</p>
+          <div className="space-y-2">
             {invites.map(invite => {
               const status = getInviteStatus(invite);
               const expires = new Date(invite.expiresAt);
               const url = `${window.location.origin}/?invite=${invite.token}`;
               const isCopied = copiedId === invite.id;
+              const isMuted = status === 'expired' || status === 'used';
               return (
-                <div key={invite.id} className="p-3 bg-neutral-50 rounded-2xl space-y-2">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex flex-wrap items-center gap-2 min-w-0">
-                      <span className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-widest shrink-0 ${roleStyles[invite.role]}`}>
-                        {invite.role === 'chamber' ? 'Chamber' : invite.role === 'business' ? 'Business' : 'Player'}
-                      </span>
-                      {invite.businessName && (
-                        <span className="text-[10px] text-neutral-500 font-medium truncate">{invite.businessName}</span>
-                      )}
-                      {invite.emailHint && (
-                        <span className="text-[10px] text-neutral-400 truncate">{invite.emailHint}</span>
-                      )}
-                      <span className="text-[9px] text-neutral-300 font-medium shrink-0">
-                        {status === 'used' ? `Used ${invite.usedAt ? new Date(invite.usedAt).toLocaleDateString() : ''}` : `Expires ${expires.toLocaleDateString()}`}
-                      </span>
-                    </div>
-                    <span className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-widest shrink-0 ${statusStyles[status]}`}>
-                      {status}
-                    </span>
+                <div
+                  key={invite.id}
+                  className={`flex items-center gap-3 p-3 bg-neutral-50 rounded-2xl border border-neutral-100 transition-all ${isMuted ? 'opacity-50' : ''}`}
+                >
+                  <span className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-widest shrink-0 ${roleStyles[invite.role]}`}>
+                    {invite.role === 'chamber' ? 'Chamber' : invite.role === 'business' ? 'Business' : 'Player'}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    {invite.businessName && (
+                      <p className="text-xs font-medium text-neutral-700 truncate">{invite.businessName}</p>
+                    )}
+                    {invite.emailHint && (
+                      <p className="text-[10px] text-neutral-400 truncate">{invite.emailHint}</p>
+                    )}
+                    <p className="text-[9px] text-neutral-300 font-medium">
+                      {status === 'used' ? `Used ${invite.usedAt ? new Date(invite.usedAt).toLocaleDateString() : ''}` : `Expires ${expires.toLocaleDateString()}`}
+                    </p>
                   </div>
+                  <span className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-widest shrink-0 ${statusStyles[status]}`}>
+                    {status}
+                  </span>
                   {status === 'pending' && (
                     <button
                       onClick={async () => {
@@ -192,14 +203,14 @@ export const InviteManager: React.FC<InviteManagerProps> = ({ businesses, curren
                         setCopiedId(invite.id);
                         setTimeout(() => setCopiedId(null), 2000);
                       }}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-widest transition-all ${
+                      className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-widest transition-all shrink-0 ${
                         isCopied
                           ? 'bg-green-50 text-green-700 border border-green-200'
                           : 'bg-white border border-neutral-200 text-neutral-600 hover:border-neutral-900'
                       }`}
                     >
-                      {isCopied ? <Check size={11} /> : <Copy size={11} />}
-                      {isCopied ? 'Copied!' : 'Copy Invite Link'}
+                      {isCopied ? <Check size={10} /> : <Copy size={10} />}
+                      {isCopied ? 'Copied' : 'Copy'}
                     </button>
                   )}
                 </div>

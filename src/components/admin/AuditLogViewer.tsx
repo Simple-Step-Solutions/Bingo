@@ -39,23 +39,32 @@ export const AuditLogViewer: React.FC<AuditLogViewerProps> = ({ logs }) => {
       ) : (
         <div className="divide-y divide-neutral-100">
           {sorted.map(log => (
-            <div key={log.id} className="py-4 first:pt-0 last:pb-0">
-              <div className="flex flex-wrap items-center gap-3 mb-2">
-                <span className="text-[10px] text-neutral-400 font-bold uppercase tracking-widest shrink-0">
+            <div key={log.id} className="py-3 first:pt-0 last:pb-0">
+              <div className="flex flex-wrap items-center gap-3">
+                {/* Timestamp */}
+                <span className="text-[10px] text-neutral-300 font-mono shrink-0 w-36">
                   {new Date(log.timestamp).toLocaleString()}
                 </span>
-                <span className="text-[10px] font-bold text-neutral-700">{log.actorEmail}</span>
-                <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest ${actionBadge(log.action)}`}>
+                {/* Action badge */}
+                <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest shrink-0 ${actionBadge(log.action)}`}>
                   {log.action}
                 </span>
+                {/* Actor */}
+                <span className="text-xs font-bold text-neutral-700 truncate">{log.actorEmail}</span>
                 {log.targetEmail && (
-                  <span className="text-[10px] text-neutral-500">-- {log.targetEmail}</span>
+                  <span className="text-xs text-neutral-400 truncate">{log.targetEmail}</span>
                 )}
               </div>
+              {/* Details: collapsible */}
               {log.details && Object.keys(log.details).length > 0 && (
-                <pre className="text-[9px] text-neutral-500 bg-neutral-50 border border-neutral-100 rounded-xl px-3 py-2 overflow-x-auto font-mono">
-                  {JSON.stringify(log.details, null, 2)}
-                </pre>
+                <details className="mt-1.5 ml-0">
+                  <summary className="text-[10px] text-neutral-400 cursor-pointer hover:text-neutral-700 font-bold uppercase tracking-widest select-none">
+                    Details
+                  </summary>
+                  <pre className="mt-1.5 text-[9px] text-neutral-500 bg-neutral-50 border border-neutral-100 rounded-xl px-3 py-2 overflow-x-auto font-mono">
+                    {JSON.stringify(log.details, null, 2)}
+                  </pre>
+                </details>
               )}
             </div>
           ))}

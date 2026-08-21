@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { UserProfile, Business, Town, RaffleEntry, AppSettings, Completion, Winner, AuditLog } from '../types';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
-import { UserIcon, ShieldCheck, Gamepad2, Settings as SettingsIcon, Loader2, BarChart3, Clock } from 'lucide-react';
+import { UserIcon, ShieldCheck, Gamepad2, BarChart3, Clock, Loader2 } from 'lucide-react';
 import { AdminMenu } from '../components/admin/AdminMenu';
 import { GameMaster } from '../components/admin/GameMaster';
 import { ChamberManager } from '../components/admin/ChamberManager';
@@ -17,16 +17,27 @@ interface AdminProps {
   settings: AppSettings | null;
 }
 
+const tabs = [
+  { id: 'admin', label: 'Users', icon: UserIcon },
+  { id: 'master', label: 'Game Master', icon: ShieldCheck },
+  { id: 'chamber', label: 'Chamber', icon: Gamepad2 },
+  { id: 'analytics', label: 'Analytics', icon: BarChart3 },
+  { id: 'audit', label: 'Audit', icon: Clock },
+] as const;
+
+type TabId = typeof tabs[number]['id'];
+
 export const Admin: React.FC<AdminProps> = ({ user, businesses, towns, settings }) => {
   const [searchParams] = useSearchParams();
-  const tabParam = searchParams.get('tab') as 'admin' | 'master' | 'chamber' | 'analytics' | 'audit' | null;
-  const [activeTab, setActiveTab] = useState<'admin' | 'master' | 'chamber' | 'analytics' | 'audit'>(
+  const tabParam = searchParams.get('tab') as TabId | null;
+  const [activeTab, setActiveTab] = useState<TabId>(
     tabParam || (user.role === 'admin' ? 'admin' : 'chamber')
   );
 
   useEffect(() => {
     if (tabParam) setActiveTab(tabParam);
   }, [tabParam]);
+
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [raffleEntries, setRaffleEntries] = useState<RaffleEntry[]>([]);
   const [winners, setWinners] = useState<Winner[]>([]);
@@ -78,51 +89,28 @@ export const Admin: React.FC<AdminProps> = ({ user, businesses, towns, settings 
 
   return (
     <div className="max-w-6xl mx-auto pb-16 md:pb-0">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
-        <div>
-          <h2 className="font-serif italic text-5xl mb-2">Admin Panel</h2>
-          <p className="text-xs text-neutral-400 uppercase tracking-[0.2em] font-bold">System Management & Oversight</p>
-        </div>
+      <div className="mb-8">
+        <h2 className="font-serif italic text-5xl mb-2">Admin Panel</h2>
+        <p className="text-xs text-neutral-400 uppercase tracking-[0.2em] font-bold">System Management &amp; Oversight</p>
+      </div>
 
-        <div className="flex bg-neutral-100 p-1.5 rounded-2xl overflow-x-auto w-full md:w-auto shadow-inner gap-1">
-          <button
-            onClick={() => setActiveTab('admin')}
-            className={`flex items-center gap-2 px-4 md:px-5 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all whitespace-nowrap shrink-0 ${activeTab === 'admin' ? 'bg-white shadow-md text-neutral-900' : 'text-neutral-400 hover:text-neutral-600'}`}
-          >
-            <UserIcon size={14} />
-            <span className="hidden sm:inline">{user.role === 'admin' ? 'Admin Menu' : 'Users'}</span>
-            <span className="sm:hidden">Users</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('master')}
-            className={`flex items-center gap-2 px-4 md:px-5 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all whitespace-nowrap shrink-0 ${activeTab === 'master' ? 'bg-white shadow-md text-neutral-900' : 'text-neutral-400 hover:text-neutral-600'}`}
-          >
-            <ShieldCheck size={14} />
-            <span className="hidden sm:inline">Game Master</span>
-            <span className="sm:hidden">Game</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('chamber')}
-            className={`flex items-center gap-2 px-4 md:px-5 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all whitespace-nowrap shrink-0 ${activeTab === 'chamber' ? 'bg-white shadow-md text-neutral-900' : 'text-neutral-400 hover:text-neutral-600'}`}
-          >
-            <Gamepad2 size={14} />
-            <span className="hidden sm:inline">Chamber Manager</span>
-            <span className="sm:hidden">Chamber</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('analytics')}
-            className={`flex items-center gap-2 px-4 md:px-5 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all whitespace-nowrap shrink-0 ${activeTab === 'analytics' ? 'bg-white shadow-md text-neutral-900' : 'text-neutral-400 hover:text-neutral-600'}`}
-          >
-            <BarChart3 size={14} />
-            <span>Analytics</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('audit')}
-            className={`flex items-center gap-2 px-4 md:px-5 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all whitespace-nowrap shrink-0 ${activeTab === 'audit' ? 'bg-white shadow-md text-neutral-900' : 'text-neutral-400 hover:text-neutral-600'}`}
-          >
-            <Clock size={14} />
-            <span>Audit</span>
-          </button>
+      {/* Tab bar: underline style, horizontally scrollable on mobile */}
+      <div className="border-b border-neutral-200 mb-8 overflow-x-auto">
+        <div className="flex gap-1 min-w-max">
+          {tabs.map(({ id, label, icon: Icon }) => (
+            <button
+              key={id}
+              onClick={() => setActiveTab(id)}
+              className={`flex items-center gap-2 px-4 py-3 text-[10px] font-bold uppercase tracking-widest transition-all whitespace-nowrap border-b-2 -mb-px ${
+                activeTab === id
+                  ? 'border-neutral-900 text-neutral-900'
+                  : 'border-transparent text-neutral-400 hover:text-neutral-600 hover:border-neutral-300'
+              }`}
+            >
+              <Icon size={13} className="hidden sm:block" />
+              <span>{label}</span>
+            </button>
+          ))}
         </div>
       </div>
 

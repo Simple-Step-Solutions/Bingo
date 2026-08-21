@@ -22,15 +22,18 @@ interface ChamberManagerProps {
   settings: AppSettings;
 }
 
+const INPUT_CLS = 'w-full px-4 py-3 bg-neutral-50 border border-neutral-200 rounded-2xl text-sm focus:ring-2 focus:ring-[var(--color-primary)] outline-none transition-all';
+const LABEL_CLS = 'block text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-2';
+
 export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, towns, raffleEntries, winners, settings }) => {
-  const [newBiz, setNewBiz] = useState({ 
-    name: '', 
-    town: 'Yorktown', 
-    task: '', 
+  const [newBiz, setNewBiz] = useState({
+    name: '',
+    town: 'Yorktown',
+    task: '',
     category: 'Retail',
-    address: '', 
-    lat: 0, 
-    lng: 0, 
+    address: '',
+    lat: 0,
+    lng: 0,
     nfcId: '',
     description: '',
     image: '',
@@ -46,6 +49,8 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
   const [bizSearch, setBizSearch] = useState('');
   const [bizPage, setBizPage] = useState(0);
   const [logoUploading, setLogoUploading] = useState(false);
+  // Local NFC state to avoid Firebase write on every keystroke
+  const [nfcValues, setNfcValues] = useState<Record<string, string>>({});
   const logoInputRef = useRef<HTMLInputElement>(null);
   const formRef = useRef<HTMLDivElement>(null);
 
@@ -70,14 +75,9 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
 
   const pickWinners = () => {
     if (raffleEntries.length === 0) return;
-    
-    // Shuffle entries
     const shuffled = [...raffleEntries].sort(() => Math.random() - 0.5);
-    
-    // Pick unique users
     const uniqueWinners: RaffleEntry[] = [];
     const seenUsers = new Set<string>();
-    
     for (const entry of shuffled) {
       if (!seenUsers.has(entry.userId)) {
         uniqueWinners.push(entry);
@@ -85,7 +85,6 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
       }
       if (uniqueWinners.length >= numWinnersToPick) break;
     }
-    
     setTempWinners(uniqueWinners);
   };
 
@@ -96,7 +95,7 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
         userName: winner.userName,
         userEmail: winner.userEmail,
         timestamp: new Date().toISOString(),
-        prize: 'Raffle Prize'
+        prize: settings.bingoPrize || 'Raffle Prize'
       });
     }
     setTempWinners([]);
@@ -108,7 +107,7 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
 
   const addBusiness = async () => {
     if (!newBiz.name || !newBiz.task || !newBiz.address) return;
-    
+
     let finalLat = newBiz.lat;
     let finalLng = newBiz.lng;
 
@@ -130,14 +129,14 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
       id,
       qrCode: editingId ? businesses.find(b => b.id === editingId)?.qrCode : `CHAMBER_${id}`
     });
-    setNewBiz({ 
-      name: '', 
-      town: 'Yorktown', 
-      task: '', 
+    setNewBiz({
+      name: '',
+      town: 'Yorktown',
+      task: '',
       category: 'Retail',
-      address: '', 
-      lat: 0, 
-      lng: 0, 
+      address: '',
+      lat: 0,
+      lng: 0,
       nfcId: '',
       description: '',
       image: '',
@@ -218,7 +217,7 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           {/* Logo */}
           <div className="flex flex-col gap-3">
-            <label className="block text-[10px] text-neutral-400 uppercase tracking-widest font-bold">Chamber Logo</label>
+            <label className={LABEL_CLS}>Chamber Logo</label>
             <div
               onClick={() => logoInputRef.current?.click()}
               className="relative flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-neutral-200 p-6 cursor-pointer hover:border-neutral-400 transition-all bg-neutral-50"
@@ -248,25 +247,25 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
 
           {/* Chamber Name */}
           <div className="md:col-span-1">
-            <label className="block text-[10px] text-neutral-400 uppercase tracking-widest mb-2 font-bold">Chamber Name</label>
+            <label className={LABEL_CLS}>Chamber Name</label>
             <input
               value={settings.chamberName || ''}
               onChange={e => updateSettings('chamberName', e.target.value)}
               placeholder="Hudson Valley Gateway Chamber of Commerce"
-              className="w-full p-4 bg-neutral-50 border border-neutral-100 rounded-2xl text-sm font-medium focus:ring-2 focus:ring-neutral-900 transition-all outline-none"
+              className={INPUT_CLS}
             />
             <p className="text-[10px] text-neutral-400 mt-2 italic">Displayed in the app footer and onboarding.</p>
           </div>
 
           {/* Primary Color */}
           <div>
-            <label className="block text-[10px] text-neutral-400 uppercase tracking-widest mb-2 font-bold">Primary Color</label>
+            <label className={LABEL_CLS}>Primary Color</label>
             <div className="flex items-center gap-3">
               <input
                 type="color"
                 value={settings.primaryColor || DEFAULT_PRIMARY}
                 onChange={e => updateSettings('primaryColor', e.target.value)}
-                className="w-14 h-14 rounded-2xl border border-neutral-100 cursor-pointer bg-neutral-50 p-1"
+                className="w-14 h-14 rounded-2xl border border-neutral-200 cursor-pointer bg-neutral-50 p-1"
               />
               <div className="flex-1">
                 <input
@@ -275,7 +274,7 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
                   onChange={e => {
                     if (/^#[0-9A-Fa-f]{0,6}$/.test(e.target.value)) updateSettings('primaryColor', e.target.value);
                   }}
-                  className="w-full p-3 bg-neutral-50 border border-neutral-100 rounded-xl text-sm font-mono font-medium focus:ring-2 focus:ring-neutral-900 transition-all outline-none uppercase"
+                  className="w-full px-3 py-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-sm font-mono focus:ring-2 focus:ring-[var(--color-primary)] outline-none uppercase"
                   maxLength={7}
                 />
                 <p className="text-[10px] text-neutral-400 mt-1 font-bold uppercase tracking-widest">Buttons, accents, links</p>
@@ -285,13 +284,13 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
 
           {/* Accent Color */}
           <div>
-            <label className="block text-[10px] text-neutral-400 uppercase tracking-widest mb-2 font-bold">Accent Color</label>
+            <label className={LABEL_CLS}>Accent Color</label>
             <div className="flex items-center gap-3">
               <input
                 type="color"
                 value={settings.accentColor || DEFAULT_ACCENT}
                 onChange={e => updateSettings('accentColor', e.target.value)}
-                className="w-14 h-14 rounded-2xl border border-neutral-100 cursor-pointer bg-neutral-50 p-1"
+                className="w-14 h-14 rounded-2xl border border-neutral-200 cursor-pointer bg-neutral-50 p-1"
               />
               <div className="flex-1">
                 <input
@@ -300,7 +299,7 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
                   onChange={e => {
                     if (/^#[0-9A-Fa-f]{0,6}$/.test(e.target.value)) updateSettings('accentColor', e.target.value);
                   }}
-                  className="w-full p-3 bg-neutral-50 border border-neutral-100 rounded-xl text-sm font-mono font-medium focus:ring-2 focus:ring-neutral-900 transition-all outline-none uppercase"
+                  className="w-full px-3 py-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-sm font-mono focus:ring-2 focus:ring-[var(--color-primary)] outline-none uppercase"
                   maxLength={7}
                 />
                 <p className="text-[10px] text-neutral-400 mt-1 font-bold uppercase tracking-widest">CTAs, free space, prizes</p>
@@ -321,7 +320,7 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
       {/* Business Management */}
       <div className="lg:col-span-2 space-y-8">
         <div className="bg-white border border-neutral-200 p-6 rounded-3xl shadow-sm">
-          <div className="flex justify-between items-center mb-8">
+          <div className="flex justify-between items-center mb-6">
             <div className="flex items-center gap-3">
               <div className="bg-neutral-100 p-2 rounded-xl">
                 <Store className="text-neutral-900" size={20} />
@@ -335,7 +334,7 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
 
           <CSVImport onComplete={() => {}} />
 
-          <div className="mt-8 flex items-center gap-3 bg-neutral-50 border border-neutral-100 rounded-2xl px-4 py-3">
+          <div className="mt-6 flex items-center gap-3 bg-neutral-50 border border-neutral-200 rounded-2xl px-4 py-3">
             <Search size={16} className="text-neutral-400 shrink-0" />
             <input
               type="text"
@@ -351,70 +350,61 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
             )}
           </div>
 
-          <div className="mt-6 space-y-4">
-            {pagedBusinesses.map(biz => (
-              <div key={biz.id} className="flex flex-col p-6 bg-neutral-50 rounded-3xl border border-neutral-100 group hover:border-neutral-900 transition-all">
-                <div className="flex justify-between items-start mb-6">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-white border border-neutral-200 rounded-2xl flex items-center justify-center text-neutral-400 group-hover:text-neutral-900 transition-colors shadow-sm">
-                      <Store size={24} />
-                    </div>
-                    <div>
-                      <p className="font-bold text-lg">{biz.name}</p>
-                      <p className="text-[10px] text-neutral-400 uppercase tracking-widest font-bold">
-                        {biz.town} • {biz.category || 'General'} • {biz.task}
-                      </p>
-                      {biz.address && (
-                        <p className="text-[10px] text-neutral-400 mt-1 flex items-center gap-1">
-                          <MapPin size={10} /> {biz.address}
-                        </p>
-                      )}
-                    </div>
+          <div className="mt-4 divide-y divide-neutral-100">
+            {pagedBusinesses.map(biz => {
+              const nfcVal = nfcValues[biz.id] ?? (biz.nfcId || '');
+              return (
+                <div key={biz.id} className="flex items-center gap-4 py-3 first:pt-0 last:pb-0 group">
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-sm truncate">{biz.name}</p>
+                    <p className="text-[10px] text-neutral-400 uppercase tracking-widest font-bold truncate">
+                      {biz.town} &bull; {biz.category || 'General'}
+                    </p>
+                    {biz.nfcId && (
+                      <p className="text-[10px] text-neutral-300 font-mono mt-0.5">NFC: {biz.nfcId}</p>
+                    )}
                   </div>
-                  <div className="flex items-center gap-3">
-                    <button 
-                      onClick={() => editBusiness(biz)}
-                      className="p-3 bg-white border border-neutral-200 rounded-xl text-neutral-400 hover:text-neutral-900 hover:border-neutral-900 transition-all shadow-sm"
-                      title="Edit Business"
-                    >
-                      <Pencil size={18} />
-                    </button>
-                    <button 
-                      onClick={() => setSelectedQR({ value: biz.qrCode, title: biz.name })}
-                      className="p-3 bg-white border border-neutral-200 rounded-xl text-neutral-400 hover:text-neutral-900 hover:border-neutral-900 transition-all shadow-sm"
-                      title="Generate QR Code"
-                    >
-                      <QrCode size={18} />
-                    </button>
-                    <button 
-                      onClick={() => deleteBusiness(biz.id)} 
-                      className="p-3 bg-white border border-neutral-200 rounded-xl text-neutral-300 hover:text-red-500 hover:border-red-200 transition-all shadow-sm"
-                    >
-                      <Trash2 size={18} />
-                    </button>
-                  </div>
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-6 border-t border-neutral-200/50">
-                  <div className="flex items-center gap-3 bg-white p-3 rounded-xl border border-neutral-100">
-                    <Nfc size={16} className="text-neutral-400" />
-                    <input 
-                      placeholder="Associate NFC ID"
-                      value={biz.nfcId || ''}
-                      onChange={(e) => updateBusinessNfc(biz.id, e.target.value)}
-                      className="flex-1 bg-transparent text-[10px] uppercase tracking-widest font-bold outline-none border-none focus:ring-0"
+                  {/* Inline NFC edit field */}
+                  <div className="hidden sm:flex items-center gap-2 bg-neutral-50 border border-neutral-100 rounded-xl px-3 py-2">
+                    <Nfc size={12} className="text-neutral-400 shrink-0" />
+                    <input
+                      placeholder="NFC ID"
+                      value={nfcVal}
+                      onChange={e => setNfcValues(prev => ({ ...prev, [biz.id]: e.target.value }))}
+                      onBlur={e => updateBusinessNfc(biz.id, e.target.value)}
+                      className="w-24 bg-transparent text-[10px] uppercase tracking-widest font-bold outline-none border-none focus:ring-0"
                     />
                   </div>
-                  <div className="flex items-center gap-3 bg-white p-3 rounded-xl border border-neutral-100">
-                    <code className="text-[10px] text-neutral-400 font-mono uppercase tracking-widest">Code: {biz.qrCode}</code>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      onClick={() => editBusiness(biz)}
+                      className="p-2 rounded-xl border border-neutral-200 text-neutral-400 hover:text-neutral-900 hover:border-neutral-900 transition-all"
+                      title="Edit Business"
+                    >
+                      <Pencil size={14} />
+                    </button>
+                    <button
+                      onClick={() => setSelectedQR({ value: biz.qrCode, title: biz.name })}
+                      className="p-2 rounded-xl border border-neutral-200 text-neutral-400 hover:text-neutral-900 hover:border-neutral-900 transition-all"
+                      title="QR Code"
+                    >
+                      <QrCode size={14} />
+                    </button>
+                    <button
+                      onClick={() => deleteBusiness(biz.id)}
+                      className="p-2 rounded-xl border border-neutral-200 text-neutral-300 hover:text-red-500 hover:border-red-200 transition-all"
+                      title="Delete"
+                    >
+                      <Trash2 size={14} />
+                    </button>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {bizPageCount > 1 && (
-            <div className="flex items-center justify-between mt-6 pt-6 border-t border-neutral-100">
+            <div className="flex items-center justify-between mt-6 pt-4 border-t border-neutral-100">
               <button
                 onClick={() => setBizPage(p => Math.max(0, p - 1))}
                 disabled={bizPage === 0}
@@ -436,97 +426,40 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
           )}
         </div>
 
+        {/* Raffle Entries */}
         <div className="bg-white border border-neutral-200 p-6 rounded-3xl shadow-sm">
-          <div className="flex items-center justify-between mb-8">
-            <div className="flex items-center gap-3">
-              <div className="bg-yellow-50 p-2 rounded-xl">
-                <Ticket className="text-yellow-600" size={20} />
-              </div>
-              <h3 className="font-bold uppercase tracking-widest text-xs text-neutral-400">Raffle Entries</h3>
+          <div className="flex items-center gap-3 mb-6">
+            <div className="bg-yellow-50 p-2 rounded-xl">
+              <Ticket className="text-yellow-600" size={20} />
             </div>
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2 bg-neutral-50 px-3 py-2 rounded-xl border border-neutral-100">
-                <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">Pick</span>
-                <input 
-                  type="number" 
-                  min="1" 
-                  max={raffleEntries.length}
-                  value={numWinnersToPick}
-                  onChange={(e) => setNumWinnersToPick(parseInt(e.target.value) || 1)}
-                  className="w-12 bg-transparent text-sm font-bold outline-none text-center"
-                />
-                <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">Winners</span>
-              </div>
-              <button 
-                onClick={pickWinners}
-                disabled={raffleEntries.length === 0}
-                className="bg-neutral-900 text-white px-6 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-neutral-800 transition-all shadow-md disabled:opacity-50"
-              >
-                Pick Randomly
-              </button>
-            </div>
+            <h3 className="font-bold uppercase tracking-widest text-xs text-neutral-400">Raffle Entries</h3>
+            <span className="ml-auto text-[10px] bg-neutral-100 px-3 py-1 rounded-full font-bold text-neutral-600 uppercase tracking-widest">
+              {raffleEntries.length} entries
+            </span>
           </div>
 
-          {tempWinners.length > 0 && (
-            <div className="mb-10 p-6 bg-yellow-50 rounded-3xl border border-yellow-100 animate-in zoom-in-95 duration-300">
-              <div className="flex items-center gap-2 mb-6 text-yellow-800">
-                <Sparkles size={18} />
-                <h4 className="font-bold uppercase tracking-widest text-[10px]">Newly Picked Winners</h4>
-              </div>
-              <div className="space-y-4">
-                {tempWinners.map(winner => (
-                  <div key={winner.id} className="flex items-center justify-between bg-white p-4 rounded-2xl shadow-sm">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 bg-yellow-100 rounded-full flex items-center justify-center text-yellow-600">
-                        <Trophy size={14} />
-                      </div>
-                      <div>
-                        <p className="font-bold text-sm">{winner.userName || winner.userEmail}</p>
-                        <p className="text-[10px] text-neutral-400 uppercase tracking-widest font-bold">{winner.userEmail}</p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <div className="flex gap-3 mt-6">
-                <button 
-                  onClick={saveWinners}
-                  className="flex-1 bg-yellow-600 text-white py-3 rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-yellow-700 transition-all shadow-md"
-                >
-                  Confirm & Save Winners
-                </button>
-                <button 
-                  onClick={() => setTempWinners([])}
-                  className="px-6 py-3 bg-white border border-yellow-200 text-yellow-600 rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-yellow-50 transition-all"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          )}
-          
           <div className="divide-y divide-neutral-100">
             {raffleEntries.length > 0 ? raffleEntries.map(entry => (
-              <div key={entry.id} className="flex justify-between items-center py-6 first:pt-0 last:pb-0">
-                <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 bg-neutral-100 rounded-full flex items-center justify-center text-neutral-400">
-                    <Users size={18} />
+              <div key={entry.id} className="flex justify-between items-center py-3 first:pt-0 last:pb-0">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 bg-neutral-100 rounded-full flex items-center justify-center text-neutral-400">
+                    <Users size={14} />
                   </div>
                   <div>
                     <p className="font-bold text-sm">{entry.userName || entry.userEmail}</p>
-                    <div className="flex items-center gap-3 mt-1">
-                      <p className="text-[10px] text-neutral-400 uppercase tracking-widest font-bold">{new Date(entry.timestamp).toLocaleString()}</p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <p className="text-[10px] text-neutral-400 uppercase tracking-widest font-bold">{new Date(entry.timestamp).toLocaleDateString()}</p>
                       <span className="text-[10px] bg-neutral-100 px-2 py-0.5 rounded-full text-neutral-600 font-bold uppercase tracking-widest">
                         {entry.completionsCount} Tasks
                       </span>
                     </div>
                   </div>
                 </div>
-                <button 
-                  onClick={() => deleteRaffleEntry(entry.id)} 
+                <button
+                  onClick={() => deleteRaffleEntry(entry.id)}
                   className="p-2 text-neutral-300 hover:text-red-500 transition-colors"
                 >
-                  <Trash2 size={18} />
+                  <Trash2 size={16} />
                 </button>
               </div>
             )) : (
@@ -538,36 +471,107 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
           </div>
         </div>
 
+        {/* Raffle Winner Picker */}
         <div className="bg-white border border-neutral-200 p-6 rounded-3xl shadow-sm">
-          <div className="flex items-center gap-3 mb-8">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="bg-yellow-50 p-2 rounded-xl">
+              <Sparkles className="text-yellow-600" size={20} />
+            </div>
+            <h3 className="font-bold uppercase tracking-widest text-xs text-neutral-400">Pick Raffle Winners</h3>
+          </div>
+
+          <div className="flex items-center gap-4 mb-6">
+            <div className="flex items-center gap-2 bg-neutral-50 px-4 py-3 rounded-xl border border-neutral-200 flex-1">
+              <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">Pick</span>
+              <input
+                type="number"
+                min="1"
+                max={raffleEntries.length}
+                value={numWinnersToPick}
+                onChange={(e) => setNumWinnersToPick(parseInt(e.target.value) || 1)}
+                className="w-12 bg-transparent text-sm font-bold outline-none text-center"
+              />
+              <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">Winners</span>
+            </div>
+            <button
+              onClick={pickWinners}
+              disabled={raffleEntries.length === 0}
+              className="bg-neutral-900 text-white px-6 py-3 rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-neutral-800 transition-all shadow-md disabled:opacity-50"
+            >
+              Pick Randomly
+            </button>
+          </div>
+
+          {tempWinners.length > 0 && (
+            <div className="p-6 bg-yellow-50 rounded-3xl border border-yellow-100 animate-in zoom-in-95 duration-300">
+              <div className="flex items-center gap-2 mb-4 text-yellow-800">
+                <Sparkles size={16} />
+                <h4 className="font-bold uppercase tracking-widest text-[10px]">Newly Picked Winners</h4>
+              </div>
+              <div className="space-y-3">
+                {tempWinners.map(winner => (
+                  <div key={winner.id} className="flex items-center gap-3 bg-white p-4 rounded-2xl shadow-sm">
+                    <div className="w-8 h-8 bg-yellow-100 rounded-full flex items-center justify-center text-yellow-600">
+                      <Trophy size={14} />
+                    </div>
+                    <div>
+                      <p className="font-bold text-sm">{winner.userName || winner.userEmail}</p>
+                      <p className="text-[10px] text-neutral-400 uppercase tracking-widest font-bold">{winner.userEmail}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="flex gap-3 mt-4">
+                <button
+                  onClick={saveWinners}
+                  className="flex-1 bg-yellow-600 text-white py-3 rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-yellow-700 transition-all shadow-md"
+                >
+                  Confirm &amp; Save Winners
+                </button>
+                <button
+                  onClick={() => setTempWinners([])}
+                  className="px-6 py-3 bg-white border border-yellow-200 text-yellow-600 rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-yellow-50 transition-all"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Official Winners */}
+        <div className="bg-white border border-neutral-200 p-6 rounded-3xl shadow-sm">
+          <div className="flex items-center gap-3 mb-6">
             <div className="bg-neutral-900 p-2 rounded-xl">
               <Trophy className="text-white" size={20} />
             </div>
             <h3 className="font-bold uppercase tracking-widest text-xs text-neutral-400">Official Winners</h3>
           </div>
-          
+
           <div className="divide-y divide-neutral-100">
             {winners.length > 0 ? winners.map(winner => (
-              <div key={winner.id} className="flex justify-between items-center py-6 first:pt-0 last:pb-0">
-                <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 bg-yellow-100 rounded-full flex items-center justify-center text-yellow-600">
-                    <Trophy size={18} />
+              <div key={winner.id} className="flex justify-between items-center py-3 first:pt-0 last:pb-0">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 bg-yellow-100 rounded-full flex items-center justify-center text-yellow-600">
+                    <Trophy size={14} />
                   </div>
                   <div>
                     <p className="font-bold text-sm">{winner.userName || winner.userEmail}</p>
-                    <div className="flex items-center gap-3 mt-1">
-                      <p className="text-[10px] text-neutral-400 uppercase tracking-widest font-bold">{new Date(winner.timestamp).toLocaleString()}</p>
-                      <span className="text-[10px] bg-yellow-50 px-2 py-0.5 rounded-full text-yellow-700 font-bold uppercase tracking-widest">
-                        Winner
-                      </span>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <p className="text-[10px] text-neutral-400 uppercase tracking-widest font-bold">{new Date(winner.timestamp).toLocaleDateString()}</p>
+                      {winner.prize && (
+                        <span className="text-[10px] bg-yellow-50 px-2 py-0.5 rounded-full text-yellow-700 font-bold uppercase tracking-widest">
+                          {winner.prize}
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
-                <button 
-                  onClick={() => deleteWinner(winner.id)} 
+                <button
+                  onClick={() => deleteWinner(winner.id)}
                   className="p-2 text-neutral-300 hover:text-red-500 transition-colors"
                 >
-                  <Trash2 size={18} />
+                  <Trash2 size={16} />
                 </button>
               </div>
             )) : (
@@ -580,129 +584,127 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
         </div>
       </div>
 
-      {/* Add Business & Towns */}
+      {/* Add / Edit Business form + Towns */}
       <div className="space-y-8">
-        <div ref={formRef} className="bg-neutral-900 text-white p-8 rounded-3xl shadow-2xl">
+        <div ref={formRef} className="bg-white border border-neutral-200 p-8 rounded-3xl shadow-sm">
           <div className="flex justify-between items-center mb-8">
             <h3 className="font-bold uppercase tracking-widest text-xs text-neutral-400">
-              {editingId ? 'Edit Business' : 'Quick Add Business'}
+              {editingId ? 'Edit Business' : 'Add Business'}
             </h3>
             {editingId && (
-              <button 
+              <button
                 onClick={() => {
                   setEditingId(null);
-                  setNewBiz({
-                    name: '', town: 'Yorktown', task: '', category: 'Retail', address: '', lat: 0, lng: 0, nfcId: '',
-                    description: '', image: '', website: ''
-                  });
+                  setNewBiz({ name: '', town: 'Yorktown', task: '', category: 'Retail', address: '', lat: 0, lng: 0, nfcId: '', description: '', image: '', website: '' });
                 }}
-                className="text-[10px] uppercase tracking-widest font-bold text-neutral-500 hover:text-white"
+                className="text-[10px] uppercase tracking-widest font-bold text-neutral-400 hover:text-red-500 transition-colors"
               >
                 Cancel
               </button>
             )}
           </div>
-          <div className="space-y-6">
+
+          <div className="space-y-5">
             <div>
-              <label className="block text-[10px] text-neutral-400 uppercase tracking-widest mb-2 font-bold">Business Name</label>
-              <input 
+              <label className={LABEL_CLS}>Business Name</label>
+              <input
                 placeholder="e.g. Main Street Bakery"
                 value={newBiz.name}
-                onChange={e => setNewBiz({...newBiz, name: e.target.value})}
-                className="w-full p-4 bg-white/10 border border-white/10 rounded-2xl text-sm font-medium focus:ring-2 focus:ring-white/20 transition-all outline-none"
+                onChange={e => setNewBiz({ ...newBiz, name: e.target.value })}
+                className={INPUT_CLS}
               />
             </div>
-            
+
             <div>
-              <label className="block text-[10px] text-neutral-400 uppercase tracking-widest mb-2 font-bold">Location Search</label>
-              <AddressSearch onSelect={(lat, lng, address) => setNewBiz({...newBiz, lat, lng, address})} />
+              <label className={LABEL_CLS}>Location Search</label>
+              <AddressSearch onSelect={(lat, lng, address) => setNewBiz({ ...newBiz, lat, lng, address })} />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-[10px] text-neutral-400 uppercase tracking-widest mb-2 font-bold">Town</label>
-                <select 
+                <label className={LABEL_CLS}>Town</label>
+                <select
                   value={newBiz.town}
-                  onChange={e => setNewBiz({...newBiz, town: e.target.value})}
-                  className="w-full p-4 bg-white/10 border border-white/10 rounded-2xl text-sm font-medium focus:ring-2 focus:ring-white/20 transition-all outline-none"
+                  onChange={e => setNewBiz({ ...newBiz, town: e.target.value })}
+                  className={INPUT_CLS}
                 >
-                  {towns.map(t => <option key={t.id} value={t.name} className="bg-neutral-900">{t.name}</option>)}
+                  {towns.map(t => <option key={t.id} value={t.name}>{t.name}</option>)}
                 </select>
               </div>
               <div>
-                <label className="block text-[10px] text-neutral-400 uppercase tracking-widest mb-2 font-bold">NFC ID</label>
-                <div className="flex items-center gap-3 p-4 bg-white/10 border border-white/10 rounded-2xl focus-within:ring-2 focus-within:ring-white/20 transition-all">
-                  <Nfc size={18} className="text-neutral-400" />
-                  <input 
+                <label className={LABEL_CLS}>NFC ID</label>
+                <div className="flex items-center gap-2 px-4 py-3 bg-neutral-50 border border-neutral-200 rounded-2xl focus-within:ring-2 focus-within:ring-[var(--color-primary)] transition-all">
+                  <Nfc size={16} className="text-neutral-400" />
+                  <input
                     placeholder="Optional"
                     value={newBiz.nfcId}
-                    onChange={e => setNewBiz({...newBiz, nfcId: e.target.value})}
-                    className="flex-1 bg-transparent outline-none text-sm font-medium"
+                    onChange={e => setNewBiz({ ...newBiz, nfcId: e.target.value })}
+                    className="flex-1 bg-transparent outline-none text-sm"
                   />
                 </div>
               </div>
             </div>
 
             <div>
-              <label className="block text-[10px] text-neutral-400 uppercase tracking-widest mb-2 font-bold">Business Category</label>
-              <select 
+              <label className={LABEL_CLS}>Business Category</label>
+              <select
                 value={newBiz.category}
-                onChange={e => setNewBiz({...newBiz, category: e.target.value})}
-                className="w-full p-4 bg-white/10 border border-white/10 rounded-2xl text-sm font-medium focus:ring-2 focus:ring-white/20 transition-all outline-none"
+                onChange={e => setNewBiz({ ...newBiz, category: e.target.value })}
+                className={INPUT_CLS}
               >
-                <option value="Retail" className="bg-neutral-900">Retail</option>
-                <option value="Restaurant" className="bg-neutral-900">Restaurant</option>
-                <option value="Service" className="bg-neutral-900">Service</option>
-                <option value="Entertainment" className="bg-neutral-900">Entertainment</option>
-                <option value="Other" className="bg-neutral-900">Other</option>
+                <option value="Retail">Retail</option>
+                <option value="Restaurant">Restaurant</option>
+                <option value="Service">Service</option>
+                <option value="Entertainment">Entertainment</option>
+                <option value="Other">Other</option>
               </select>
             </div>
 
             <div>
-              <label className="block text-[10px] text-neutral-400 uppercase tracking-widest mb-2 font-bold">Task Description</label>
-              <input 
+              <label className={LABEL_CLS}>Task Description</label>
+              <input
                 placeholder="e.g. Buy a coffee"
                 value={newBiz.task}
-                onChange={e => setNewBiz({...newBiz, task: e.target.value})}
-                className="w-full p-4 bg-white/10 border border-white/10 rounded-2xl text-sm font-medium focus:ring-2 focus:ring-white/20 transition-all outline-none"
+                onChange={e => setNewBiz({ ...newBiz, task: e.target.value })}
+                className={INPUT_CLS}
               />
             </div>
 
             <div>
-              <label className="block text-[10px] text-neutral-400 uppercase tracking-widest mb-2 font-bold">About Business (Optional)</label>
-              <textarea 
+              <label className={LABEL_CLS}>About Business (Optional)</label>
+              <textarea
                 placeholder="Brief description of the business..."
                 value={newBiz.description}
-                onChange={e => setNewBiz({...newBiz, description: e.target.value})}
-                className="w-full p-4 bg-white/10 border border-white/10 rounded-2xl text-sm font-medium focus:ring-2 focus:ring-white/20 transition-all outline-none h-24 resize-none"
+                onChange={e => setNewBiz({ ...newBiz, description: e.target.value })}
+                className={`${INPUT_CLS} h-24 resize-none`}
               />
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-[10px] text-neutral-400 uppercase tracking-widest mb-2 font-bold">Image URL (Optional)</label>
-                <input 
+                <label className={LABEL_CLS}>Image URL (Optional)</label>
+                <input
                   placeholder="https://..."
                   value={newBiz.image}
-                  onChange={e => setNewBiz({...newBiz, image: e.target.value})}
-                  className="w-full p-4 bg-white/10 border border-white/10 rounded-2xl text-sm font-medium focus:ring-2 focus:ring-white/20 transition-all outline-none"
+                  onChange={e => setNewBiz({ ...newBiz, image: e.target.value })}
+                  className={INPUT_CLS}
                 />
               </div>
               <div>
-                <label className="block text-[10px] text-neutral-400 uppercase tracking-widest mb-2 font-bold">Website (Optional)</label>
-                <input 
+                <label className={LABEL_CLS}>Website (Optional)</label>
+                <input
                   placeholder="https://..."
                   value={newBiz.website}
-                  onChange={e => setNewBiz({...newBiz, website: e.target.value})}
-                  className="w-full p-4 bg-white/10 border border-white/10 rounded-2xl text-sm font-medium focus:ring-2 focus:ring-white/20 transition-all outline-none"
+                  onChange={e => setNewBiz({ ...newBiz, website: e.target.value })}
+                  className={INPUT_CLS}
                 />
               </div>
             </div>
 
-            <button 
+            <button
               onClick={addBusiness}
               disabled={isGeocoding}
-              className="w-full bg-white text-neutral-900 p-5 rounded-2xl font-bold hover:bg-neutral-100 transition-all shadow-lg active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
+              className="w-full bg-neutral-900 text-white py-4 rounded-2xl font-bold text-sm hover:bg-neutral-800 transition-all shadow-md active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {isGeocoding && <Loader2 className="animate-spin" size={18} />}
               {editingId ? 'Update Business' : 'Add Business'}
@@ -710,31 +712,32 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
           </div>
         </div>
 
+        {/* Manage Towns */}
         <div className="bg-white border border-neutral-200 p-6 rounded-3xl shadow-sm">
-          <h3 className="font-bold uppercase tracking-widest text-xs mb-8 text-neutral-400">Manage Towns</h3>
-          <div className="flex gap-3 mb-8">
-            <input 
+          <h3 className="font-bold uppercase tracking-widest text-xs mb-6 text-neutral-400">Manage Towns</h3>
+          <div className="flex gap-3 mb-6">
+            <input
               placeholder="New Town Name"
               value={newTown}
               onChange={e => setNewTown(e.target.value)}
-              className="flex-1 p-4 bg-neutral-50 border border-neutral-100 rounded-2xl text-sm font-medium focus:ring-2 focus:ring-neutral-900 transition-all outline-none"
+              className={`flex-1 ${INPUT_CLS}`}
             />
-            <button 
-              onClick={addTown} 
-              className="bg-neutral-900 text-white p-4 rounded-2xl hover:bg-neutral-800 transition-all shadow-md"
+            <button
+              onClick={addTown}
+              className="bg-neutral-900 text-white px-4 py-3 rounded-2xl hover:bg-neutral-800 transition-all shadow-md"
             >
-              <Plus size={20} />
+              <Plus size={18} />
             </button>
           </div>
-          <div className="space-y-3">
+          <div className="space-y-2">
             {towns.map(t => (
-              <div key={t.id} className="flex justify-between items-center p-4 bg-neutral-50 rounded-2xl border border-neutral-100 group hover:border-neutral-900 transition-all">
+              <div key={t.id} className="flex justify-between items-center p-3 bg-neutral-50 rounded-2xl border border-neutral-100 hover:border-neutral-300 transition-all">
                 <span className="text-sm font-bold">{t.name}</span>
-                <button 
-                  onClick={() => deleteTown(t.id)} 
-                  className="p-2 text-neutral-300 hover:text-red-500 transition-colors"
+                <button
+                  onClick={() => deleteTown(t.id)}
+                  className="p-1.5 text-neutral-300 hover:text-red-500 transition-colors"
                 >
-                  <Trash2 size={16} />
+                  <Trash2 size={15} />
                 </button>
               </div>
             ))}
