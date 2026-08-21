@@ -197,9 +197,29 @@ service cloud.firestore {
     // minutes without leaving the parking lot.
     // ===============================================================
 
-    match /boards/{userId} {
-      allow get:  if isAuthenticated() && (request.auth.uid == userId || isChamber());
+    match /boards/{boardId} {
+      // Board ids are scoped to the event ({eventId}_{uid}), so ownership comes
+      // from the document rather than the id. Pre-event boards are keyed by uid
+      // alone, hence the second clause.
+      allow get: if isAuthenticated() && (
+        resource.data.get('userId', '') == request.auth.uid
+        || boardId == request.auth.uid
+        || isChamber()
+      );
       allow list: if isChamber();
+      allow write: if false;
+    }
+
+    // ===============================================================
+    // Events
+    //
+    // Readable so the app can say "the game opens on Saturday" rather than
+    // failing a scan with no explanation. Written only by callables, because
+    // the window is what actually gates verification.
+    // ===============================================================
+
+    match /events/{eventId} {
+      allow read:  if isAuthenticated();
       allow write: if false;
     }
 
@@ -233,8 +253,13 @@ service cloud.firestore {
     // so the app can show the fanfare; nobody may write either.
     // ===============================================================
 
-    match /wins/{userId} {
-      allow get:  if isAuthenticated() && (request.auth.uid == userId || isChamber());
+    match /wins/{winId} {
+      // Same story as boards: ids are event-scoped, ownership is in the data.
+      allow get: if isAuthenticated() && (
+        resource.data.get('userId', '') == request.auth.uid
+        || winId == request.auth.uid
+        || isChamber()
+      );
       allow list: if isChamber();
       allow write: if false;
     }

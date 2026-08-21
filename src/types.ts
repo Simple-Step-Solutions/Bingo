@@ -49,7 +49,32 @@ export interface Town {
   name: string;
 }
 
+export interface GameEvent {
+  id: string;
+  name: string;
+  status: 'draft' | 'active' | 'paused' | 'archived';
+  startsAt?: string | null;
+  endsAt?: string | null;
+  boardSize?: number;
+  difficulty?: number;
+  bingoPrize?: string | null;
+  rafflePrize?: string | null;
+  raffleEnabled?: boolean;
+  raffleRequirement?: number | null;
+  raffleDescription?: string | null;
+  freeSpaceName?: string;
+  freeSpaceTask?: string | null;
+  archivedAt?: string | null;
+}
+
 export interface AppSettings {
+  /**
+   * Pointer to the running event. Everything that varies per season lives on
+   * events/{id}; settings/global keeps only chamber-wide branding.
+   * Absent before the migration has run, which is treated as a single
+   * open-ended legacy game.
+   */
+  activeEventId?: string;
   freeSpaceName: string;
   freeSpaceTask: string;
   boardSize: number;
@@ -92,6 +117,8 @@ export interface Completion {
   id: string;
   userId: string;
   businessId: string;
+  /** Absent on completions written before events existed. */
+  eventId?: string;
   timestamp: string;
   town: string;
   /**

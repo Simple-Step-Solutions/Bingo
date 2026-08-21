@@ -4,6 +4,7 @@ const { FieldValue } = require('firebase-admin/firestore');
 const { db, callableOpts } = require('./lib/db');
 const { requireVerifiedEmail, requireRole, writeAudit } = require('./lib/guards');
 const { generateBingoBoard, businessesNeededFor } = require('./lib/board');
+const { getActiveEvent, boardIdFor } = require('./lib/events');
 
 /**
  * Boards move off users/{uid} and into boards/{uid}, written only here.
@@ -18,9 +19,10 @@ const { generateBingoBoard, businessesNeededFor } = require('./lib/board');
  * minutes without leaving the parking lot.
  */
 
-const buildBoard = async (uid, profile) => {
-  const settingsSnap = await db().collection('settings').doc('global').get();
-  const settings = settingsSnap.exists ? settingsSnap.data() : { boardSize: 3, difficulty: 50 };
+const buildBoard = async (uid, profile, event) => {
+  // Board size and difficulty belong to the event, so two seasons can run
+  // different formats without rewriting settings/global.
+  const settings = { boardSize: event.boardSize || 3, difficulty: event.difficulty ?? 50 };
 
   const bizSnap = await db().collection('businesses').get();
   const businesses = bizSnap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -33,6 +35,8 @@ const buildBoard = async (uid, profile) => {
   return {
     cells,
     size,
+    userId: uid,
+    eventId: event.id,
     town: profile.town || null,
     generatedAt: FieldValue.serverTimestamp(),
     version: 1,
@@ -49,7 +53,10 @@ exports.ensureBoard = onCall(callableOpts({ maxInstances: 20 }), async (request)
   const auth = requireVerifiedEmail(request);
   const uid = auth.uid;
 
-  const existing = await db().collection('boards').doc(uid).get();
+  const event = await getActiveEvent();
+  const boardId = boardIdFor(event.id, uid);
+
+  const existing = await db().collection('boards').doc(boardId).get();
   if (existing.exists) {
     const d = existing.data();
     return { created: false, cells: d.cells, size: d.size, incomplete: !!d.incomplete };
@@ -66,18 +73,20 @@ exports.ensureBoard = onCall(callableOpts({ maxInstances: 20 }), async (request)
     const migrated = {
       cells: profile.bingoBoard,
       size: profile.boardSize || Math.sqrt(profile.bingoBoard.length),
+      userId: uid,
+      eventId: event.id,
       town: profile.town,
       generatedAt: FieldValue.serverTimestamp(),
       version: 1,
       incomplete: profile.bingoBoard.includes('EMPTY'),
       migratedFromUserDoc: true,
     };
-    await db().collection('boards').doc(uid).set(migrated);
+    await db().collection('boards').doc(boardId).set(migrated);
     return { created: true, cells: migrated.cells, size: migrated.size, incomplete: migrated.incomplete };
   }
 
-  const board = await buildBoard(uid, profile);
-  await db().collection('boards').doc(uid).set(board);
+  const board = await buildBoard(uid, profile, event);
+  await db().collection('boards').doc(boardId).set(board);
   return { created: true, cells: board.cells, size: board.size, incomplete: board.incomplete };
 });
 
@@ -105,14 +114,21 @@ exports.regenerateBoard = onCall(callableOpts({ maxInstances: 20 }), async (requ
   const profile = userSnap.data();
   if (!profile.town) throw new HttpsError('failed-precondition', 'That player has no town set.');
 
-  const completions = await db().collection('completions').where('userId', '==', targetUid).get();
+  const event = await getActiveEvent();
+  const boardId = boardIdFor(event.id, targetUid);
+
+  const completionsSnap = await db().collection('completions').where('userId', '==', targetUid).get();
+  const completions = {
+    empty: completionsSnap.docs.every(d => (d.data().eventId || 'legacy') !== event.id),
+    size: completionsSnap.docs.filter(d => (d.data().eventId || 'legacy') === event.id).length,
+  };
   if (!completions.empty && targetUid === auth.uid) {
     throw new HttpsError('failed-precondition',
       'You have already verified visits on this board, so it cannot be rerolled. Ask the Chamber if you need a new one.');
   }
 
-  const board = await buildBoard(targetUid, profile);
-  await db().collection('boards').doc(targetUid).set(board);
+  const board = await buildBoard(targetUid, profile, event);
+  await db().collection('boards').doc(boardId).set(board);
 
   if (targetUid !== auth.uid) {
     await writeAudit({

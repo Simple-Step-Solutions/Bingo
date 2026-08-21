@@ -138,6 +138,33 @@ export const adminGlobalReset = call<
   { ok: true; users: number; completions: number; boards: number }
 >('adminGlobalReset');
 
+// --- Events -----------------------------------------------------------------
+
+export const createEvent = call<
+  { name: string; startsAt?: string | null; endsAt?: string | null; boardSize?: number; difficulty?: number },
+  { ok: true; eventId: string }
+>('createEvent');
+
+export const updateEvent = call<
+  Record<string, unknown> & { eventId: string },
+  { ok: true }
+>('updateEvent');
+
+export const setActiveEvent = call<
+  { eventId: string; archivePrevious?: boolean },
+  { ok: true; previousEventId: string | null }
+>('setActiveEvent');
+
+export const migrateToEvents = call<
+  Record<string, never>,
+  { ok: true; migrated: boolean; eventId: string; reason?: string; counts?: Record<string, number> }
+>('migrateToEvents');
+
+export const getActiveEventInfo = call<
+  Record<string, never>,
+  { id: string; name: string; status: string; startsAt: string | null; endsAt: string | null; synthetic: boolean }
+>('getActiveEventInfo');
+
 export interface SuspicionFlag {
   type: 'impossible_travel' | 'burst' | 'no_app_check' | 'near_geofence_boundary' | 'shared_ip';
   userId?: string;

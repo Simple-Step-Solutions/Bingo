@@ -58,9 +58,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, settings
   const [boardLoaded, setBoardLoaded] = useState(false);
   const ensuringRef = useRef(false);
 
+  // Board ids are scoped to the event, so a new season gives every player a
+  // fresh board without destroying last season's. Before the migration has run
+  // there is no activeEventId and boards keep their bare uid key.
+  const boardDocId = settings?.activeEventId ? `${settings.activeEventId}_${user.uid}` : user.uid;
+
   useEffect(() => {
     const unsub = onSnapshot(
-      doc(db, 'boards', user.uid),
+      doc(db, 'boards', boardDocId),
       (snap) => {
         if (snap.exists()) {
           const d = snap.data();
@@ -77,7 +82,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, settings
       (err) => { console.error('Board snapshot error:', err); setBoardLoaded(true); },
     );
     return unsub;
-  }, [user.uid]);
+  }, [boardDocId]);
 
   // Ask the server for a board once, when there genuinely is not one.
   useEffect(() => {
@@ -122,7 +127,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, settings
     const unsubscribeCompletions = onSnapshot(
       query(collection(db, 'completions'), where('userId', '==', user.uid)),
       (snapshot) => {
-        setCompletions(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Completion)));
+        const all = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Completion));
+        // A completion from a previous season must not mark a square on this
+        // season's board.
+        const activeId = settings?.activeEventId;
+        setCompletions(activeId ? all.filter(c => (c.eventId || null) === activeId) : all);
         setLoading(false);
       },
       (err) => { console.error('Completions snapshot error:', err); setLoading(false); }
@@ -131,7 +140,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, settings
       unsubscribeCompletions();
       if (qrScannerRef.current) qrScannerRef.current.stop().catch(console.error);
     };
-  }, [user.uid]);
+  }, [user.uid, settings?.activeEventId]);
 
   // The QR callback fires at 10fps for as long as the code stays in frame.
   // setVerifying is async, so without a synchronous lock a single scan wrote

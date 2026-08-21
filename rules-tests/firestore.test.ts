@@ -98,8 +98,23 @@ beforeEach(async () => {
     });
     await setDoc(doc(db, 'code_index/deadbeef'), { businessId: 'bizA', active: true });
 
+    // Pre-event board, keyed by uid alone.
     await setDoc(doc(db, 'boards/player1'), {
-      cells: ['bizA', 'bizB', 'FREE'], size: 3, town: 'Yorktown',
+      cells: ['bizA', 'bizB', 'FREE'], size: 3, town: 'Yorktown', userId: 'player1',
+    });
+    // Event-scoped board: ownership lives in the document, not the id.
+    await setDoc(doc(db, 'boards/evt1_player2'), {
+      cells: ['bizB', 'bizA', 'FREE'], size: 3, town: 'Yorktown',
+      userId: 'player2', eventId: 'evt1',
+    });
+
+    await setDoc(doc(db, 'events/evt1'), {
+      name: 'Fall Bingo 2026', status: 'active',
+      startsAt: null, endsAt: null, boardSize: 3, difficulty: 50,
+    });
+    await setDoc(doc(db, 'events/evt0'), {
+      name: 'Spring Bingo 2026', status: 'archived',
+      startsAt: null, endsAt: null, boardSize: 3, difficulty: 50,
     });
 
     await setDoc(doc(db, 'completions/player1_bizA'), {
@@ -111,6 +126,9 @@ beforeEach(async () => {
 
     await setDoc(doc(db, 'wins/player1'), {
       userId: 'player1', userName: 'Player One', redeemed: false,
+    });
+    await setDoc(doc(db, 'wins/evt1_player2'), {
+      userId: 'player2', userName: 'Player Two', redeemed: false, eventId: 'evt1',
     });
     await setDoc(doc(db, 'verification_attempts/a1'), {
       uid: 'player1', outcome: 'out_of_range', distanceM: 4200,
@@ -667,6 +685,67 @@ describe('unauthenticated access', () => {
     await assertFails(getDoc(doc(db, 'users/player1')));
     await assertFails(getDoc(doc(db, 'boards/player1')));
     await assertFails(getDoc(doc(db, 'business_secrets/bizA')));
+  });
+});
+
+describe('events', () => {
+  test('any player can read the event, so the app can explain itself', async () => {
+    // "The game opens on Saturday" is a far better answer at a shop counter
+    // than a scan that fails with nothing.
+    const db = authed('player1');
+    await assertSucceeds(getDoc(doc(db, 'events/evt1')));
+    await assertSucceeds(getDocs(collection(db, 'events')));
+  });
+
+  test('nobody can write an event, not even an admin', async () => {
+    // The window is what gates verification, so it moves through callables.
+    for (const uid of ['player1', 'chamber1', 'admin1']) {
+      const db = authed(uid);
+      await assertFails(setDoc(doc(db, 'events/evt1'), { status: 'active' }, { merge: true }));
+      await assertFails(addDoc(collection(db, 'events'), { name: 'Mine', status: 'active' }));
+    }
+  });
+
+  test('a player cannot reopen a closed event to keep scanning', async () => {
+    const db = authed('player1');
+    await assertFails(updateDoc(doc(db, 'events/evt0'), { status: 'active' }));
+    await assertFails(setDoc(doc(db, 'settings/global'), { activeEventId: 'evt0' }, { merge: true }));
+  });
+});
+
+describe('event-scoped board and win ids', () => {
+  test('a player can read their event-scoped board', async () => {
+    // The id is evt1_player2, so ownership has to come from the document.
+    const db = authed('player2');
+    await assertSucceeds(getDoc(doc(db, 'boards/evt1_player2')));
+  });
+
+  test('a player cannot read someone else event-scoped board', async () => {
+    const db = authed('player1');
+    await assertFails(getDoc(doc(db, 'boards/evt1_player2')));
+  });
+
+  test('a player still cannot write an event-scoped board', async () => {
+    const db = authed('player2');
+    await assertFails(setDoc(doc(db, 'boards/evt1_player2'), {
+      cells: ['bizA', 'bizA', 'FREE'], size: 3, userId: 'player2', eventId: 'evt1',
+    }));
+  });
+
+  test('a player cannot forge a board by claiming an id that is not theirs', async () => {
+    const db = authed('player1');
+    await assertFails(setDoc(doc(db, 'boards/evt1_player1'), {
+      cells: ['bizA', 'bizA', 'FREE'], size: 3, userId: 'player1', eventId: 'evt1',
+    }));
+  });
+
+  test('event-scoped wins follow the same ownership rule', async () => {
+    const owner = authed('player2');
+    await assertSucceeds(getDoc(doc(owner, 'wins/evt1_player2')));
+
+    const other = authed('player1');
+    await assertFails(getDoc(doc(other, 'wins/evt1_player2')));
+    await assertFails(setDoc(doc(other, 'wins/evt1_player1'), { userId: 'player1' }));
   });
 });
 
