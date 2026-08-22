@@ -27,6 +27,10 @@ const { consume } = require('./lib/ratelimit');
 
 const INVITE_TTL_HOURS = 48;
 
+// The default only pre-fills the interactive prompt. firebase-tools checks the
+// dotenv files first and, under --non-interactive, fails on any param missing
+// from them before it ever reads this default -- so the real value has to live
+// in functions/.env.sss-hvgcc-bingo, and does.
 const ADMIN_EMAIL = defineString('BOOTSTRAP_ADMIN_EMAIL', {
   default: 'logan@simplestepsolutions.com',
 });
