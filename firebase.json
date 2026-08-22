@@ -42,13 +42,11 @@
       }
     ]
   },
-  "firestore": [
-    {
-      "database": "ai-studio-b22a3d46-2072-4ec8-b7cc-b2370d5fdd10",
-      "rules": "firestore.rules",
-      "indexes": "firestore.indexes.json"
-    }
-  ],
+  "firestore": {
+    "database": "ai-studio-b22a3d46-2072-4ec8-b7cc-b2370d5fdd10",
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
   "storage": {
     "rules": "storage.rules"
   },
