@@ -1,21 +1,14 @@
 const { onDocumentCreated, onDocumentWritten } = require('firebase-functions/v2/firestore');
-const { defineString } = require('firebase-functions/params');
 const logger = require('firebase-functions/logger');
 const { initializeApp } = require('firebase-admin/app');
-const { getFirestore } = require('firebase-admin/firestore');
 const { getMessaging } = require('firebase-admin/messaging');
 const { getAuth } = require('firebase-admin/auth');
 
 initializeApp();
 
-// The app runs on a NAMED database. getFirestore() with no argument reads and
-// writes an empty (default) database with no error and no log, so every
-// function here must pass databaseId.
-//
-// No default value, on purpose: a default of '(default)' turns a missing param
-// into exactly that silent empty-database deploy. Failing the deploy is
-// enormously preferable.
-const databaseId = defineString('FIRESTORE_DATABASE_ID');
+// initializeApp() must run before anything calls getFirestore, so lib/db is
+// required after it rather than at the top of the file.
+const { databaseId, db: firestore } = require('./lib/db');
 
 const TYPE_TITLES = {
   info: 'Chamber Bingo',
@@ -32,7 +25,7 @@ exports.sendPushOnNotification = onDocumentCreated({
   const notification = event.data.data();
   if (!notification) return;
 
-  const db = getFirestore(databaseId.value());
+  const db = firestore();
   const messaging = getMessaging();
 
   const title = TYPE_TITLES[notification.type] || 'Chamber Bingo';
@@ -179,3 +172,47 @@ exports.syncRoleClaims = onDocumentWritten({
     previousRole: existing.role || 'player',
   });
 });
+
+// =====================================================================
+// Callables (Phase 2b-2d)
+//
+// Re-exported here because firebase.json points at index.js. Each module keeps
+// its own concern: visits.js is the game loop, boards.js owns board generation,
+// businessCodes.js owns the code/secret/index split.
+//
+// Every one of them gets its Firestore handle from lib/db, which pins the named
+// database. A callable that calls getFirestore() directly reads an empty
+// (default) database and returns cheerful, wrong answers.
+// =====================================================================
+
+const visits = require('./visits');
+const boards = require('./boards');
+const businessCodes = require('./businessCodes');
+
+exports.verifyVisit = visits.verifyVisit;
+exports.adminGrantCompletion = visits.adminGrantCompletion;
+
+exports.ensureBoard = boards.ensureBoard;
+exports.regenerateBoard = boards.regenerateBoard;
+
+exports.provisionBusinessCode = businessCodes.provisionBusinessCode;
+exports.rotateAllCodes = businessCodes.rotateAllCodes;
+exports.setBusinessNfc = businessCodes.setBusinessNfc;
+
+// Invites, business claiming, admin bootstrap (Phase 2e)
+const invites = require('./invites');
+
+exports.createInvite = invites.createInvite;
+exports.peekInvite = invites.peekInvite;
+exports.redeemInvite = invites.redeemInvite;
+exports.revokeInvite = invites.revokeInvite;
+exports.claimBusiness = invites.claimBusiness;
+exports.bootstrapAdmin = invites.bootstrapAdmin;
+
+// Role administration, raffle draw, win redemption, cheat review
+const admin = require('./admin');
+
+exports.setUserRole = admin.setUserRole;
+exports.drawRaffleWinner = admin.drawRaffleWinner;
+exports.redeemWin = admin.redeemWin;
+exports.reviewSuspiciousActivity = admin.reviewSuspiciousActivity;
