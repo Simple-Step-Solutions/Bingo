@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { collection, onSnapshot, query, orderBy, limit } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { Business, UserProfile, Invite } from '../../types';
-import { createInvite } from '../../services/inviteService';
-import { Link2, Copy, Check, Loader2, ExternalLink } from 'lucide-react';
+import { createInvite, revokeInvite, errorMessage, isExpectedError } from '../../services/api';
+import { Link2, Copy, Check, Loader2, Ban } from 'lucide-react';
 
 interface InviteManagerProps {
   businesses: Business[];
@@ -11,14 +11,20 @@ interface InviteManagerProps {
 }
 
 export const InviteManager: React.FC<InviteManagerProps> = ({ businesses, currentUser }) => {
+  // Chamber invites are admin-only on the server: a chamber account that can
+  // mint more chamber accounts is a root of trust for the whole system. Hide
+  // the option rather than letting the request fail with permission-denied.
+  const canInviteChamber = currentUser.role === 'admin';
+
   const [role, setRole] = useState<'chamber' | 'business' | 'player'>('player');
   const [businessId, setBusinessId] = useState('');
   const [emailHint, setEmailHint] = useState('');
   const [loading, setLoading] = useState(false);
   const [generatedToken, setGeneratedToken] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-  const [copiedId, setCopiedId] = useState<string | null>(null);
   const [invites, setInvites] = useState<Invite[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [revoking, setRevoking] = useState<string | null>(null);
 
   useEffect(() => {
     const q = query(collection(db, 'invites'), orderBy('createdAt', 'desc'), limit(10));
@@ -30,21 +36,37 @@ export const InviteManager: React.FC<InviteManagerProps> = ({ businesses, curren
 
   const handleGenerate = async () => {
     setLoading(true);
+    setError(null);
     setGeneratedToken(null);
     try {
       const selectedBusiness = businesses.find(b => b.id === businessId);
-      const token = await createInvite(
-        currentUser.uid,
+      const res = await createInvite({
         role,
-        role === 'business' ? businessId || undefined : undefined,
-        role === 'business' ? selectedBusiness?.name : undefined,
-        emailHint.trim() || undefined
-      );
-      setGeneratedToken(token);
+        ...(role === 'business' && businessId ? { businessId } : {}),
+        ...(role === 'business' && selectedBusiness ? { businessName: selectedBusiness.name } : {}),
+        ...(emailHint.trim() ? { emailHint: emailHint.trim() } : {}),
+      });
+      // The only moment this token exists in readable form. It is stored as a
+      // hash, so if this link is lost the invite has to be reissued.
+      setGeneratedToken(res.token);
     } catch (err) {
-      console.error('Error creating invite:', err);
+      if (!isExpectedError(err)) console.error('createInvite failed:', err);
+      setError(errorMessage(err, 'Could not create that invite.'));
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleRevoke = async (inviteId: string) => {
+    setRevoking(inviteId);
+    setError(null);
+    try {
+      await revokeInvite({ inviteId });
+    } catch (err) {
+      if (!isExpectedError(err)) console.error('revokeInvite failed:', err);
+      setError(errorMessage(err, 'Could not revoke that invite.'));
+    } finally {
+      setRevoking(null);
     }
   };
 
@@ -59,14 +81,16 @@ export const InviteManager: React.FC<InviteManagerProps> = ({ businesses, curren
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const getInviteStatus = (invite: Invite): 'used' | 'expired' | 'pending' => {
+  const getInviteStatus = (invite: Invite): 'used' | 'revoked' | 'expired' | 'pending' => {
     if (invite.used) return 'used';
+    if (invite.revoked) return 'revoked';
     if (new Date(invite.expiresAt) < new Date()) return 'expired';
     return 'pending';
   };
 
   const statusStyles: Record<string, string> = {
     used: 'bg-green-50 text-green-700',
+    revoked: 'bg-red-50 text-red-600',
     expired: 'bg-neutral-100 text-neutral-400',
     pending: 'bg-yellow-50 text-yellow-700',
   };
@@ -86,6 +110,12 @@ export const InviteManager: React.FC<InviteManagerProps> = ({ businesses, curren
         <h3 className="font-bold uppercase tracking-widest text-xs text-neutral-400">Invite Users</h3>
       </div>
 
+      {error && (
+        <div role="alert" className="mb-4 bg-red-50 border border-red-200 rounded-2xl px-4 py-3">
+          <p className="text-red-600 text-xs font-bold">{error}</p>
+        </div>
+      )}
+
       <div className="space-y-4 mb-6">
         <div>
           <label className="block text-[10px] font-bold uppercase tracking-widest text-neutral-400 mb-2">Role</label>
@@ -95,7 +125,7 @@ export const InviteManager: React.FC<InviteManagerProps> = ({ businesses, curren
             className="w-full border border-neutral-200 rounded-xl px-4 py-3 text-sm font-medium bg-neutral-50 outline-none focus:ring-2 focus:ring-neutral-900 transition-all"
           >
             <option value="player">Player</option>
-            <option value="chamber">Chamber Staff</option>
+            {canInviteChamber && <option value="chamber">Chamber Staff</option>}
             <option value="business">Business Owner</option>
           </select>
         </div>
@@ -139,7 +169,10 @@ export const InviteManager: React.FC<InviteManagerProps> = ({ businesses, curren
 
       {inviteUrl && (
         <div className="mb-8 bg-neutral-50 border border-neutral-200 rounded-2xl p-4">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-neutral-400 mb-3">Shareable Link</p>
+          <p className="text-[10px] font-bold uppercase tracking-widest text-neutral-400 mb-1">Shareable Link</p>
+          <p className="text-[10px] text-neutral-500 mb-3 leading-relaxed">
+            Copy this now. Invites are stored hashed, so this link cannot be shown again.
+          </p>
           <div className="flex items-start gap-3">
             <p className="font-mono text-sm break-all text-neutral-700 flex-1 leading-relaxed">{inviteUrl}</p>
             <button
@@ -164,8 +197,6 @@ export const InviteManager: React.FC<InviteManagerProps> = ({ businesses, curren
             {invites.map(invite => {
               const status = getInviteStatus(invite);
               const expires = new Date(invite.expiresAt);
-              const url = `${window.location.origin}/?invite=${invite.token}`;
-              const isCopied = copiedId === invite.id;
               return (
                 <div
                   key={invite.id}
@@ -186,27 +217,24 @@ export const InviteManager: React.FC<InviteManagerProps> = ({ businesses, curren
                     <span className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-widest shrink-0 ${statusStyles[status]}`}>
                       {status}
                     </span>
-                    <span className="text-[9px] text-neutral-300 font-medium shrink-0">
+                    <span className="text-[9px] text-neutral-500 font-medium shrink-0">
                       {status === 'used'
                         ? `Used ${invite.usedAt ? new Date(invite.usedAt).toLocaleDateString() : ''}`
                         : `Expires ${expires.toLocaleDateString()}`}
                     </span>
                   </div>
-                  <button
-                    onClick={async () => {
-                      await navigator.clipboard.writeText(url);
-                      setCopiedId(invite.id);
-                      setTimeout(() => setCopiedId(null), 2000);
-                    }}
-                    className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-widest transition-all ${
-                      isCopied
-                        ? 'bg-green-50 text-green-700 border border-green-200'
-                        : 'bg-white border border-neutral-200 text-neutral-600 hover:border-neutral-900'
-                    }`}
-                  >
-                    {isCopied ? <Check size={11} /> : <Copy size={11} />}
-                    {isCopied ? 'Copied!' : 'Copy'}
-                  </button>
+                  {status === 'pending' && (
+                    <button
+                      onClick={() => handleRevoke(invite.id)}
+                      disabled={revoking === invite.id}
+                      className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-widest bg-white border border-neutral-200 text-neutral-600 hover:border-red-500 hover:text-red-600 transition-all disabled:opacity-50"
+                    >
+                      {revoking === invite.id
+                        ? <Loader2 size={11} className="animate-spin" aria-hidden="true" />
+                        : <Ban size={11} aria-hidden="true" />}
+                      Revoke
+                    </button>
+                  )}
                 </div>
               );
             })}

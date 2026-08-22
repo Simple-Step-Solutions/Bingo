@@ -216,3 +216,14 @@ exports.setUserRole = admin.setUserRole;
 exports.drawRaffleWinner = admin.drawRaffleWinner;
 exports.redeemWin = admin.redeemWin;
 exports.reviewSuspiciousActivity = admin.reviewSuspiciousActivity;
+exports.adminResetUser = admin.adminResetUser;
+exports.adminGlobalReset = admin.adminGlobalReset;
+
+// Events / seasons (Phase 4)
+const events = require('./events');
+
+exports.createEvent = events.createEvent;
+exports.updateEvent = events.updateEvent;
+exports.setActiveEvent = events.setActiveEvent;
+exports.migrateToEvents = events.migrateToEvents;
+exports.getActiveEventInfo = events.getActiveEventInfo;

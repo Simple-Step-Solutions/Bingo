@@ -2,14 +2,13 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { doc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
-import { Town, AppSettings, Business, UserProfile } from '../types';
-import { generateBingoBoard } from '../services/bingoService';
+import { ensureBoard, errorMessage, isExpectedError } from '../services/api';
+import { Town, AppSettings, UserProfile } from '../types';
 import { MapPin, QrCode, Trophy, Store, ChevronRight, CheckCircle2 } from 'lucide-react';
 
 interface OnboardingProps {
   user: UserProfile;
   towns: Town[];
-  businesses: Business[];
   settings: AppSettings;
   onComplete: () => void;
 }
@@ -17,9 +16,10 @@ interface OnboardingProps {
 const STEPS = ['welcome', 'howtoplay', 'town'] as const;
 type Step = typeof STEPS[number];
 
-export const Onboarding: React.FC<OnboardingProps> = ({ user, towns, businesses, settings, onComplete }) => {
+export const Onboarding: React.FC<OnboardingProps> = ({ user, towns, settings, onComplete }) => {
   const [step, setStep] = useState<Step>('welcome');
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const currentIndex = STEPS.indexOf(step);
 
@@ -30,23 +30,41 @@ export const Onboarding: React.FC<OnboardingProps> = ({ user, towns, businesses,
 
   const selectTown = async (townName: string) => {
     setSaving(true);
+    setError(null);
     try {
-      const newBoard = generateBingoBoard(businesses, settings, townName);
+      // The town has to land before the board is asked for, because the server
+      // reads it to decide which businesses are local.
       await setDoc(doc(db, 'users', user.uid), {
         town: townName,
-        bingoBoard: newBoard,
-        boardSize: settings.boardSize || 3,
         onboardingComplete: true,
       }, { merge: true });
+
+      // Boards are generated server-side now. Writing bingoBoard from here
+      // would be ignored: the game reads boards/{uid}, which no client can
+      // write, so a locally generated board would simply never appear.
+      await ensureBoard({});
       onComplete();
     } catch (err) {
-      console.error('Error completing onboarding:', err);
+      // This used to only console.log, leaving the button dead and the player
+      // stuck on the town step with no idea what had happened.
+      if (!isExpectedError(err)) console.error('Onboarding failed:', err);
+      setError(errorMessage(err, 'Could not set up your board. Check your connection and try again.'));
       setSaving(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-neutral-900/95 backdrop-blur-xl overflow-y-auto">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Welcome to Chamber Bingo"
+      className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-neutral-900/95 backdrop-blur-xl overflow-y-auto"
+    >
+      {error && (
+        <div role="alert" className="fixed top-6 inset-x-6 z-[81] bg-red-50 border border-red-200 rounded-2xl px-4 py-3 max-w-md mx-auto">
+          <p className="text-red-600 text-xs font-bold">{error}</p>
+        </div>
+      )}
       <AnimatePresence mode="wait">
 
         {step === 'welcome' && (
@@ -186,7 +204,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ user, towns, businesses,
                     className="w-full p-5 rounded-2xl border-2 border-neutral-100 hover:border-[var(--color-primary)] hover:bg-[var(--color-primary)]/5 transition-all font-bold text-sm flex items-center justify-between group disabled:opacity-50"
                   >
                     <span>{town.name}</span>
-                    <ChevronRight size={16} className="text-neutral-300 group-hover:text-[var(--color-primary)] transition-colors" />
+                    <ChevronRight size={16} className="text-neutral-500 group-hover:text-[var(--color-primary)] transition-colors" />
                   </button>
                 )) : (
                   <div className="p-8 bg-neutral-50 rounded-2xl border border-dashed border-neutral-200 text-center">
@@ -196,11 +214,30 @@ export const Onboarding: React.FC<OnboardingProps> = ({ user, towns, businesses,
               </div>
 
               <div className="flex items-start gap-3 p-4 bg-amber-50 rounded-2xl border border-amber-100">
-                <CheckCircle2 size={16} className="text-amber-500 shrink-0 mt-0.5" />
+                <CheckCircle2 size={16} className="text-amber-500 shrink-0 mt-0.5" aria-hidden="true" />
                 <p className="text-[10px] text-amber-700 font-bold uppercase tracking-widest leading-relaxed">
                   Your town selection is permanent. Your board will be filled with businesses from that area.
                 </p>
               </div>
+
+              {/*
+                The app collects a consumer's email and their continuous
+                location, and shows a live player map to chamber staff. Saying
+                so before they commit is the minimum, and it is far cheaper to
+                say it here than to explain it after someone notices.
+              */}
+              <p className="text-[11px] text-neutral-500 leading-relaxed mt-6 text-center">
+                By continuing you agree that the Chamber can see your name, email,
+                visits, and location while you play.{' '}
+                <a
+                  href="/privacy"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-bold text-[var(--color-primary)] underline underline-offset-2"
+                >
+                  What we collect
+                </a>
+              </p>
             </div>
           </motion.div>
         )}

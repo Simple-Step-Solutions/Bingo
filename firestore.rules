@@ -3,13 +3,22 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // ===============================================================
-    // PHASE 1 HARDENING (rules-only hotfix).
+    // PHASE 2 RULES
     //
-    // Role is still read from users/{uid}.role. Phase 2 replaces this
-    // with custom claims and moves writes behind callable functions.
-    // Until then the critical change is: a user can no longer assign
-    // themselves any role other than 'player'. Business and chamber
-    // accounts are promoted by an admin from the admin panel.
+    // Roles come from a custom claim that the syncRoleClaims trigger
+    // projects from users/{uid}.role. Rules read the claim; the
+    // document remains the human-editable source of truth.
+    //
+    // DUAL TRUST, deliberately. Every role helper accepts the claim OR
+    // the document. The PWA caches its own JavaScript, so during the
+    // overlap there are users signed in with tokens minted before the
+    // trigger existed. Dropping the document fallback before those
+    // tokens have all rotated would lock chamber staff out of the
+    // admin panel. Step 8 of the rollout removes the fallback.
+    //
+    // Anything genuinely dangerous is NOT defended here. It lives in a
+    // callable, which can check tokensValidAfterTime and therefore does
+    // not inherit the up-to-an-hour demotion lag that rules do.
     // ===============================================================
 
     // --------------------------- Helpers ---------------------------
@@ -18,6 +27,18 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    // Custom claim path. Zero reads. An absent claim means 'player',
+    // which is why existing players needed no backfill.
+    function claimRole() {
+      return request.auth.token.get('role', 'player');
+    }
+
+    function claimBusinessId() {
+      return request.auth.token.get('bid', '');
+    }
+
+    // Document path, kept only for the overlap. Costs a get() per
+    // evaluation, which is why the claim is checked first everywhere.
     function userDoc() {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
     }
@@ -31,24 +52,24 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      return isAuthenticated() && (
-        docRole() == 'admin' ||
-        // Bootstrap admin. Removed in Phase 2 in favour of a callable.
-        (request.auth.token.email == "logan@simplestepsolutions.com" &&
-         request.auth.token.email_verified == true)
-      );
+      return isAuthenticated() && (claimRole() == 'admin' || docRole() == 'admin');
     }
 
     function isChamber() {
-      return isAuthenticated() && (isAdmin() || docRole() == 'chamber');
+      return isAuthenticated() && (
+        claimRole() == 'chamber' || claimRole() == 'admin'
+        || docRole() == 'chamber' || docRole() == 'admin'
+      );
     }
 
     function isBusinessRole() {
-      return isAuthenticated() && docRole() == 'business';
+      return isAuthenticated() && (claimRole() == 'business' || docRole() == 'business');
     }
 
     function callerBusinessId() {
-      return userExists() ? userDoc().get('businessId', '') : '';
+      return claimBusinessId() != ''
+        ? claimBusinessId()
+        : (userExists() ? userDoc().get('businessId', '') : '');
     }
 
     function affected() {
@@ -56,8 +77,12 @@ service cloud.firestore {
     }
 
     // Fields a user may change on their own profile. Deliberately
-    // excludes role and businessId. bingoBoard and boardSize remain
-    // here only until Phase 2 moves boards to boards/{uid}.
+    // excludes role, businessId, and email.
+    //
+    // bingoBoard and boardSize are still here because a client running
+    // a cached bundle may still write them. They are ignored: the game
+    // reads boards/{uid}, which no client can write. They come out in
+    // step 8 along with the document fallback.
     function selfEditableKeys() {
       return ['displayName', 'town', 'currentLocation', 'lastActive', 'lastReadAt',
               'fcmTokens', 'onboardingComplete', 'tourCompleted', 'roleSelected',
@@ -65,10 +90,10 @@ service cloud.firestore {
     }
 
     // Fields chamber staff may override on another profile.
-    // Never role and never email.
+    // Never role, never email, never businessId -- businessId now
+    // implies a claim, so it has to move through setUserRole.
     function chamberEditableKeys() {
-      return ['town', 'bingoBoard', 'boardSize', 'onboardingComplete',
-              'tourCompleted', 'businessId'];
+      return ['town', 'bingoBoard', 'boardSize', 'onboardingComplete', 'tourCompleted'];
     }
 
     // ===============================================================
@@ -95,35 +120,36 @@ service cloud.firestore {
         //    it cannot change through this branch at all.
         (request.auth.uid == userId && affected().hasOnly(selfEditableKeys()))
 
-        // 2. Self, first-time role selection. Locked to player.
-        //    Business and chamber promotion goes through an admin until
-        //    the redeemInvite callable lands in Phase 2.
+        // 2. Self, first-time role selection, locked to player. Business
+        //    and chamber promotion happens inside redeemInvite, which
+        //    writes with the Admin SDK and bypasses these rules.
         || (request.auth.uid == userId
             && affected().hasOnly(selfEditableKeys().concat(['role']))
             && resource.data.get('roleSelected', true) == false
             && request.resource.data.get('roleSelected', false) == true
             && request.resource.data.role == 'player')
 
-        // 3. Chamber overrides for resets and business linking.
+        // 3. Chamber overrides for resets. No role, no businessId.
         || (isChamber() && affected().hasOnly(chamberEditableKeys()))
-
-        // 4. Admin. Phase 2 moves role changes to a callable so the
-        //    document and the custom claim cannot drift apart.
-        || isAdmin()
       );
 
+      // Admin is NOT a blanket update branch any more. Role changes go
+      // through setUserRole so the document and the claim cannot drift
+      // apart, and so a demotion can revoke refresh tokens.
       allow delete: if isAdmin();
     }
 
     // ===============================================================
     // Businesses / Towns / Settings / Winners
-    // Read by any authenticated user, written by chamber staff.
-    // Phase 2 splits qrCode and nfcId out of businesses.
     // ===============================================================
 
     match /businesses/{businessId} {
-      allow read:  if isAuthenticated();
-      allow write: if isChamber();
+      allow read: if isAuthenticated();
+
+      // qrCode and nfcId must never come back. They are what made every
+      // code in the game derivable from a player's own board.
+      allow write: if isChamber()
+        && !request.resource.data.keys().hasAny(['qrCode', 'nfcId']);
     }
 
     match /towns/{townId} {
@@ -142,10 +168,67 @@ service cloud.firestore {
     }
 
     // ===============================================================
+    // Business secrets and the code index
+    //
+    // The split that makes codes unguessable. Secrets are readable by
+    // the chamber and the owning business, and by nobody else. The
+    // index is readable by nobody at all: it is the hash -> business
+    // map, and being able to read it would defeat the hashing.
+    //
+    // Both are written exclusively by the Admin SDK.
+    // ===============================================================
+
+    match /business_secrets/{businessId} {
+      allow get: if isChamber()
+        || (isBusinessRole() && callerBusinessId() == businessId);
+      allow list, write: if false;
+    }
+
+    match /code_index/{codeHash} {
+      allow read, write: if false;
+    }
+
+    // ===============================================================
+    // Boards
+    //
+    // Read your own, or chamber for support. Written only by
+    // ensureBoard and regenerateBoard. A player who can rewrite their
+    // board picks nine businesses in one strip mall and wins in ten
+    // minutes without leaving the parking lot.
+    // ===============================================================
+
+    match /boards/{boardId} {
+      // Board ids are scoped to the event ({eventId}_{uid}), so ownership comes
+      // from the document rather than the id. Pre-event boards are keyed by uid
+      // alone, hence the second clause.
+      allow get: if isAuthenticated() && (
+        resource.data.get('userId', '') == request.auth.uid
+        || boardId == request.auth.uid
+        || isChamber()
+      );
+      allow list: if isChamber();
+      allow write: if false;
+    }
+
+    // ===============================================================
+    // Events
+    //
+    // Readable so the app can say "the game opens on Saturday" rather than
+    // failing a scan with no explanation. Written only by callables, because
+    // the window is what actually gates verification.
+    // ===============================================================
+
+    match /events/{eventId} {
+      allow read:  if isAuthenticated();
+      allow write: if false;
+    }
+
+    // ===============================================================
     // Completions
-    // Previously any authenticated user could list the whole
-    // collection. Now: your own, your linked business, or chamber.
-    // Phase 2 replaces create with the verifyVisit callable.
+    //
+    // create and update are closed entirely: verifyVisit is the only
+    // way a completion comes into existence, which is what makes the
+    // geofence and the duplicate check unskippable.
     // ===============================================================
 
     match /completions/{completionId} {
@@ -159,16 +242,35 @@ service cloud.firestore {
         || (isAuthenticated() && resource.data.userId == request.auth.uid)
         || (isBusinessRole() && resource.data.businessId == callerBusinessId());
 
-      allow create: if isAuthenticated()
-        && (request.resource.data.userId == request.auth.uid || isChamber());
-      allow update: if isAdmin();
+      allow create, update: if false;
       allow delete: if isChamber();
     }
 
     // ===============================================================
+    // Wins and verification attempts
+    //
+    // Both are server-written evidence. A player may see their own win
+    // so the app can show the fanfare; nobody may write either.
+    // ===============================================================
+
+    match /wins/{winId} {
+      // Same story as boards: ids are event-scoped, ownership is in the data.
+      allow get: if isAuthenticated() && (
+        resource.data.get('userId', '') == request.auth.uid
+        || winId == request.auth.uid
+        || isChamber()
+      );
+      allow list: if isChamber();
+      allow write: if false;
+    }
+
+    match /verification_attempts/{attemptId} {
+      allow read:  if isChamber();
+      allow write: if false;
+    }
+
+    // ===============================================================
     // Raffle Entries
-    // Previously any authenticated user could list every entry,
-    // which exposed userName and userEmail for every participant.
     // ===============================================================
 
     match /raffle_entries/{entryId} {
@@ -183,7 +285,6 @@ service cloud.firestore {
 
     // ===============================================================
     // Activities
-    // Orphaned by commit 6fa0a3a. Removed entirely in Phase 3.
     // ===============================================================
 
     match /activities/{activityId} {
@@ -207,7 +308,8 @@ service cloud.firestore {
 
     // ===============================================================
     // Audit Log
-    // Append-only, and the actor can no longer be forged.
+    // Append-only, and the actor can no longer be forged. Server-side
+    // entries are written with the Admin SDK and skip these rules.
     // ===============================================================
 
     match /audit_log/{logId} {
@@ -218,17 +320,25 @@ service cloud.firestore {
 
     // ===============================================================
     // Invites
-    // Previously listable and updatable by every authenticated user,
-    // which leaked every token and allowed replaying a spent chamber
-    // invite. Players now have no access at all. Redemption moves to
-    // the redeemInvite callable in Phase 2.
+    //
+    // Documents are keyed by sha256(token) and carry no plaintext, so
+    // even a chamber read yields nothing replayable. Players have no
+    // access at all. Creation, redemption and revocation are callables.
     // ===============================================================
 
     match /invites/{inviteId} {
       allow get, list: if isChamber();
-      allow create:    if isChamber();
-      allow update:    if false;
-      allow delete:    if isChamber();
+      allow write:     if false;
+    }
+
+    // ===============================================================
+    // Rate limits
+    // Admin SDK only. Set a TTL policy on expiresAt in the console so
+    // these are reaped rather than accumulating forever.
+    // ===============================================================
+
+    match /rate_limits/{bucketId} {
+      allow read, write: if false;
     }
   }
 }

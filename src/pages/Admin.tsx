@@ -3,12 +3,13 @@ import { useSearchParams } from 'react-router-dom';
 import { UserProfile, Business, Town, RaffleEntry, AppSettings, Completion, Winner, AuditLog } from '../types';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
-import { UserIcon, ShieldCheck, Gamepad2, Settings as SettingsIcon, Loader2, BarChart3, Clock } from 'lucide-react';
+import { UserIcon, ShieldCheck, Gamepad2, Settings as Loader2, BarChart3, Clock, CalendarDays } from 'lucide-react';
 import { AdminMenu } from '../components/admin/AdminMenu';
 import { GameMaster } from '../components/admin/GameMaster';
 import { ChamberManager } from '../components/admin/ChamberManager';
 import { Analytics } from '../components/admin/Analytics';
 import { AuditLogViewer } from '../components/admin/AuditLogViewer';
+import { EventManager } from '../components/admin/EventManager';
 
 interface AdminProps {
   user: UserProfile;
@@ -19,8 +20,8 @@ interface AdminProps {
 
 export const Admin: React.FC<AdminProps> = ({ user, businesses, towns, settings }) => {
   const [searchParams] = useSearchParams();
-  const tabParam = searchParams.get('tab') as 'admin' | 'master' | 'chamber' | 'analytics' | 'audit' | null;
-  const [activeTab, setActiveTab] = useState<'admin' | 'master' | 'chamber' | 'analytics' | 'audit'>(
+  const tabParam = searchParams.get('tab') as 'admin' | 'master' | 'chamber' | 'events' | 'analytics' | 'audit' | null;
+  const [activeTab, setActiveTab] = useState<'admin' | 'master' | 'chamber' | 'events' | 'analytics' | 'audit'>(
     tabParam || (user.role === 'admin' ? 'admin' : 'chamber')
   );
 
@@ -110,6 +111,13 @@ export const Admin: React.FC<AdminProps> = ({ user, businesses, towns, settings 
             <span className="sm:hidden">Chamber</span>
           </button>
           <button
+            onClick={() => setActiveTab('events')}
+            className={`flex items-center gap-2 px-4 md:px-5 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all whitespace-nowrap shrink-0 ${activeTab === 'events' ? 'bg-white shadow-md text-neutral-900' : 'text-neutral-400 hover:text-neutral-600'}`}
+          >
+            <CalendarDays size={14} aria-hidden="true" />
+            <span>Seasons</span>
+          </button>
+          <button
             onClick={() => setActiveTab('analytics')}
             className={`flex items-center gap-2 px-4 md:px-5 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all whitespace-nowrap shrink-0 ${activeTab === 'analytics' ? 'bg-white shadow-md text-neutral-900' : 'text-neutral-400 hover:text-neutral-600'}`}
           >
@@ -133,6 +141,9 @@ export const Admin: React.FC<AdminProps> = ({ user, businesses, towns, settings 
         {activeTab === 'master' && settings && <GameMaster settings={settings} user={user} />}
         {activeTab === 'chamber' && settings && (
           <ChamberManager businesses={businesses} towns={towns} raffleEntries={raffleEntries} winners={winners} settings={settings} currentUser={user} />
+        )}
+        {activeTab === 'events' && settings && (
+          <EventManager settings={settings} currentUser={user} />
         )}
         {activeTab === 'analytics' && settings && (
           <Analytics users={users} completions={completions} businesses={businesses} settings={settings} currentUser={user} />

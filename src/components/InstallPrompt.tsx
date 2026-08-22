@@ -90,7 +90,7 @@ export const InstallPrompt: React.FC<Props> = ({ force = false, onClose }) => {
                   Chamber Bingo works best installed. It opens full screen and keeps
                   your board available when signal is patchy.
                 </p>
-                <ol className="mt-3 space-y-2 text-xs text-neutral-300">
+                <ol className="mt-3 space-y-2 text-xs text-neutral-500">
                   <li className="flex items-center gap-2">
                     <span className="w-5 h-5 rounded-full bg-white/10 flex items-center justify-center text-[10px] font-black shrink-0">1</span>
                     <span className="flex items-center gap-1.5">

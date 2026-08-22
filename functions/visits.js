@@ -8,6 +8,7 @@ const { distanceMeters, validCoords } = require('./lib/geo');
 const { requireVerifiedEmail, requireRole, writeAudit, fingerprint } = require('./lib/guards');
 const { consume } = require('./lib/ratelimit');
 const { checkBingo } = require('./lib/board');
+const { getActiveEvent, eventBlockReason, boardIdFor, completionIdFor } = require('./lib/events');
 
 const GEOFENCE_M = 500;
 
@@ -19,14 +20,25 @@ const GEOFENCE_M = 500;
  * new bundle for a release, because the PWA caches its own JavaScript and a
  * player who has not reopened the app is still running the old one.
  */
-const loadBoard = async (uid) => {
-  const boardSnap = await db().collection('boards').doc(uid).get();
+const loadBoard = async (uid, eventId) => {
+  const boardSnap = await db().collection('boards').doc(boardIdFor(eventId, uid)).get();
   if (boardSnap.exists) {
     const d = boardSnap.data();
     if (Array.isArray(d.cells) && d.cells.length) {
       return { cells: d.cells, size: d.size || Math.sqrt(d.cells.length) };
     }
   }
+  // Pre-event board, from before ids were scoped.
+  if (eventId !== 'legacy') {
+    const legacySnap = await db().collection('boards').doc(uid).get();
+    if (legacySnap.exists) {
+      const d = legacySnap.data();
+      if (Array.isArray(d.cells) && d.cells.length) {
+        return { cells: d.cells, size: d.size || Math.sqrt(d.cells.length) };
+      }
+    }
+  }
+
   const userSnap = await db().collection('users').doc(uid).get();
   const u = userSnap.exists ? userSnap.data() : null;
   if (u && Array.isArray(u.bingoBoard) && u.bingoBoard.length) {
@@ -89,11 +101,15 @@ exports.verifyVisit = onCall(callableOpts({ maxInstances: 40 }), async (request)
 
   const settingsSnap = await db().collection('settings').doc('global').get();
   const settings = settingsSnap.exists ? settingsSnap.data() : {};
-  if (settings.gamePaused === true) {
-    throw new HttpsError('failed-precondition', 'The game is paused by the Chamber right now.');
-  }
 
-  const board = await loadBoard(uid);
+  // The event window replaces the gamePaused boolean, and is enforced here
+  // rather than in the client so an event genuinely stops accepting visits
+  // when it closes instead of relying on every phone having reloaded.
+  const event = await getActiveEvent();
+  const blocked = eventBlockReason(event);
+  if (blocked) throw new HttpsError('failed-precondition', blocked);
+
+  const board = await loadBoard(uid, event.id);
   if (!board) {
     throw new HttpsError('failed-precondition', 'Generate your board before verifying a visit.');
   }
@@ -122,14 +138,18 @@ exports.verifyVisit = onCall(callableOpts({ maxInstances: 40 }), async (request)
   const userSnap = await db().collection('users').doc(uid).get();
   const profile = userSnap.exists ? userSnap.data() : {};
 
-  // Deterministic ID. This is what makes double-completion structurally
-  // impossible: there is no read-then-write window to race, and create() on an
-  // existing document fails atomically.
-  const completionRef = db().collection('completions').doc(`${uid}_${businessId}`);
+  // Deterministic ID, scoped to the event. Within an event this makes
+  // double-completion structurally impossible: there is no read-then-write
+  // window to race, and create() on an existing document fails atomically.
+  // Across events it must differ, or a business visited last season could never
+  // be visited again.
+  const completionRef = db().collection('completions')
+    .doc(completionIdFor(event.id, uid, businessId));
   try {
     await completionRef.create({
       userId: uid,
       businessId,
+      eventId: event.id,
       town: biz.town || null,
       userName: profile.displayName || '',
       timestamp: FieldValue.serverTimestamp(),
@@ -149,19 +169,25 @@ exports.verifyVisit = onCall(callableOpts({ maxInstances: 40 }), async (request)
 
   // Win detection, server-side, recorded. The old flow told the player to show
   // their screen to a chamber official, which is forgeable and left no record.
+  // Scoped to this event: a completion from last spring must not count towards
+  // this season's board.
   const completionsSnap = await db().collection('completions').where('userId', '==', uid).get();
-  const completedIds = completionsSnap.docs.map(d => d.data().businessId);
+  const completedIds = completionsSnap.docs
+    .filter(d => (d.data().eventId || 'legacy') === event.id)
+    .map(d => d.data().businessId);
   const hasBingo = checkBingo(board.cells, completedIds, board.size);
 
   if (hasBingo) {
-    const winRef = db().collection('wins').doc(uid);
+    const winRef = db().collection('wins').doc(
+      event.id === 'legacy' ? uid : `${event.id}_${uid}`);
     try {
       await winRef.create({
         userId: uid,
+        eventId: event.id,
         userName: profile.displayName || '',
         userEmail: profile.email || '',
         completionsCount: completedIds.length,
-        prize: settings.bingoPrize || null,
+        prize: event.bingoPrize || settings.bingoPrize || null,
         redeemed: false,
         timestamp: FieldValue.serverTimestamp(),
         timestampIso: new Date().toISOString(),
@@ -208,11 +234,14 @@ exports.adminGrantCompletion = onCall(callableOpts(), async (request) => {
   const targetSnap = await db().collection('users').doc(userId).get();
   if (!targetSnap.exists) throw new HttpsError('not-found', 'No such player.');
 
-  const ref = db().collection('completions').doc(`${userId}_${businessId}`);
+  const grantEvent = await getActiveEvent();
+  const ref = db().collection('completions')
+    .doc(completionIdFor(grantEvent.id, userId, businessId));
   try {
     await ref.create({
       userId,
       businessId,
+      eventId: grantEvent.id,
       town: bizSnap.data().town || null,
       userName: targetSnap.data().displayName || '',
       timestamp: FieldValue.serverTimestamp(),

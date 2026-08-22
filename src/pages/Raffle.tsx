@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Trophy, Ticket, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { collection, query, where, onSnapshot, addDoc, getDocs, doc } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, addDoc, doc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { UserProfile, AppSettings, RaffleEntry, Completion } from '../types';
 
@@ -112,10 +112,10 @@ export const Raffle: React.FC<RaffleProps> = ({ user }) => {
 
           <div className="flex flex-wrap gap-4 items-center">
             <div className="bg-white/10 px-4 py-2 rounded-full backdrop-blur-sm border border-white/10">
-              <span className="text-xs font-bold uppercase tracking-widest text-neutral-300">Requirement: {requirement} Tasks</span>
+              <span className="text-xs font-bold uppercase tracking-widest text-neutral-500">Requirement: {requirement} Tasks</span>
             </div>
             <div className="bg-white/10 px-4 py-2 rounded-full backdrop-blur-sm border border-white/10">
-              <span className="text-xs font-bold uppercase tracking-widest text-neutral-300">Your Progress: {completions.length}</span>
+              <span className="text-xs font-bold uppercase tracking-widest text-neutral-500">Your Progress: {completions.length}</span>
             </div>
           </div>
         </div>

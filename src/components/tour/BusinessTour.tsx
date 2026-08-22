@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Store, QrCode, Printer, Users, CheckCircle2 } from 'lucide-react';
 import { TourModal, TourStep } from './TourModal';
@@ -55,13 +55,19 @@ export const BusinessTour: React.FC<BusinessTourProps> = ({ businessName, onComp
   const [step, setStep] = useState(0);
   const navigate = useNavigate();
 
-  const steps = businessName
-    ? [{ ...STEPS[0], body: `${businessName} is part of Chamber Bingo. Players will visit you to complete tasks on their bingo board. This is your home base.` }, ...STEPS.slice(1)]
-    : STEPS;
+  // Memoised because this array is otherwise rebuilt on every render, and the
+  // navigate effect below depends on it. Without this, listing it as a
+  // dependency would navigate on every render.
+  const steps = useMemo(
+    () => (businessName
+      ? [{ ...STEPS[0], body: `${businessName} is part of Chamber Bingo. Players will visit you to complete tasks on their bingo board. This is your home base.` }, ...STEPS.slice(1)]
+      : STEPS),
+    [businessName],
+  );
 
   useEffect(() => {
     navigate(steps[step].route);
-  }, [step]);
+  }, [step, steps, navigate]);
 
   const handleDone = () => {
     navigate('/business');

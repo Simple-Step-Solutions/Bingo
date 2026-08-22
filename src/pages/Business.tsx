@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { UserProfile, Business, Completion } from '../types';
-import { collection, onSnapshot, query, where, getDocs, doc, getDoc, setDoc } from 'firebase/firestore';
-import { db } from '../firebase';
-import { Store, Users, CheckCircle2, Loader2, QrCode, Download, MapPin, Printer, Hash, KeyRound } from 'lucide-react';
+import { collection, onSnapshot, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
+import { db, auth } from '../firebase';
+import { claimBusiness, errorMessage, isExpectedError } from '../services/api';
+import { useBusinessSecret } from '../services/secrets';
+import { Store, Users, CheckCircle2, Loader2, Download, MapPin, Printer, Hash, KeyRound } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { svgToDataUrl } from '../lib/utils';
 
@@ -53,7 +55,7 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ user }) =>
 
     const code = doc.createElement('p');
     code.className = 'code';
-    code.textContent = `Manual code: ${business.qrCode}`;
+    code.textContent = `Manual code: ${manualCode}`;
 
     doc.body.append(heading, caption, img, code);
 
@@ -126,11 +128,30 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ user }) =>
     return () => unsubscribe();
   }, [business]);
 
+  // The code is no longer on the business document. It comes from
+  // business_secrets, which only the chamber and this owner can read.
+  //
+  // Declared above the loading early-return on purpose: a hook after a
+  // conditional return runs in a different order once loading flips, which is
+  // exactly the mismatch React refuses to recover from.
+  const { secret, error: secretError } = useBusinessSecret(business?.id);
+  const manualCode = secret?.code ?? '';
+
   if (loading) return (
     <div className="flex items-center justify-center min-h-[60vh]">
       <Loader2 className="animate-spin text-neutral-400" size={32} />
     </div>
   );
+
+  /**
+   * Claiming is server-side now.
+   *
+   * This was a privilege escalation path: codes were CHAMBER_<documentId> and
+   * every document id was readable from the public businesses collection, so
+   * any business-role account could claim any business in the game along with
+   * its visitor list. The server resolves the code from a hash index the client
+   * cannot read, and refuses a business that already has an owner.
+   */
 
   const handleClaim = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -138,22 +159,13 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ user }) =>
     setClaiming(true);
     setClaimError(null);
     try {
-      const code = claimCode.trim();
-      const q = query(collection(db, 'businesses'), where('qrCode', '==', code));
-      const snap = await getDocs(q);
-      if (snap.empty) {
-        setClaimError('No business found with that code. Check the code and try again.');
-        return;
-      }
-      const bizDoc = snap.docs[0];
-      await setDoc(doc(db, 'users', user.uid), {
-        role: 'business',
-        businessId: bizDoc.id,
-        onboardingComplete: true,
-      }, { merge: true });
+      await claimBusiness({ code: claimCode.trim() });
+      // Refresh the token so the new business claim is present before the next
+      // Firestore read runs against it.
+      await auth.currentUser?.getIdToken(true);
     } catch (err) {
-      console.error(err);
-      setClaimError('Something went wrong. Please try again.');
+      if (!isExpectedError(err)) console.error(err);
+      setClaimError(errorMessage(err, 'Could not claim that business.'));
     } finally {
       setClaiming(false);
     }
@@ -226,10 +238,10 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ user }) =>
           <div className="flex flex-wrap gap-4 items-center mb-10">
             <div className="bg-white/10 px-4 py-2 rounded-full backdrop-blur-sm border border-white/10 flex items-center gap-2">
               <MapPin size={14} className="text-neutral-400" />
-              <span className="text-xs font-bold uppercase tracking-widest text-neutral-300">{business.town}</span>
+              <span className="text-xs font-bold uppercase tracking-widest text-neutral-500">{business.town}</span>
             </div>
             <div className="bg-white/10 px-4 py-2 rounded-full backdrop-blur-sm border border-white/10">
-              <span className="text-xs font-bold uppercase tracking-widest text-neutral-300">{business.task}</span>
+              <span className="text-xs font-bold uppercase tracking-widest text-neutral-500">{business.task}</span>
             </div>
           </div>
 
@@ -286,7 +298,7 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ user }) =>
               <div className="bg-white border-2 border-neutral-200 rounded-2xl p-3">
                 <QRCodeSVG
                   id="business-qr-svg"
-                  value={business.qrCode}
+                  value={manualCode || 'pending'}
                   size={180}
                   level="H"
                   includeMargin={false}
@@ -298,18 +310,34 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ user }) =>
               Display this at your checkout. Players scan it to verify their visit.
             </p>
 
+            {secretError && (
+              <div role="alert" className="mb-4 bg-red-50 border border-red-200 rounded-2xl px-4 py-3">
+                <p className="text-red-600 text-[11px] font-bold">{secretError}</p>
+              </div>
+            )}
+
+            {secret === undefined && !secretError && (
+              <div role="alert" className="mb-4 bg-yellow-50 border border-yellow-200 rounded-2xl px-4 py-3">
+                <p className="text-yellow-800 text-[11px] font-bold leading-relaxed">
+                  No code has been issued for your business yet. Ask the Chamber to generate one.
+                </p>
+              </div>
+            )}
+
             <div className="flex gap-3">
               <button
                 onClick={printQR}
-                className="flex-1 bg-neutral-900 text-white py-4 rounded-2xl font-bold text-xs uppercase tracking-widest hover:bg-neutral-800 transition-all shadow-lg flex items-center justify-center gap-2"
+                disabled={!manualCode}
+                className="flex-1 bg-neutral-900 text-white py-4 rounded-2xl font-bold text-xs uppercase tracking-widest hover:bg-neutral-800 transition-all shadow-lg flex items-center justify-center gap-2 disabled:opacity-40"
               >
-                <Printer size={15} /> Print
+                <Printer size={15} aria-hidden="true" /> Print
               </button>
               <button
                 onClick={downloadQR}
-                className="flex-1 bg-white border border-neutral-200 py-4 rounded-2xl font-bold text-xs uppercase tracking-widest hover:border-neutral-900 transition-all flex items-center justify-center gap-2"
+                disabled={!manualCode}
+                className="flex-1 bg-white border border-neutral-200 py-4 rounded-2xl font-bold text-xs uppercase tracking-widest hover:border-neutral-900 transition-all flex items-center justify-center gap-2 disabled:opacity-40"
               >
-                <Download size={15} /> Save
+                <Download size={15} aria-hidden="true" /> Save
               </button>
             </div>
 
@@ -317,7 +345,9 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ user }) =>
               <Hash size={14} className="text-neutral-400 shrink-0" />
               <div className="text-left min-w-0">
                 <p className="text-[9px] text-neutral-400 font-bold uppercase tracking-widest">Manual code</p>
-                <p className="text-sm font-mono font-bold text-neutral-900 tracking-widest truncate">{business.qrCode}</p>
+                <p className="text-sm font-mono font-bold text-neutral-900 tracking-widest truncate">
+                  {manualCode || (secret === null ? 'Loading...' : 'Not issued yet')}
+                </p>
               </div>
             </div>
           </div>

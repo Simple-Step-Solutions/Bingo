@@ -1,24 +1,23 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { UserProfile, Business, Completion, AppSettings, Town } from '../types';
-import { collection, onSnapshot, query, where, addDoc, setDoc, doc } from 'firebase/firestore';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { UserProfile, Business, Completion, AppSettings } from '../types';
+import { collection, onSnapshot, query, where, doc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { motion, AnimatePresence } from 'motion/react';
 import confetti from 'canvas-confetti';
 import { Trophy, CheckCircle2, MapPin, Store, RefreshCw, Loader2, ExternalLink, Ticket, QrCode, Radio, X, Navigation, Globe, Info, Star } from 'lucide-react';
-import { generateBingoBoard, checkBingo, boardIsIncomplete } from '../services/bingoService';
+import { checkBingo, boardIsIncomplete } from '../services/bingoService';
 import { Link } from 'react-router-dom';
 import { Html5Qrcode } from 'html5-qrcode';
-import { calculateDistance } from '../lib/utils';
-import { Onboarding } from '../components/Onboarding';
+import { useModalA11y, prefersReducedMotion } from '../lib/a11y';
+import { verifyVisit, ensureBoard, regenerateBoard as regenerateBoardCall, errorMessage, isExpectedError } from '../services/api';
 
 interface DashboardProps {
   user: UserProfile;
   businesses: Business[];
-  towns: Town[];
   settings: AppSettings | null;
 }
 
-export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, towns, settings }) => {
+export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, settings }) => {
   const [completions, setCompletions] = useState<Completion[]>([]);
   const [loading, setLoading] = useState(true);
   const [verifying, setVerifying] = useState(false);
@@ -27,6 +26,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, towns, s
   const [scanning, setScanning] = useState(false);
   const [nfcScanning, setNfcScanning] = useState(false);
   const [selectedBusiness, setSelectedBusiness] = useState<Business | null>(null);
+  const closeBusiness = useCallback(() => setSelectedBusiness(null), []);
+  const businessModalRef = useModalA11y(selectedBusiness !== null, closeBusiness);
   const [showBingoFanfare, setShowBingoFanfare] = useState(false);
   const [hasShownFanfare, setHasShownFanfare] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -47,8 +48,56 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, towns, s
     return () => mq.removeEventListener('change', onChange);
   }, []);
 
-  const size = user.boardSize || settings?.boardSize || 3;
-  const board = user.bingoBoard || [];
+  // The board now lives in boards/{uid}, written only by Cloud Functions. A
+  // player who could rewrite their own board picked nine businesses in one
+  // strip mall and finished without leaving the parking lot.
+  //
+  // users/{uid}.bingoBoard is still read as a fallback so a player mid-game
+  // sees their squares during the one release where both shapes exist.
+  const [serverBoard, setServerBoard] = useState<{ cells: string[]; size: number; incomplete: boolean } | null>(null);
+  const [boardLoaded, setBoardLoaded] = useState(false);
+  const ensuringRef = useRef(false);
+
+  // Board ids are scoped to the event, so a new season gives every player a
+  // fresh board without destroying last season's. Before the migration has run
+  // there is no activeEventId and boards keep their bare uid key.
+  const boardDocId = settings?.activeEventId ? `${settings.activeEventId}_${user.uid}` : user.uid;
+
+  useEffect(() => {
+    const unsub = onSnapshot(
+      doc(db, 'boards', boardDocId),
+      (snap) => {
+        if (snap.exists()) {
+          const d = snap.data();
+          setServerBoard({
+            cells: Array.isArray(d.cells) ? d.cells : [],
+            size: d.size || 3,
+            incomplete: !!d.incomplete,
+          });
+        } else {
+          setServerBoard(null);
+        }
+        setBoardLoaded(true);
+      },
+      (err) => { console.error('Board snapshot error:', err); setBoardLoaded(true); },
+    );
+    return unsub;
+  }, [boardDocId]);
+
+  // Ask the server for a board once, when there genuinely is not one.
+  useEffect(() => {
+    if (!boardLoaded || serverBoard || ensuringRef.current || !user.town) return;
+    ensuringRef.current = true;
+    ensureBoard({})
+      .catch((err) => {
+        console.error('ensureBoard failed:', err);
+        setError(errorMessage(err, 'Could not generate your board. Please refresh.'));
+      })
+      .finally(() => { ensuringRef.current = false; });
+  }, [boardLoaded, serverBoard, user.town]);
+
+  const size = serverBoard?.size || user.boardSize || settings?.boardSize || 3;
+  const board = serverBoard?.cells || user.bingoBoard || [];
 
   const hasBingo = checkBingo(board, completions, size);
 
@@ -59,18 +108,30 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, towns, s
   const incomplete = boardIsIncomplete(board);
   const emptyCount = board.filter(c => c === 'EMPTY').length;
 
+  // hasShownFanfare was component state, so the celebration modal reappeared
+  // on every single reload once a player had a bingo. The win itself is now
+  // recorded server-side in wins/{uid}; this only tracks whether this device
+  // has already shown the animation.
+  const fanfareKey = `bingoFanfareShown:${user.uid}`;
+
   useEffect(() => {
-    if (hasBingo && !hasShownFanfare) {
-      setShowBingoFanfare(true);
-      setHasShownFanfare(true);
-    }
-  }, [hasBingo, hasShownFanfare]);
+    if (!hasBingo || hasShownFanfare) return;
+    let alreadySeen = false;
+    try { alreadySeen = localStorage.getItem(fanfareKey) === '1'; } catch { /* private mode */ }
+    if (!alreadySeen) setShowBingoFanfare(true);
+    setHasShownFanfare(true);
+    try { localStorage.setItem(fanfareKey, '1'); } catch { /* private mode */ }
+  }, [hasBingo, hasShownFanfare, fanfareKey]);
 
   useEffect(() => {
     const unsubscribeCompletions = onSnapshot(
       query(collection(db, 'completions'), where('userId', '==', user.uid)),
       (snapshot) => {
-        setCompletions(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Completion)));
+        const all = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Completion));
+        // A completion from a previous season must not mark a square on this
+        // season's board.
+        const activeId = settings?.activeEventId;
+        setCompletions(activeId ? all.filter(c => (c.eventId || null) === activeId) : all);
         setLoading(false);
       },
       (err) => { console.error('Completions snapshot error:', err); setLoading(false); }
@@ -79,71 +140,114 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, towns, s
       unsubscribeCompletions();
       if (qrScannerRef.current) qrScannerRef.current.stop().catch(console.error);
     };
-  }, [user.uid]);
-
-  useEffect(() => {
-    if (!loading && settings && businesses.length > 0 && user.town && (!user.bingoBoard || user.bingoBoard.length === 0)) {
-      const newBoard = generateBingoBoard(businesses, settings, user.town);
-      setDoc(doc(db, 'users', user.uid), { bingoBoard: newBoard, boardSize: settings.boardSize || 3 }, { merge: true })
-        .catch(err => { console.error('Failed to save bingo board:', err); setError('Could not generate your board. Please refresh.'); });
-    }
-  }, [loading, settings, businesses, user.bingoBoard, user.uid, user.town]);
+  }, [user.uid, settings?.activeEventId]);
 
   // The QR callback fires at 10fps for as long as the code stays in frame.
   // setVerifying is async, so without a synchronous lock a single scan wrote
   // several duplicate completions before the first one finished.
   const verifyLockRef = useRef(false);
 
-  const handleVerify = async (code: string) => {
+  const stopScanning = async (e?: React.MouseEvent) => {
+    if (e) e.preventDefault();
+    if (qrScannerRef.current) {
+      try { await qrScannerRef.current.stop(); qrScannerRef.current = null; } catch (err) { console.error(err); }
+    }
+    setScanning(false);
+  };
+
+  /** True when the browser has an explicit denial recorded for this origin. */
+  const locationDenied = async (): Promise<boolean> => {
+    if (!navigator.permissions?.query) return false;
+    try {
+      const status = await navigator.permissions.query({ name: 'geolocation' as PermissionName });
+      return status.state === 'denied';
+    } catch {
+      return false;
+    }
+  };
+
+  /**
+   * Fresh fix rather than the cached user.currentLocation, which LocationTracker
+   * only refreshes once a minute and only after 30m of movement. Walking into a
+   * shop and scanning immediately would otherwise be judged against a position
+   * from a block away.
+   */
+  const currentPosition = (): Promise<{ lat: number; lng: number } | null> =>
+    new Promise((resolve) => {
+      if (!('geolocation' in navigator)) return resolve(user.currentLocation ?? null);
+      navigator.geolocation.getCurrentPosition(
+        (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+        () => resolve(user.currentLocation ?? null),
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 },
+      );
+    });
+
+  /**
+   * Verification is now entirely server-side.
+   *
+   * The client no longer resolves the code, checks for duplicates, runs the
+   * geofence, or reads the pause switch. It hands the scanned string to
+   * verifyVisit and shows whatever comes back.
+   *
+   * There is deliberately no fallback to the old addDoc path. A fallback would
+   * keep the hole open for the entire overlap window, which is the opposite of
+   * the point.
+   */
+  const handleVerify = async (code: string, method: 'qr' | 'nfc' | 'manual' = 'manual') => {
     if (verifyLockRef.current) return;
     verifyLockRef.current = true;
     setVerifying(true);
     setError(null);
     try {
-      if (settings?.gamePaused) {
-        setError('The game is currently paused by the Chamber. Please try again later.');
-        setVerifying(false);
+      const pos = await currentPosition();
+
+      // A denied permission is close to unrecoverable on its own: the browser
+      // will not prompt again, so the player would just keep failing with
+      // "Location required" and no idea why. Say what actually has to happen.
+      if (!pos && (await locationDenied())) {
+        setError(
+          'Location is blocked for this site. Tap the padlock or the (i) in your '
+          + 'address bar, allow Location, then try again.',
+        );
+        stopScanning();
         return;
       }
-      const biz = businesses.find(b => b.qrCode === code || b.nfcId === code);
-      if (!biz) { setError('Invalid code. Please try again.'); stopScanning(); return; }
 
-      if (completions.some(c => c.businessId === biz.id)) {
-        setError(`You already completed ${biz.name}!`); stopScanning(); return;
-      }
-
-      if (biz.lat && biz.lng) {
-        if (!user.currentLocation) {
-          setError('Location required. Enable GPS and wait a moment, then try again.'); stopScanning(); return;
-        }
-        const distance = calculateDistance(user.currentLocation.lat, user.currentLocation.lng, biz.lat, biz.lng);
-        if (distance > 500) {
-          setError(`You need to be at ${biz.name} to verify. You are ${Math.round(distance)}m away.`); stopScanning(); return;
-        }
-      }
-
-      await addDoc(collection(db, 'completions'), {
-        userId: user.uid,
-        businessId: biz.id,
-        timestamp: new Date().toISOString(),
-        town: biz.town,
-        userName: user.displayName || '',
+      const result = await verifyVisit({
+        code,
+        method,
+        ...(pos ? { lat: pos.lat, lng: pos.lng } : {}),
       });
-      confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 }, colors: ['#141414', '#F27D26', '#FFFFFF'] });
+
+      if (!prefersReducedMotion()) {
+        confetti({
+          particleCount: result.bingo ? 220 : 100,
+          spread: result.bingo ? 100 : 70,
+          origin: { y: 0.6 },
+          colors: ['#141414', '#F27D26', '#FFFFFF'],
+        });
+      }
       setManualCode('');
       setShowManual(false);
       stopScanning();
     } catch (err) {
-      console.error(err);
-      setError('Verification failed. Please try again.');
+      // Server messages are written for the player ("You are 1,240m away"), so
+      // show them rather than replacing them with something generic.
+      setError(errorMessage(err, 'Verification failed. Please try again.'));
+      if (!isExpectedError(err)) console.error('verifyVisit failed:', err);
+      stopScanning();
     } finally {
       verifyLockRef.current = false;
       setVerifying(false);
     }
   };
 
+  // The latest-ref pattern: the QR and NFC callbacks are registered once, when
+  // the scanner starts, and must not capture a stale closure. No dependency
+  // array on purpose -- this should run after every render, which is precisely
+  // what keeps the ref current.
   const handleVerifyRef = useRef(handleVerify);
-  useEffect(() => { handleVerifyRef.current = handleVerify; }, [handleVerify]);
+  useEffect(() => { handleVerifyRef.current = handleVerify; });
 
   const startScanning = async (e?: React.MouseEvent) => {
     if (e) e.preventDefault();
@@ -156,7 +260,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, towns, s
         await scanner.start(
           { facingMode: 'environment' },
           { fps: 10, qrbox: { width: 220, height: 220 } },
-          (decodedText) => { handleVerifyRef.current(decodedText); },
+          (decodedText) => { handleVerifyRef.current(decodedText, 'qr'); },
           () => {}
         );
       } catch (err) {
@@ -165,14 +269,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, towns, s
         setScanning(false);
       }
     }, 300);
-  };
-
-  const stopScanning = async (e?: React.MouseEvent) => {
-    if (e) e.preventDefault();
-    if (qrScannerRef.current) {
-      try { await qrScannerRef.current.stop(); qrScannerRef.current = null; } catch (err) { console.error(err); }
-    }
-    setScanning(false);
   };
 
   const startNfcScan = async (e?: React.MouseEvent) => {
@@ -184,7 +280,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, towns, s
       const ndef = new (window as any).NDEFReader();
       await ndef.scan();
       ndef.onreading = (event: any) => {
-        handleVerifyRef.current(event.serialNumber);
+        handleVerifyRef.current(event.serialNumber, 'nfc');
         setNfcScanning(false);
       };
     } catch (err) {
@@ -194,10 +290,22 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, towns, s
     }
   };
 
+  const [regenerating, setRegenerating] = useState(false);
+
   const regenerateBoard = async () => {
-    if (!settings) return;
-    const newBoard = generateBingoBoard(businesses, settings, user.town);
-    await setDoc(doc(db, 'users', user.uid), { bingoBoard: newBoard, boardSize: settings.boardSize || 3 }, { merge: true });
+    setRegenerating(true);
+    setError(null);
+    try {
+      await regenerateBoardCall({});
+    } catch (err) {
+      // The server refuses a self-reroll once completions exist, which used to
+      // be possible and let a player abandon a hard board while keeping credit
+      // for the businesses they had already visited.
+      setError(errorMessage(err, 'Could not regenerate your board.'));
+      if (!isExpectedError(err)) console.error('regenerateBoard failed:', err);
+    } finally {
+      setRegenerating(false);
+    }
   };
 
   if (loading || !settings) return (
@@ -215,7 +323,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, towns, s
   const verifyContent = (
     <div className="flex flex-col gap-6">
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-2xl px-4 py-3">
+        <div role="alert" className="bg-red-50 border border-red-200 rounded-2xl px-4 py-3">
           <p className="text-red-600 text-xs font-bold uppercase tracking-widest">{error}</p>
         </div>
       )}
@@ -224,7 +332,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, towns, s
         <h3 className="font-bold uppercase tracking-widest text-[10px] md:text-xs mb-4 flex items-center justify-between">
           Scan to Verify
           <a href={window.location.href} target="_blank" rel="noopener noreferrer"
-            className="text-[8px] text-neutral-400 hover:text-neutral-900 transition-colors flex items-center gap-1">
+            className="text-[10px] text-neutral-400 hover:text-neutral-900 transition-colors flex items-center gap-1">
             <ExternalLink size={10} /> Open in New Tab
           </a>
         </h3>
@@ -263,7 +371,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, towns, s
             onChange={e => setManualCode(e.target.value)}
             className="w-full p-4 bg-neutral-50 border border-neutral-100 rounded-2xl text-xs font-medium focus:ring-2 focus:ring-neutral-900 transition-all outline-none"
           />
-          <button onClick={() => handleVerify(manualCode)} disabled={verifying || !manualCode}
+          <button onClick={() => handleVerify(manualCode, 'manual')} disabled={verifying || !manualCode}
             className="bg-neutral-900 text-white p-4 rounded-2xl font-bold text-xs hover:bg-neutral-800 transition-all disabled:opacity-50 flex items-center justify-center gap-2">
             {verifying ? <Loader2 className="animate-spin" size={16} /> : 'Verify Code'}
           </button>
@@ -292,7 +400,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, towns, s
           <p className="text-[9px] md:text-xs text-neutral-400 uppercase tracking-[0.2em] font-bold flex items-center gap-2">
             <MapPin size={10} /> {user.town || 'Global'} Edition
             {completions.length > 0 && (
-              <span className="bg-neutral-100 text-neutral-600 px-2 py-0.5 rounded-full text-[8px] font-black normal-case tracking-normal">{completions.length} done</span>
+              <span className="bg-neutral-100 text-neutral-600 px-2 py-0.5 rounded-full text-[10px] font-black normal-case tracking-normal">{completions.length} done</span>
             )}
           </p>
         </div>
@@ -307,8 +415,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, towns, s
           </button>
           {(user.role === 'admin' || user.role === 'chamber') && (
             <button onClick={regenerateBoard}
-              className="bg-white border border-neutral-200 text-neutral-900 p-2.5 rounded-2xl hover:border-neutral-900 transition-all shadow-sm">
-              <RefreshCw size={14} />
+              disabled={regenerating}
+              aria-label="Generate a new board"
+              title="Generate a new board"
+              className="bg-white border border-neutral-200 text-neutral-900 p-2.5 rounded-2xl hover:border-neutral-900 transition-all shadow-sm disabled:opacity-50">
+              <RefreshCw size={14} className={regenerating ? 'animate-spin' : undefined} aria-hidden="true" />
             </button>
           )}
         </div>
@@ -327,6 +438,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, towns, s
       {/* Board */}
       <div className="flex-1 min-h-0 flex items-center justify-center relative">
         <div
+          role="group"
+          aria-label={`Bingo board, ${size} by ${size}. ${completions.length} of ${board.filter(c => c !== 'FREE' && c !== 'EMPTY').length} businesses visited.`}
           className="grid gap-1.5 md:gap-3"
           style={{
             gridTemplateColumns: `repeat(${size}, 1fr)`,
@@ -339,11 +452,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, towns, s
             if (bizId === 'FREE') {
               return (
                 <div key="free"
+                  aria-label={`Free space: ${settings.freeSpaceName}. Already counted.`}
                   className="bg-orange-50 border-2 border-orange-200 rounded-xl md:rounded-3xl flex flex-col items-center justify-center text-center p-1 shadow-sm relative overflow-hidden group">
-                  <div className="absolute inset-0 bg-orange-100/50 opacity-0 group-hover:opacity-100 transition-opacity" />
-                  <Trophy className="text-orange-500 mb-1 relative z-10 w-5 h-5 md:w-8 md:h-8" />
+                  <div className="absolute inset-0 bg-orange-100/50 opacity-0 group-hover:opacity-100 transition-opacity" aria-hidden="true" />
+                  <Trophy className="text-orange-500 mb-1 relative z-10 w-5 h-5 md:w-8 md:h-8" aria-hidden="true" />
                   <p className="text-[9px] md:text-sm font-black text-orange-900 uppercase tracking-tighter relative z-10 leading-none px-1">{settings.freeSpaceName}</p>
-                  <p className="text-[7px] md:text-[10px] text-orange-600 font-bold uppercase tracking-widest mt-0.5 relative z-10 opacity-60 px-1 leading-tight hidden sm:block">{settings.freeSpaceTask}</p>
+                  <p className="text-[10px] md:text-[10px] text-orange-600 font-bold uppercase tracking-widest mt-0.5 relative z-10 opacity-60 px-1 leading-tight hidden sm:block">{settings.freeSpaceTask}</p>
                 </div>
               );
             }
@@ -353,7 +467,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, towns, s
                 <div
                   key={idx}
                   className="rounded-xl md:rounded-3xl bg-neutral-50 border border-dashed border-neutral-300 flex items-center justify-center p-1"
-                  aria-label="Empty square, no business assigned yet"
+                  aria-label="Empty square. Not enough businesses in your town to fill this one, so it cannot be completed."
                 >
                   <span className="text-[10px] md:text-xs text-neutral-500 font-bold uppercase tracking-wider text-center leading-tight">
                     Coming<br />soon
@@ -366,27 +480,36 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, towns, s
             const isDone = completions.some(c => c.businessId === bizId);
 
             return (
-              <div key={idx}
+              <button
+                key={idx}
+                type="button"
+                aria-pressed={isDone}
+                disabled={!biz}
+                aria-label={
+                  biz
+                    ? `${biz.name}, ${biz.town}. ${isDone ? 'Visited.' : 'Not visited yet.'} Open details.`
+                    : 'Loading business'
+                }
                 onClick={() => {
                   if (biz) { setSelectedBusiness(biz); }
                 }}
-                className={`rounded-xl md:rounded-3xl flex flex-col items-center justify-center text-center transition-all relative overflow-hidden group cursor-pointer p-1 md:p-3 ${
+                className={`rounded-xl md:rounded-3xl flex flex-col items-center justify-center text-center transition-all relative overflow-hidden group cursor-pointer p-1 md:p-3 focus:outline-none focus-visible:ring-4 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-2 ${
                   isDone ? 'bg-neutral-900 text-white shadow-lg' : 'bg-white border border-neutral-100 text-neutral-900 hover:border-neutral-300 hover:shadow-sm shadow-sm'
                 }`}
               >
                 {isDone ? (
                   <>
-                    <CheckCircle2 className="text-orange-500 mb-1 w-5 h-5 md:w-8 md:h-8 shrink-0" />
+                    <CheckCircle2 className="text-orange-500 mb-1 w-5 h-5 md:w-8 md:h-8 shrink-0" aria-hidden="true" />
                     <p className="text-[9px] md:text-sm font-bold uppercase tracking-tighter leading-tight line-clamp-2 px-1">{biz?.name || 'Unknown'}</p>
                   </>
                 ) : (
                   <>
-                    <Store className="text-neutral-200 mb-1 group-hover:text-neutral-400 transition-colors w-5 h-5 md:w-8 md:h-8 shrink-0" />
+                    <Store className="text-neutral-200 mb-1 group-hover:text-neutral-400 transition-colors w-5 h-5 md:w-8 md:h-8 shrink-0" aria-hidden="true" />
                     <p className="text-[9px] md:text-sm font-bold uppercase tracking-tighter leading-tight line-clamp-2 px-1">{biz?.name || '...'}</p>
-                    <p className="text-[7px] md:text-[10px] text-neutral-400 font-medium uppercase tracking-widest mt-0.5 hidden sm:block">{biz?.town}</p>
+                    <p className="text-[10px] md:text-[10px] text-neutral-500 font-medium uppercase tracking-widest mt-0.5 hidden sm:block">{biz?.town}</p>
                   </>
                 )}
-              </div>
+              </button>
             );
           })}
         </div>
@@ -451,8 +574,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, towns, s
             onClick={() => setSelectedBusiness(null)}
           >
             <motion.div
+              ref={businessModalRef}
+              role="dialog"
+              aria-modal="true"
+              aria-label={selectedBusiness.name}
+              tabIndex={-1}
               initial={{ y: 60, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 60, opacity: 0 }}
-              className="bg-white w-full max-w-2xl rounded-t-[2.5rem] md:rounded-[3rem] overflow-hidden shadow-2xl relative"
+              className="bg-white w-full max-w-2xl rounded-t-[2.5rem] md:rounded-[3rem] overflow-hidden shadow-2xl relative focus:outline-none"
               style={{ maxHeight: '90dvh' }}
               onClick={e => e.stopPropagation()}
             >
@@ -581,10 +709,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, towns, s
         )}
       </AnimatePresence>
 
-      {!loading && settings && !user.onboardingComplete && (
-        <Onboarding user={user} towns={towns} businesses={businesses} settings={settings} onComplete={() => {}} />
-      )}
-
       {/* Bingo raffle banner -- fixed so it never pushes layout */}
       {hasBingo && settings.raffleEnabled && (
         <motion.div
@@ -603,7 +727,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, towns, s
       )}
 
       <footer className="hidden md:block mt-16 pt-10 border-t border-neutral-200">
-        <p className="text-center text-[10px] text-neutral-300 uppercase tracking-[0.3em] font-bold">
+        <p className="text-center text-[10px] text-neutral-500 uppercase tracking-[0.3em] font-bold">
           {settings?.chamberName || 'Hudson Valley Gateway Chamber of Commerce'}
         </p>
       </footer>

@@ -80,7 +80,9 @@ const requireRole = async (request, minimum) => {
  * with a server timestamp so the ordering cannot be gamed.
  */
 const writeAudit = async (entry) => {
-  await db().collection('audit_logs').add({
+  // Collection is 'audit_log', singular. Admin.tsx and auditService.ts both
+  // read that name; a plural here writes to a collection nothing displays.
+  await db().collection('audit_log').add({
     ...entry,
     timestamp: FieldValue.serverTimestamp(),
     // Kept alongside the server timestamp because the existing AuditLogViewer

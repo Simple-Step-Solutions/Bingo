@@ -2,7 +2,9 @@ import React, { useState } from 'react';
 import Papa from 'papaparse';
 import { doc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
+import { provisionBusinessCode, setBusinessNfc } from '../services/api';
 import { newDocId } from '../lib/utils';
+import { geocodeAddress } from '../lib/geocoding';
 import { Upload, CheckCircle2, Loader2, AlertCircle, Download } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -12,21 +14,6 @@ interface CSVImportProps {
 
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
-async function geocodeAddress(address: string): Promise<{ lat: number; lng: number } | null> {
-  try {
-    const res = await fetch(
-      `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address)}&format=json&limit=1`,
-      { headers: { 'User-Agent': 'ChamberBingo/1.0' } }
-    );
-    const data = await res.json();
-    if (data.length > 0) {
-      return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
-    }
-  } catch (err) {
-    console.error('Geocoding failed for:', address, err);
-  }
-  return null;
-}
 
 const SAMPLE_CSV = [
   ['name', 'town', 'task', 'address', 'description', 'website', 'nfcId'],
@@ -92,15 +79,18 @@ export const CSVImport: React.FC<CSVImportProps> = ({ onComplete }) => {
               name: row.name || 'Unknown',
               town: row.town || '',
               task: row.task || 'Support Local!',
-              qrCode: `CHAMBER_${id}`,
               address,
               lat,
               lng,
-              nfcId: row.nfcId || '',
               description: row.description || '',
               image: row.image || '',
               website: row.website || '',
             });
+
+            // Codes and NFC serials are provisioned server-side and never
+            // written into the public business document.
+            await provisionBusinessCode({ businessId: id });
+            if (row.nfcId) await setBusinessNfc({ businessId: id, nfcId: String(row.nfcId).trim() });
           }
 
           setGeocodeStatus(null);

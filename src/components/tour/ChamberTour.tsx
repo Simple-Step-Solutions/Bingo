@@ -58,7 +58,7 @@ export const ChamberTour: React.FC<ChamberTourProps> = ({ onComplete }) => {
   useEffect(() => {
     const route = STEPS[step].route;
     navigate(route);
-  }, [step]);
+  }, [step, navigate]);
 
   const handleDone = () => {
     navigate('/admin?tab=chamber');

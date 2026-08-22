@@ -133,7 +133,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({ user }) => {
                 )}
                 <button
                   onClick={() => setOpen(false)}
-                  className="p-1.5 rounded-lg text-neutral-300 hover:text-neutral-900 hover:bg-neutral-100 transition-all"
+                  className="p-1.5 rounded-lg text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100 transition-all"
                 >
                   <X size={14} />
                 </button>
@@ -208,7 +208,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({ user }) => {
                         {canCompose && (
                           <button
                             onClick={() => deleteDoc(doc(db, 'notifications', n.id)).catch(console.error)}
-                            className="opacity-0 group-hover:opacity-100 p-1 rounded-lg text-neutral-300 hover:text-red-500 hover:bg-red-50 transition-all"
+                            className="opacity-0 group-hover:opacity-100 p-1 rounded-lg text-neutral-500 hover:text-red-500 hover:bg-red-50 transition-all"
                             title="Delete notification"
                           >
                             <Trash2 size={12} />

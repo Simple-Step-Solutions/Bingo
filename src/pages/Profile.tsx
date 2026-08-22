@@ -151,7 +151,7 @@ export const Profile: React.FC<ProfileProps> = ({ user }) => {
 
         {loading ? (
           <div className="flex items-center justify-center py-8">
-            <Loader2 className="animate-spin text-neutral-300" size={28} />
+            <Loader2 className="animate-spin text-neutral-500" size={28} />
           </div>
         ) : (
           <div className="grid grid-cols-3 gap-4">
@@ -173,7 +173,7 @@ export const Profile: React.FC<ProfileProps> = ({ user }) => {
             </div>
 
             <div className="bg-neutral-50 rounded-2xl p-5 text-center">
-              <MapPin className="mx-auto mb-2 text-neutral-300" size={22} />
+              <MapPin className="mx-auto mb-2 text-neutral-500" size={22} />
               <p className="text-sm font-bold text-neutral-900 truncate">{user.town || 'None'}</p>
               <p className="text-[10px] uppercase tracking-widest text-neutral-400 mt-1">Town</p>
             </div>
@@ -196,7 +196,7 @@ export const Profile: React.FC<ProfileProps> = ({ user }) => {
             Your Town
           </label>
           <div className="flex items-center gap-3 bg-neutral-50 border border-neutral-200 rounded-2xl px-5 py-4">
-            <MapPin size={16} className="text-neutral-300 shrink-0" />
+            <MapPin size={16} className="text-neutral-500 shrink-0" />
             <span className="text-sm font-medium text-neutral-900">{user.town || 'Not set'}</span>
           </div>
           <p className="text-[10px] text-neutral-400 mt-2 ml-1">Your town is assigned by the chamber. Contact them to make changes.</p>

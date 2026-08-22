@@ -2,9 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { doc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { UserProfile } from '../types';
-import { getInviteByToken, markInviteUsed } from '../services/inviteService';
+import { peekInvite, redeemInvite, errorMessage, isExpectedError } from '../services/api';
+import { auth } from '../firebase';
 import { Gamepad2, Store, ShieldCheck, Loader2, Lock } from 'lucide-react';
-import { Invite } from '../types';
 
 interface RoleSelectorProps {
   user: UserProfile;
@@ -18,45 +18,57 @@ const ROLE_META = {
 
 export const RoleSelector: React.FC<RoleSelectorProps> = ({ user }) => {
   const [role, setRole] = useState<'player' | 'business' | 'chamber'>('player');
-  const [lockedInvite, setLockedInvite] = useState<Invite | null>(null);
+  // Only what peekInvite is willing to tell an unauthenticated caller. The
+  // plaintext token stays in localStorage and is sent back on redemption.
+  const [lockedInvite, setLockedInvite] = useState<
+    { token: string; role: 'player' | 'business' | 'chamber'; businessName: string | null } | null
+  >(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Pre-fill and lock from localStorage if they arrived via an invite link
+  // Pre-fill and lock from localStorage if they arrived via an invite link.
+  //
+  // peekInvite returns a whitelisted projection and nothing else. The invites
+  // collection is no longer readable by any client, and documents are keyed by
+  // the token hash, so there is no query that could enumerate them.
   useEffect(() => {
     const token = localStorage.getItem('pendingInvite');
     if (!token) return;
-    getInviteByToken(token).then(invite => {
-      if (!invite || invite.used || new Date(invite.expiresAt) < new Date()) return;
-      setRole(invite.role as 'player' | 'business' | 'chamber');
-      setLockedInvite(invite);
-    }).catch(() => {});
+    peekInvite({ token })
+      .then(res => {
+        if (!res.valid || !res.role) return;
+        setRole(res.role);
+        setLockedInvite({ token, role: res.role, businessName: res.businessName ?? null });
+      })
+      .catch(() => { /* An unreachable server should not block signing up as a player. */ });
   }, []);
 
   const handleContinue = async () => {
     setError(null);
     setLoading(true);
     try {
-      const updates: Record<string, any> = {
-        role,
-        roleSelected: true,
-        ...(role !== 'player' ? { onboardingComplete: true } : {}),
-      };
-
       if (lockedInvite) {
-        if (lockedInvite.businessId) updates.businessId = lockedInvite.businessId;
-        await markInviteUsed(lockedInvite.id, user.uid);
+        // The server validates the token, sets the role, and moves the custom
+        // claim in one transaction. This used to be a client-side setDoc, so
+        // the invite requirement could be skipped by writing role directly.
+        await redeemInvite({ token: lockedInvite.token });
         localStorage.removeItem('pendingInvite');
-      } else if (role !== 'player') {
-        setError('An invite code is required for this role. Please use your invite link.');
+        // Pick up the new claim now rather than waiting up to an hour for the
+        // token to refresh on its own.
+        await auth.currentUser?.getIdToken(true);
+        return;
+      }
+
+      if (role !== 'player') {
+        setError('An invite link is required for this role. Ask your Chamber administrator for one.');
         setLoading(false);
         return;
       }
 
-      await setDoc(doc(db, 'users', user.uid), updates, { merge: true });
+      await setDoc(doc(db, 'users', user.uid), { role: 'player', roleSelected: true }, { merge: true });
     } catch (err) {
-      console.error(err);
-      setError('Something went wrong. Please try again.');
+      if (!isExpectedError(err)) console.error(err);
+      setError(errorMessage(err));
       setLoading(false);
     }
   };
@@ -102,14 +114,14 @@ export const RoleSelector: React.FC<RoleSelectorProps> = ({ user }) => {
                       : 'border-neutral-100 hover:border-neutral-300 bg-neutral-50'
                   }`}
                 >
-                  <div className={`shrink-0 transition-colors ${role === value ? 'text-[var(--color-primary)]' : 'text-neutral-300'}`}>
+                  <div className={`shrink-0 transition-colors ${role === value ? 'text-[var(--color-primary)]' : 'text-neutral-500'}`}>
                     {opt.icon}
                   </div>
                   <div className="flex-1">
                     <p className={`text-sm font-bold ${role === value ? 'text-[var(--color-primary)]' : 'text-neutral-700'}`}>{opt.label}</p>
                     <p className="text-[10px] text-neutral-400 mt-0.5">{opt.sub}</p>
                   </div>
-                  {value !== 'player' && <Lock size={12} className="text-neutral-300 shrink-0" />}
+                  {value !== 'player' && <Lock size={12} className="text-neutral-500 shrink-0" />}
                 </button>
               ))}
               <p className="text-[9px] text-neutral-400 text-center pt-1">Business and chamber accounts require an invite link.</p>

@@ -254,3 +254,127 @@ exports.reviewSuspiciousActivity = onCall(callableOpts({ timeoutSeconds: 120 }),
 
   return { flags, completionsReviewed: snap.size, playersReviewed: byUser.size };
 });
+
+/**
+ * Reset one player.
+ *
+ * This had to become a callable: the board moved to boards/{uid}, which no
+ * client can write, so the old client-side reset silently stopped clearing the
+ * board while appearing to succeed. It also deletes completions in a batch
+ * rather than one delete per document from the browser.
+ */
+exports.adminResetUser = onCall(callableOpts({ timeoutSeconds: 120 }), async (request) => {
+  const { uid: actorUid, role, profile } = await requireRole(request, 'chamber');
+  const { userId, type } = request.data || {};
+
+  if (typeof userId !== 'string' || !userId) {
+    throw new HttpsError('invalid-argument', 'userId is required.');
+  }
+  if (!['town', 'progress', 'board', 'everything'].includes(type)) {
+    throw new HttpsError('invalid-argument', 'Not a valid reset type.');
+  }
+
+  const targetRef = db().collection('users').doc(userId);
+  const targetSnap = await targetRef.get();
+  if (!targetSnap.exists) throw new HttpsError('not-found', 'No such player.');
+
+  let deletedCompletions = 0;
+
+  if (type === 'progress' || type === 'everything') {
+    const snap = await db().collection('completions').where('userId', '==', userId).get();
+    deletedCompletions = snap.size;
+    for (let i = 0; i < snap.docs.length; i += 400) {
+      const batch = db().batch();
+      snap.docs.slice(i, i + 400).forEach(d => batch.delete(d.ref));
+      await batch.commit();
+    }
+    // A win recorded against progress that no longer exists is misleading in
+    // the chamber's redemption view.
+    await db().collection('wins').doc(userId).delete().catch(() => {});
+  }
+
+  if (['board', 'everything', 'town'].includes(type)) {
+    await db().collection('boards').doc(userId).delete().catch(() => {});
+    await targetRef.set({ bingoBoard: FieldValue.delete(), boardSize: FieldValue.delete() }, { merge: true });
+  }
+
+  if (type === 'town' || type === 'everything') {
+    await targetRef.set({ town: '', onboardingComplete: false }, { merge: true });
+  }
+
+  await writeAudit({
+    actorUid,
+    actorEmail: (profile && profile.email) || '',
+    actorRole: role,
+    action: `reset_${type}`,
+    targetUid: userId,
+    targetEmail: targetSnap.data().email || '',
+    details: { resetType: type, deletedCompletions },
+  });
+
+  return { ok: true, deletedCompletions };
+});
+
+/**
+ * Reset every player's town, board and progress. Used between events until
+ * Phase 4 replaces it with archiving an event and opening the next one.
+ */
+exports.adminGlobalReset = onCall(callableOpts({ timeoutSeconds: 540 }), async (request) => {
+  const { uid, role, profile } = await requireRole(request, 'admin');
+
+  const usersSnap = await db().collection('users').get();
+  const completionsSnap = await db().collection('completions').get();
+  const boardsSnap = await db().collection('boards').get();
+  const winsSnap = await db().collection('wins').get();
+  // Rejected-attempt records belong to the event that produced them, and no
+  // client can delete them, so they have to be cleared here or never.
+  const attemptsSnap = await db().collection('verification_attempts').get();
+
+  const deleteAll = async (docs) => {
+    for (let i = 0; i < docs.length; i += 400) {
+      const batch = db().batch();
+      docs.slice(i, i + 400).forEach(d => batch.delete(d.ref));
+      await batch.commit();
+    }
+  };
+
+  await deleteAll(completionsSnap.docs);
+  await deleteAll(boardsSnap.docs);
+  await deleteAll(winsSnap.docs);
+  await deleteAll(attemptsSnap.docs);
+
+  for (let i = 0; i < usersSnap.docs.length; i += 400) {
+    const batch = db().batch();
+    usersSnap.docs.slice(i, i + 400).forEach(d => {
+      batch.set(d.ref, {
+        town: '',
+        onboardingComplete: false,
+        bingoBoard: FieldValue.delete(),
+        boardSize: FieldValue.delete(),
+      }, { merge: true });
+    });
+    await batch.commit();
+  }
+
+  await writeAudit({
+    actorUid: uid,
+    actorEmail: (profile && profile.email) || '',
+    actorRole: role,
+    action: 'global_reset',
+    targetUid: 'ALL',
+    details: {
+      users: usersSnap.size,
+      completions: completionsSnap.size,
+      boards: boardsSnap.size,
+      wins: winsSnap.size,
+      attempts: attemptsSnap.size,
+    },
+  });
+
+  return {
+    ok: true,
+    users: usersSnap.size,
+    completions: completionsSnap.size,
+    boards: boardsSnap.size,
+  };
+});

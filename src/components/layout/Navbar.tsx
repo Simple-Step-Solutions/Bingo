@@ -60,17 +60,19 @@ const MobileAccountMenu: React.FC<{ user: UserProfile }> = ({ user }) => {
     <>
       <button
         onClick={openMenu}
+        aria-label={unread > 0 ? `Account, ${unread} unread notifications` : 'Account'}
+        aria-expanded={open}
         className={`flex flex-col items-center gap-1 relative transition-all duration-300 ${open ? 'text-neutral-900 scale-110' : 'text-neutral-400 hover:text-neutral-600'}`}
       >
         <div className={`relative p-2 rounded-xl transition-all ${open ? 'bg-neutral-100' : 'bg-transparent'}`}>
-          <UserCircle size={20} />
+          <UserCircle size={20} aria-hidden="true" />
           {unread > 0 && (
             <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-[var(--color-accent,#CC5500)] text-white text-[9px] font-black rounded-full flex items-center justify-center leading-none">
               {unread > 9 ? '9+' : unread}
             </span>
           )}
         </div>
-        <span className={`text-[8px] font-black uppercase tracking-[0.2em] ${open ? 'opacity-100' : 'opacity-0'}`}>
+        <span className={`text-[10px] font-black uppercase tracking-[0.2em] transition-opacity ${open ? 'opacity-100' : 'opacity-70'}`}>
           Account
         </span>
       </button>
@@ -88,7 +90,7 @@ const MobileAccountMenu: React.FC<{ user: UserProfile }> = ({ user }) => {
               <div className="w-10 h-1 bg-neutral-200 rounded-full mx-auto mt-4 mb-6" />
               <div className="flex items-center justify-between px-6 mb-5">
                 <h3 className="font-serif italic text-2xl">Account</h3>
-                <button onClick={() => setOpen(false)} className="p-2 text-neutral-400 hover:text-neutral-900 transition-colors">
+                <button onClick={() => setOpen(false)} aria-label="Close account menu" className="p-3 text-neutral-500 hover:text-neutral-900 transition-colors">
                   <X size={20} />
                 </button>
               </div>
@@ -107,7 +109,7 @@ const MobileAccountMenu: React.FC<{ user: UserProfile }> = ({ user }) => {
                     <p className="text-sm font-bold text-neutral-900 truncate">{user.displayName || user.email.split('@')[0]}</p>
                     <p className="text-[10px] text-neutral-400 uppercase tracking-widest mt-0.5">{user.role}</p>
                   </div>
-                  <ChevronRight className="text-neutral-300 shrink-0" size={16} />
+                  <ChevronRight className="text-neutral-500 shrink-0" size={16} />
                 </Link>
               </div>
 
@@ -161,7 +163,7 @@ const MobileAccountMenu: React.FC<{ user: UserProfile }> = ({ user }) => {
               </div>
 
               {/* Version */}
-              <p className="text-center text-[9px] text-neutral-300 uppercase tracking-widest font-bold mt-4 pb-2">
+              <p className="text-center text-[9px] text-neutral-500 uppercase tracking-widest font-bold mt-4 pb-2">
                 v{__APP_VERSION__}
               </p>
             </motion.div>
@@ -227,14 +229,20 @@ export const Navbar: React.FC<NavbarProps> = ({ user, settings }) => {
             <Link
               key={item.to}
               to={item.to}
+              aria-current={isActive ? 'page' : undefined}
               className={`flex flex-col items-center gap-1 transition-all duration-300 ${
                 isActive ? 'text-neutral-900 scale-110' : 'text-neutral-400 hover:text-neutral-600'
               }`}
             >
               <div className={`p-2 rounded-xl transition-all ${isActive ? 'bg-neutral-100' : 'bg-transparent'}`}>
-                <Icon size={20} />
+                <Icon size={20} aria-hidden="true" />
               </div>
-              <span className={`text-[8px] font-black uppercase tracking-[0.2em] ${isActive ? 'opacity-100' : 'opacity-0'}`}>
+              {/*
+                These labels used to be opacity-0 unless the item was active, so
+                the mobile bar was icon-only and a player had to guess what each
+                one did. Dimmed now rather than invisible.
+              */}
+              <span className={`text-[10px] font-black uppercase tracking-[0.2em] transition-opacity ${isActive ? 'opacity-100' : 'opacity-70'}`}>
                 {item.label}
               </span>
             </Link>
@@ -251,15 +259,16 @@ export const Navbar: React.FC<NavbarProps> = ({ user, settings }) => {
           </div>
           <div className="flex flex-col">
             <span className="text-[10px] font-bold text-neutral-900 leading-none">{user.displayName || user.email.split('@')[0]}</span>
-            <span className="text-[8px] font-bold text-neutral-400 uppercase tracking-widest mt-1">{user.role}</span>
+            <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mt-1">{user.role}</span>
           </div>
         </Link>
         <button
           onClick={() => signOut(auth)}
-          className="p-3 text-neutral-400 hover:text-red-600 hover:bg-red-50 rounded-2xl transition-all"
+          className="p-3 text-neutral-500 hover:text-red-600 hover:bg-red-50 rounded-2xl transition-all"
           title="Sign Out"
+          aria-label="Sign out"
         >
-          <LogOut size={20} />
+          <LogOut size={20} aria-hidden="true" />
         </button>
       </div>
 

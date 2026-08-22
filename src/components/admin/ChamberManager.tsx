@@ -4,7 +4,7 @@ import { doc, setDoc, deleteDoc, addDoc, collection } from 'firebase/firestore';
 import { db, storage } from '../../firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { Store, Trash2, Plus, Nfc, QrCode, Search, Users, Ticket, Pencil, Trophy, Sparkles, Loader2, ChevronLeft, ChevronRight, Palette, ImagePlus, Download } from 'lucide-react';
-import { createInvite } from '../../services/inviteService';
+import { provisionBusinessCode, setBusinessNfc, createInvite, errorMessage, isExpectedError } from '../../services/api';
 import { shuffle } from '../../services/bingoService';
 import { logAudit } from '../../services/auditService';
 
@@ -154,13 +154,26 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
     }
 
     const id = editingId || newDocId();
+
+    // The business document no longer carries a code or an NFC serial. The code
+    // is provisioned server-side into business_secrets, and the NFC serial is
+    // registered in the code index, so neither is readable by a player.
+    const { nfcId, ...publicFields } = newBiz;
     await setDoc(doc(db, 'businesses', id), {
-      ...newBiz,
+      ...publicFields,
       lat: finalLat,
       lng: finalLng,
       id,
-      qrCode: editingId ? businesses.find(b => b.id === editingId)?.qrCode : `CHAMBER_${id}`
     });
+
+    try {
+      // Idempotent: returns the existing code when there already is one.
+      await provisionBusinessCode({ businessId: id });
+      await setBusinessNfc({ businessId: id, nfcId: nfcId?.trim() || null });
+    } catch (err) {
+      if (!isExpectedError(err)) console.error('Code provisioning failed:', err);
+      setSaveError(errorMessage(err, 'The business was saved but its code could not be issued.'));
+    }
     setNewBiz({ 
       name: '', 
       town: 'Yorktown', 
@@ -176,6 +189,22 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
       email: ''
     });
     setEditingId(null);
+  };
+
+  /**
+   * Codes are not on the business document any more, so the QR dialog fetches
+   * one. provisionBusinessCode is idempotent and returns the existing code, so
+   * this also quietly backfills a business created before the split.
+   */
+  const showQrFor = async (biz: Business) => {
+    setSaveError(null);
+    try {
+      const { code } = await provisionBusinessCode({ businessId: biz.id });
+      setSelectedQR({ value: code, title: biz.name });
+    } catch (err) {
+      if (!isExpectedError(err)) console.error('provisionBusinessCode failed:', err);
+      setSaveError(errorMessage(err, 'Could not load the code for that business.'));
+    }
   };
 
   const editBusiness = (biz: Business) => {
@@ -208,7 +237,12 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
     try {
       const rows = await Promise.all(
         bizWithEmail.map(async (biz: Business) => {
-          const token = await createInvite('system', 'business', biz.id, biz.name, biz.email);
+          const { token } = await createInvite({
+            role: 'business',
+            businessId: biz.id,
+            businessName: biz.name,
+            ...(biz.email ? { emailHint: biz.email } : {}),
+          });
           const url = `${window.location.origin}/?invite=${token}`;
           return [biz.name, biz.email ?? '', url];
         })
@@ -272,21 +306,23 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
           {/* Logo */}
           <div className="flex flex-col gap-3">
             <label className="block text-[10px] text-neutral-400 uppercase tracking-widest font-bold">Chamber Logo</label>
-            <div
+            <button
+              type="button"
               onClick={() => logoInputRef.current?.click()}
-              className="relative flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-neutral-200 p-6 cursor-pointer hover:border-neutral-400 transition-all bg-neutral-50"
+              aria-label="Upload a chamber logo"
+              className="relative flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-neutral-200 p-6 cursor-pointer hover:border-neutral-400 transition-all bg-neutral-50 w-full focus:outline-none focus-visible:ring-4 focus-visible:ring-[var(--color-primary)]"
             >
               {logoUploading ? (
                 <Loader2 className="animate-spin text-neutral-400" size={24} />
               ) : settings.chamberLogoUrl ? (
                 <img src={settings.chamberLogoUrl} alt="Chamber Logo" className="h-12 w-auto object-contain" />
               ) : (
-                <ImagePlus className="text-neutral-300" size={24} />
+                <ImagePlus className="text-neutral-500" size={24} />
               )}
               <span className="text-[10px] font-bold uppercase tracking-widest text-neutral-400">
                 {settings.chamberLogoUrl ? 'Replace' : 'Upload Logo'}
               </span>
-            </div>
+            </button>
             <input
               ref={logoInputRef}
               type="file"
@@ -406,7 +442,7 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
               placeholder="Search by name, town, category, or task..."
               value={bizSearch}
               onChange={e => handleBizSearch(e.target.value)}
-              className="flex-1 bg-transparent text-sm outline-none font-medium placeholder:text-neutral-300"
+              className="flex-1 bg-transparent text-sm outline-none font-medium placeholder:text-neutral-500"
             />
             {bizSearch && (
               <span className="text-[10px] text-neutral-400 font-bold uppercase tracking-widest shrink-0">
@@ -431,7 +467,7 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
                     <Pencil size={15} />
                   </button>
                   <button
-                    onClick={() => setSelectedQR({ value: biz.qrCode, title: biz.name })}
+                    onClick={() => showQrFor(biz)}
                     className="p-2 bg-white border border-neutral-200 rounded-xl text-neutral-400 hover:text-neutral-900 hover:border-neutral-900 transition-all shadow-sm"
                     title="QR Code"
                   >
@@ -439,7 +475,7 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
                   </button>
                   <button
                     onClick={() => deleteBusiness(biz.id)}
-                    className="p-2 bg-white border border-neutral-200 rounded-xl text-neutral-300 hover:text-red-500 hover:border-red-200 transition-all shadow-sm"
+                    className="p-2 bg-white border border-neutral-200 rounded-xl text-neutral-500 hover:text-red-500 hover:border-red-200 transition-all shadow-sm"
                     title="Delete"
                   >
                     <Trash2 size={15} />
@@ -565,7 +601,7 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
                 </div>
                 <button 
                   onClick={() => deleteRaffleEntry(entry.id)} 
-                  className="p-2 text-neutral-300 hover:text-red-500 transition-colors"
+                  className="p-2 text-neutral-500 hover:text-red-500 transition-colors"
                 >
                   <Trash2 size={18} />
                 </button>
@@ -606,7 +642,7 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
                 </div>
                 <button 
                   onClick={() => deleteWinner(winner.id)} 
-                  className="p-2 text-neutral-300 hover:text-red-500 transition-colors"
+                  className="p-2 text-neutral-500 hover:text-red-500 transition-colors"
                 >
                   <Trash2 size={18} />
                 </button>
@@ -782,7 +818,7 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
                 <span className="text-sm font-bold">{t.name}</span>
                 <button 
                   onClick={() => deleteTown(t.id)} 
-                  className="p-2 text-neutral-300 hover:text-red-500 transition-colors"
+                  className="p-2 text-neutral-500 hover:text-red-500 transition-colors"
                 >
                   <Trash2 size={16} />
                 </button>

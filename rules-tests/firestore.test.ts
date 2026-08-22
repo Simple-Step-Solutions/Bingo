@@ -4,8 +4,9 @@
  * Run with:  npm run test:rules
  * (that wraps `firebase emulators:exec`, which needs a JRE on PATH)
  *
- * Every test here corresponds to a hole found in the Phase 0 review.
- * If one of these starts failing, a real exploit has been reopened.
+ * Every test here corresponds to a hole found in the Phase 0 review, or to a
+ * property Phase 2 depends on. If one starts failing, a real exploit has been
+ * reopened.
  */
 import { test, before, after, beforeEach, describe } from 'node:test';
 import assert from 'node:assert/strict';
@@ -26,9 +27,16 @@ const BOOTSTRAP_EMAIL = 'logan@simplestepsolutions.com';
 
 let env: RulesTestEnvironment;
 
-/** An authed context whose token carries a verified email. */
+/** An authed context whose token carries a verified email and no role claim. */
 const authed = (uid: string, email = `${uid}@example.com`, emailVerified = true) =>
   env.authenticatedContext(uid, { email, email_verified: emailVerified }).firestore();
+
+/**
+ * An authed context carrying a role claim, which is what syncRoleClaims
+ * produces and what the rules read first.
+ */
+const authedAs = (uid: string, claims: Record<string, unknown>, email = `${uid}@example.com`) =>
+  env.authenticatedContext(uid, { email, email_verified: true, ...claims }).firestore();
 
 before(async () => {
   env = await initializeTestEnvironment({
@@ -72,12 +80,60 @@ beforeEach(async () => {
       uid: 'bizowner', email: 'bizowner@example.com', role: 'business',
       roleSelected: true, businessId: 'bizA',
     });
+    // Has a chamber CLAIM but a player document. Proves the claim path works
+    // on its own, which is what the rules will rely on after step 8.
+    await setDoc(doc(db, 'users/claimchamber'), {
+      uid: 'claimchamber', email: 'claimchamber@example.com',
+      role: 'player', roleSelected: true,
+    });
 
     await setDoc(doc(db, 'businesses/bizA'), { name: 'Cafe A', town: 'Yorktown' });
     await setDoc(doc(db, 'businesses/bizB'), { name: 'Shop B', town: 'Peekskill' });
 
-    await setDoc(doc(db, 'completions/c1'), { userId: 'player1', businessId: 'bizA', town: 'Yorktown' });
-    await setDoc(doc(db, 'completions/c2'), { userId: 'player2', businessId: 'bizB', town: 'Peekskill' });
+    await setDoc(doc(db, 'business_secrets/bizA'), {
+      businessId: 'bizA', code: 'HVG-A2K7-QW9Z-M4TR-P8XN', codeHash: 'deadbeef',
+    });
+    await setDoc(doc(db, 'business_secrets/bizB'), {
+      businessId: 'bizB', code: 'HVG-ZZZZ-ZZZZ-ZZZZ-ZZZZ', codeHash: 'cafebabe',
+    });
+    await setDoc(doc(db, 'code_index/deadbeef'), { businessId: 'bizA', active: true });
+
+    // Pre-event board, keyed by uid alone.
+    await setDoc(doc(db, 'boards/player1'), {
+      cells: ['bizA', 'bizB', 'FREE'], size: 3, town: 'Yorktown', userId: 'player1',
+    });
+    // Event-scoped board: ownership lives in the document, not the id.
+    await setDoc(doc(db, 'boards/evt1_player2'), {
+      cells: ['bizB', 'bizA', 'FREE'], size: 3, town: 'Yorktown',
+      userId: 'player2', eventId: 'evt1',
+    });
+
+    await setDoc(doc(db, 'events/evt1'), {
+      name: 'Fall Bingo 2026', status: 'active',
+      startsAt: null, endsAt: null, boardSize: 3, difficulty: 50,
+    });
+    await setDoc(doc(db, 'events/evt0'), {
+      name: 'Spring Bingo 2026', status: 'archived',
+      startsAt: null, endsAt: null, boardSize: 3, difficulty: 50,
+    });
+
+    await setDoc(doc(db, 'completions/player1_bizA'), {
+      userId: 'player1', businessId: 'bizA', town: 'Yorktown',
+    });
+    await setDoc(doc(db, 'completions/player2_bizB'), {
+      userId: 'player2', businessId: 'bizB', town: 'Peekskill',
+    });
+
+    await setDoc(doc(db, 'wins/player1'), {
+      userId: 'player1', userName: 'Player One', redeemed: false,
+    });
+    await setDoc(doc(db, 'wins/evt1_player2'), {
+      userId: 'player2', userName: 'Player Two', redeemed: false, eventId: 'evt1',
+    });
+    await setDoc(doc(db, 'verification_attempts/a1'), {
+      uid: 'player1', outcome: 'out_of_range', distanceM: 4200,
+    });
+    await setDoc(doc(db, 'rate_limits/verify_player1'), { count: 1, windowStart: 0 });
 
     await setDoc(doc(db, 'raffle_entries/r1'), {
       userId: 'player1', userName: 'Player One', userEmail: 'player1@example.com',
@@ -86,8 +142,9 @@ beforeEach(async () => {
       userId: 'player2', userName: 'Player Two', userEmail: 'player2@example.com',
     });
 
-    await setDoc(doc(db, 'invites/inv1'), {
-      token: 'SECRETTOKEN', role: 'chamber', used: false,
+    // Keyed by the token hash, and carrying no plaintext.
+    await setDoc(doc(db, 'invites/a1b2c3hash'), {
+      role: 'chamber', used: false,
       expiresAt: '2099-01-01T00:00:00.000Z', createdBy: 'admin1',
       emailHint: 'someone@a-real-business.com',
     });
@@ -188,17 +245,69 @@ describe('privilege escalation', () => {
     await assertFails(updateDoc(doc(db, 'users/player1'), { email: 'attacker@evil.com' }));
   });
 
-  test('an admin can still change a role', async () => {
-    const db = authed('admin1');
-    await assertSucceeds(updateDoc(doc(db, 'users/player1'), { role: 'business' }));
+  test('chamber staff cannot link a user to a business', async () => {
+    // businessId now implies a custom claim, so it has to move through
+    // setUserRole or the token and the document drift apart.
+    const db = authed('chamber1');
+    await assertFails(updateDoc(doc(db, 'users/player1'), { businessId: 'bizA' }));
   });
 
-  test('the bootstrap admin email works only when verified', async () => {
-    const verified = authed('boot', BOOTSTRAP_EMAIL, true);
-    await assertSucceeds(setDoc(doc(verified, 'settings/global'), { boardSize: 4 }, { merge: true }));
+  test('even an admin cannot change a role directly any more', async () => {
+    // Role changes go through the setUserRole callable, which moves the claim
+    // in the same operation and revokes refresh tokens on demotion.
+    const db = authed('admin1');
+    await assertFails(updateDoc(doc(db, 'users/player1'), { role: 'business' }));
+  });
 
-    const unverified = authed('boot2', BOOTSTRAP_EMAIL, false);
-    await assertFails(setDoc(doc(unverified, 'settings/global'), { boardSize: 5 }, { merge: true }));
+  test('the hardcoded bootstrap email no longer grants anything', async () => {
+    // It used to be trusted in the rules. It is now a server-side check inside
+    // the bootstrapAdmin callable, so holding the address proves nothing here.
+    const db = authed('boot', BOOTSTRAP_EMAIL, true);
+    await assertFails(setDoc(doc(db, 'settings/global'), { boardSize: 9 }, { merge: true }));
+  });
+});
+
+describe('custom claims (dual trust)', () => {
+  test('a chamber CLAIM grants chamber access with a player document', async () => {
+    const db = authedAs('claimchamber', { role: 'chamber' });
+    await assertSucceeds(getDocs(collection(db, 'users')));
+    await assertSucceeds(setDoc(doc(db, 'settings/global'), { boardSize: 4 }, { merge: true }));
+  });
+
+  test('a chamber DOCUMENT still grants access with no claim', async () => {
+    // The fallback that keeps cached bundles working during the overlap.
+    const db = authed('chamber1');
+    await assertSucceeds(getDocs(collection(db, 'users')));
+  });
+
+  test('DOCUMENTED LAG: a stale chamber claim still works after demotion', async () => {
+    // Rules cannot check token revocation, so a demoted user keeps rule-level
+    // access until their token refreshes, up to an hour. This is asserted so
+    // nobody "fixes" it here instead of in the callables, which do check
+    // tokensValidAfterTime. If this test starts failing, check that the
+    // callables still enforce it.
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'users/claimchamber'),
+        { role: 'player' }, { merge: true });
+    });
+    const db = authedAs('claimchamber', { role: 'chamber' });
+    await assertSucceeds(getDocs(collection(db, 'users')));
+  });
+
+  test('a forged-looking claim is still just a claim the server signed', async () => {
+    // Sanity check that an absent claim means player, not "no role at all".
+    const db = authedAs('player1', {});
+    await assertFails(getDocs(collection(db, 'users')));
+  });
+
+  test('a business claim scopes completions without a document read', async () => {
+    const db = authedAs('bizowner', { role: 'business', bid: 'bizA' });
+    await assertSucceeds(
+      getDocs(query(collection(db, 'completions'), where('businessId', '==', 'bizA'))),
+    );
+    await assertFails(
+      getDocs(query(collection(db, 'completions'), where('businessId', '==', 'bizB'))),
+    );
   });
 });
 
@@ -214,13 +323,6 @@ describe('profile self-edits still work', () => {
   test('a player can register an FCM token', async () => {
     const db = authed('player1');
     await assertSucceeds(updateDoc(doc(db, 'users/player1'), { fcmTokens: ['abc'] }));
-  });
-
-  test('a player can reset their own board (pre-Phase-2 behaviour)', async () => {
-    const db = authed('player1');
-    await assertSucceeds(updateDoc(doc(db, 'users/player1'), {
-      bingoBoard: [], onboardingComplete: false,
-    }));
   });
 
   test('a player cannot link themselves to a business', async () => {
@@ -246,6 +348,161 @@ describe('profile self-edits still work', () => {
   test('a player cannot delete anyone', async () => {
     const db = authed('player1');
     await assertFails(deleteDoc(doc(db, 'users/player1')));
+  });
+});
+
+describe('boards are server-owned', () => {
+  test('a player CAN read their own board', async () => {
+    const db = authed('player1');
+    await assertSucceeds(getDoc(doc(db, 'boards/player1')));
+  });
+
+  test('THE STRIP-MALL ATTACK: a player cannot write their own board', async () => {
+    // Rewriting the board to nine businesses in one plaza wins the game in ten
+    // minutes without leaving the parking lot, and is far cheaper than
+    // spoofing GPS nine times.
+    const db = authed('player1');
+    await assertFails(setDoc(doc(db, 'boards/player1'), {
+      cells: ['bizA', 'bizA', 'bizA'], size: 3,
+    }));
+  });
+
+  test('a player cannot read another player board', async () => {
+    const db = authed('player1');
+    await assertFails(getDoc(doc(db, 'boards/player2')));
+  });
+
+  test('not even chamber or admin can write a board', async () => {
+    const chamber = authed('chamber1');
+    await assertFails(setDoc(doc(chamber, 'boards/player1'), { cells: [], size: 3 }));
+    const admin = authed('admin1');
+    await assertFails(setDoc(doc(admin, 'boards/player1'), { cells: [], size: 3 }));
+  });
+
+  test('chamber CAN read boards for support', async () => {
+    const db = authed('chamber1');
+    await assertSucceeds(getDoc(doc(db, 'boards/player1')));
+  });
+});
+
+describe('business codes are unguessable', () => {
+  test('a player cannot read any business secret', async () => {
+    const db = authed('player1');
+    await assertFails(getDoc(doc(db, 'business_secrets/bizA')));
+    await assertFails(getDocs(collection(db, 'business_secrets')));
+  });
+
+  test('a business owner CAN read their own secret', async () => {
+    const db = authed('bizowner');
+    await assertSucceeds(getDoc(doc(db, 'business_secrets/bizA')));
+  });
+
+  test('a business owner cannot read another business secret', async () => {
+    const db = authed('bizowner');
+    await assertFails(getDoc(doc(db, 'business_secrets/bizB')));
+  });
+
+  test('nobody can list business secrets, not even chamber', async () => {
+    // A list would hand over every code in the game in one request.
+    const db = authed('chamber1');
+    await assertFails(getDocs(collection(db, 'business_secrets')));
+    await assertSucceeds(getDoc(doc(db, 'business_secrets/bizA')));
+  });
+
+  test('nobody can read the code index at all', async () => {
+    for (const uid of ['player1', 'bizowner', 'chamber1', 'admin1']) {
+      const db = authed(uid);
+      await assertFails(getDoc(doc(db, 'code_index/deadbeef')));
+    }
+  });
+
+  test('nobody can write a secret or an index entry', async () => {
+    const db = authed('admin1');
+    await assertFails(setDoc(doc(db, 'business_secrets/bizA'), { code: 'MINE' }, { merge: true }));
+    await assertFails(setDoc(doc(db, 'code_index/deadbeef'), { businessId: 'bizB' }, { merge: true }));
+  });
+
+  test('codes cannot be smuggled back onto the public business document', async () => {
+    const db = authed('chamber1');
+    await assertFails(setDoc(doc(db, 'businesses/bizA'),
+      { qrCode: 'CHAMBER_bizA' }, { merge: true }));
+    await assertFails(setDoc(doc(db, 'businesses/bizA'),
+      { nfcId: '04:A2:B3' }, { merge: true }));
+  });
+});
+
+describe('completions are server-written', () => {
+  test('a player cannot forge a completion', async () => {
+    // This is what made the geofence, the duplicate check and the pause switch
+    // all skippable: they were client-side ifs guarding an unguarded addDoc.
+    const db = authed('player1');
+    await assertFails(addDoc(collection(db, 'completions'), {
+      userId: 'player1', businessId: 'bizB', town: 'Peekskill',
+    }));
+    await assertFails(setDoc(doc(db, 'completions/player1_bizB'), {
+      userId: 'player1', businessId: 'bizB',
+    }));
+  });
+
+  test('not even chamber can create a completion directly', async () => {
+    const db = authed('chamber1');
+    await assertFails(addDoc(collection(db, 'completions'), {
+      userId: 'player1', businessId: 'bizB',
+    }));
+  });
+
+  test('a completion cannot be edited after the fact', async () => {
+    const db = authed('admin1');
+    await assertFails(updateDoc(doc(db, 'completions/player1_bizA'), { businessId: 'bizB' }));
+  });
+
+  test('chamber can still delete a completion', async () => {
+    const db = authed('chamber1');
+    await assertSucceeds(deleteDoc(doc(db, 'completions/player1_bizA')));
+  });
+});
+
+describe('wins and verification attempts', () => {
+  test('a player can see their own win but not write one', async () => {
+    const db = authed('player1');
+    await assertSucceeds(getDoc(doc(db, 'wins/player1')));
+    await assertFails(setDoc(doc(db, 'wins/player1'), { redeemed: true }, { merge: true }));
+  });
+
+  test('a player cannot declare themselves a winner', async () => {
+    const db = authed('player2');
+    await assertFails(setDoc(doc(db, 'wins/player2'), {
+      userId: 'player2', redeemed: false,
+    }));
+  });
+
+  test('a player cannot see another player win', async () => {
+    const db = authed('player2');
+    await assertFails(getDoc(doc(db, 'wins/player1')));
+  });
+
+  test('rejected attempts are visible to chamber and nobody else', async () => {
+    const chamber = authed('chamber1');
+    await assertSucceeds(getDocs(collection(chamber, 'verification_attempts')));
+
+    const player = authed('player1');
+    await assertFails(getDocs(collection(player, 'verification_attempts')));
+    await assertFails(getDoc(doc(player, 'verification_attempts/a1')));
+  });
+
+  test('nobody can delete the evidence', async () => {
+    const db = authed('admin1');
+    await assertFails(deleteDoc(doc(db, 'verification_attempts/a1')));
+  });
+});
+
+describe('rate limits', () => {
+  test('nobody can read or clear their own rate limit bucket', async () => {
+    for (const uid of ['player1', 'chamber1', 'admin1']) {
+      const db = authed(uid);
+      await assertFails(getDoc(doc(db, 'rate_limits/verify_player1')));
+      await assertFails(deleteDoc(doc(db, 'rate_limits/verify_player1')));
+    }
   });
 });
 
@@ -311,7 +568,7 @@ describe('invites', () => {
 
   test('a player cannot read a single invite', async () => {
     const db = authed('player1');
-    await assertFails(getDoc(doc(db, 'invites/inv1')));
+    await assertFails(getDoc(doc(db, 'invites/a1b2c3hash')));
   });
 
   test('a player cannot query an invite by token', async () => {
@@ -323,20 +580,28 @@ describe('invites', () => {
 
   test('nobody can replay a spent invite', async () => {
     const db = authed('chamber1');
-    await assertFails(updateDoc(doc(db, 'invites/inv1'), { used: false }));
+    await assertFails(updateDoc(doc(db, 'invites/a1b2c3hash'), { used: false }));
   });
 
   test('a player cannot mark an invite used', async () => {
     const db = authed('player1');
-    await assertFails(updateDoc(doc(db, 'invites/inv1'), { used: true, usedBy: 'player1' }));
+    await assertFails(updateDoc(doc(db, 'invites/a1b2c3hash'), { used: true, usedBy: 'player1' }));
   });
 
-  test('chamber staff can still read and create invites', async () => {
+  test('chamber can read invites but no longer create them directly', async () => {
+    // Creation moved to the createInvite callable, which generates the token
+    // with a CSPRNG and stores only its hash. A client-written invite would
+    // have to carry a plaintext token, defeating the point.
     const db = authed('chamber1');
     await assertSucceeds(getDocs(collection(db, 'invites')));
-    await assertSucceeds(addDoc(collection(db, 'invites'), {
+    await assertFails(addDoc(collection(db, 'invites'), {
       token: 'X', role: 'business', used: false, createdBy: 'chamber1',
     }));
+  });
+
+  test('chamber cannot delete an invite to cover its tracks', async () => {
+    const db = authed('chamber1');
+    await assertFails(deleteDoc(doc(db, 'invites/a1b2c3hash')));
   });
 });
 
@@ -418,6 +683,69 @@ describe('unauthenticated access', () => {
     await assertFails(getDoc(doc(db, 'settings/global')));
     await assertFails(getDocs(collection(db, 'businesses')));
     await assertFails(getDoc(doc(db, 'users/player1')));
+    await assertFails(getDoc(doc(db, 'boards/player1')));
+    await assertFails(getDoc(doc(db, 'business_secrets/bizA')));
+  });
+});
+
+describe('events', () => {
+  test('any player can read the event, so the app can explain itself', async () => {
+    // "The game opens on Saturday" is a far better answer at a shop counter
+    // than a scan that fails with nothing.
+    const db = authed('player1');
+    await assertSucceeds(getDoc(doc(db, 'events/evt1')));
+    await assertSucceeds(getDocs(collection(db, 'events')));
+  });
+
+  test('nobody can write an event, not even an admin', async () => {
+    // The window is what gates verification, so it moves through callables.
+    for (const uid of ['player1', 'chamber1', 'admin1']) {
+      const db = authed(uid);
+      await assertFails(setDoc(doc(db, 'events/evt1'), { status: 'active' }, { merge: true }));
+      await assertFails(addDoc(collection(db, 'events'), { name: 'Mine', status: 'active' }));
+    }
+  });
+
+  test('a player cannot reopen a closed event to keep scanning', async () => {
+    const db = authed('player1');
+    await assertFails(updateDoc(doc(db, 'events/evt0'), { status: 'active' }));
+    await assertFails(setDoc(doc(db, 'settings/global'), { activeEventId: 'evt0' }, { merge: true }));
+  });
+});
+
+describe('event-scoped board and win ids', () => {
+  test('a player can read their event-scoped board', async () => {
+    // The id is evt1_player2, so ownership has to come from the document.
+    const db = authed('player2');
+    await assertSucceeds(getDoc(doc(db, 'boards/evt1_player2')));
+  });
+
+  test('a player cannot read someone else event-scoped board', async () => {
+    const db = authed('player1');
+    await assertFails(getDoc(doc(db, 'boards/evt1_player2')));
+  });
+
+  test('a player still cannot write an event-scoped board', async () => {
+    const db = authed('player2');
+    await assertFails(setDoc(doc(db, 'boards/evt1_player2'), {
+      cells: ['bizA', 'bizA', 'FREE'], size: 3, userId: 'player2', eventId: 'evt1',
+    }));
+  });
+
+  test('a player cannot forge a board by claiming an id that is not theirs', async () => {
+    const db = authed('player1');
+    await assertFails(setDoc(doc(db, 'boards/evt1_player1'), {
+      cells: ['bizA', 'bizA', 'FREE'], size: 3, userId: 'player1', eventId: 'evt1',
+    }));
+  });
+
+  test('event-scoped wins follow the same ownership rule', async () => {
+    const owner = authed('player2');
+    await assertSucceeds(getDoc(doc(owner, 'wins/evt1_player2')));
+
+    const other = authed('player1');
+    await assertFails(getDoc(doc(other, 'wins/evt1_player2')));
+    await assertFails(setDoc(doc(other, 'wins/evt1_player1'), { userId: 'player1' }));
   });
 });
 

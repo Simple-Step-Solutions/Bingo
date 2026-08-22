@@ -43,7 +43,8 @@ The chamber controls everything through an admin panel:
 - Raffle entry system with configurable completion requirements
 - Real-time notifications from the chamber to all players
 - Interactive business map with filtering by town
-- Progressive Web App — installable on iOS and Android, works offline
+- Progressive Web App - installable on iOS and Android. The app shell and
+  cached data load without a connection; verifying a visit needs one.
 - Role-based access: player, business, chamber, admin
 - Branded per chamber — colors, logo, and chamber name are all configurable
 
@@ -66,12 +67,20 @@ cp .env.example .env
 npm run dev
 ```
 
-**Deploy:** Push to `main` — GitHub Actions builds and deploys to Firebase Hosting automatically. See `docs/` for setup details including required secrets, CORS configuration, and custom domain setup.
+**Deploy:** Push to `main`. GitHub Actions runs the gates (typecheck, rules
+tests, function tests), then deploys hosting, functions and rules. Pull requests
+run the gates without deploying.
 
 **Docs:**
-- [Deployment & secrets](docs/updating-icons.md) — icon updates
-- See `firestore.rules` and `storage.rules` for security rules
-- See `.github/workflows/deploy.yml` for the CI/CD pipeline
+- [CLAUDE.md](CLAUDE.md) - architecture, the named-database gotcha, the security
+  model, and the brand rules. Read this first.
+- [Updating icons](docs/updating-icons.md)
+- `firestore.rules` and `storage.rules` for the security rules, and
+  `rules-tests/` for what they are asserted to do
+- `.github/workflows/deploy.yml` for the pipeline
+
+Secrets, CORS and custom-domain setup are configured in the Firebase console and
+in GitHub repository secrets; there is no doc for them yet.
 
 ---
 

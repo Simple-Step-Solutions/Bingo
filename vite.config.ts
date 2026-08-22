@@ -2,7 +2,7 @@ import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { defineConfig, loadEnv } from 'vite';
+import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 import { createRequire } from 'module';
 import { execSync } from 'child_process';
@@ -13,8 +13,7 @@ const commitHash = execSync('git rev-parse HEAD').toString().trim().slice(0, 8);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, '.', '');
+export default defineConfig(() => {
   return {
     base: '/',
     plugins: [
@@ -68,7 +67,11 @@ export default defineConfig(({ mode }) => {
       }),
     ],
     define: {
-      'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
+      // GEMINI_API_KEY was inlined here. `define` performs a literal text
+      // substitution into the bundle, so whatever that variable held shipped to
+      // every browser in plain text. It is blank today and the Google GenAI
+      // dependency is not installed, so nothing used it -- but the day someone
+      // filled it in, they would have published it.
       __APP_VERSION__: JSON.stringify(`${pkg.version}.${commitHash}`),
     },
     build: {
