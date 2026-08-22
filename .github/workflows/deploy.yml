@@ -272,8 +272,6 @@ jobs:
         run: >
           npx ${{ env.FIREBASE_TOOLS }} deploy
           --only functions --project sss-hvgcc-bingo --non-interactive
-        env:
-          FIRESTORE_DATABASE_ID: ${{ secrets.VITE_FIREBASE_DATABASE_ID }}
 
       # firebase-tools prints "An unexpected error has occurred" and nothing
       # else when the real failure only reaches firebase-debug.log. Without
