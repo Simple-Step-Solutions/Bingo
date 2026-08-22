@@ -47,8 +47,8 @@ export const Privacy: React.FC<PrivacyProps> = ({ settings }) => {
       <Section icon={<Mail size={18} />} title="Your account">
         <p>
           Signing in gives us your email address and display name from Google, or
-          the email you register with. {chamber} staff can see both, along with
-          the town you pick and which businesses you have visited.
+          the email you register with. Staff at {chamber} can see both, along
+          with the town you pick and which businesses you have visited.
         </p>
         <p>
           Other players never see your email. If you appear on a leaderboard, it
@@ -66,7 +66,7 @@ export const Privacy: React.FC<PrivacyProps> = ({ settings }) => {
         <p>
           While the app is open on a phone it also records your approximate
           position about once a minute, and only when you have moved more than 30
-          metres. {chamber} staff can see a live map of where players are.
+          metres. Staff at {chamber} can see a live map of where players are.
         </p>
         <p className="font-semibold text-neutral-900">
           You can turn location off in your browser or phone settings at any time.
@@ -77,8 +77,8 @@ export const Privacy: React.FC<PrivacyProps> = ({ settings }) => {
       <Section icon={<Eye size={18} />} title="Who sees what">
         <ul className="list-disc pl-5 space-y-2">
           <li>
-            <strong>{chamber} staff</strong> see your name, email, town, visits,
-            and current location while you are playing.
+            <strong>Staff at {chamber}</strong> see your name, email, town,
+            visits, and current location while you are playing.
           </li>
           <li>
             <strong>A participating business</strong> sees the display names of

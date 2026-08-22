@@ -21,6 +21,19 @@ const BusinessIcon = L.divIcon({
   iconAnchor: [5, 5]
 });
 
+/**
+ * Every panel below is derived from completions, so before the first visit is
+ * recorded they all render an empty list. Without this they showed as a titled
+ * box with nothing under it, which reads as broken rather than as "no data
+ * yet" -- Town Distribution in particular left a ~300px void.
+ */
+const EmptyPanel: React.FC<{ icon: React.ElementType; message: string }> = ({ icon: Icon, message }) => (
+  <div className="text-center py-12">
+    <Icon className="mx-auto text-neutral-100 mb-4" size={48} aria-hidden="true" />
+    <p className="text-neutral-400 text-sm italic">{message}</p>
+  </div>
+);
+
 interface AnalyticsProps {
   users: UserProfile[];
   completions: Completion[];
@@ -116,6 +129,13 @@ export const Analytics: React.FC<AnalyticsProps> = ({ users, completions, busine
           </div>
           <p className="text-4xl font-black text-neutral-900 leading-none mb-1">{players.length}</p>
           <p className="text-[10px] text-neutral-400 uppercase tracking-widest font-bold">Total Players</p>
+          {/*
+            This counts people playing -- role 'player', plus any staff account
+            that has a board -- not accounts. The Users tab counts accounts, so
+            the two legitimately differ. Showing the denominator stops that
+            looking like one of them is wrong.
+          */}
+          <p className="text-[10px] text-neutral-300 tracking-wide font-bold mt-0.5">of {users.length} account{users.length === 1 ? '' : 's'}</p>
         </div>
 
         <div className="bg-white border border-neutral-200 p-5 rounded-3xl shadow-sm">
@@ -216,6 +236,9 @@ export const Analytics: React.FC<AnalyticsProps> = ({ users, completions, busine
             <h3 className="font-bold uppercase tracking-widest text-xs text-neutral-400">Top Players</h3>
           </div>
 
+          {leaderboard.length === 0 ? (
+            <EmptyPanel icon={TrendingUp} message="No visits recorded yet. Players appear here once they check in." />
+          ) : (
           <div className="space-y-4">
             {leaderboard.map((u, idx) => (
               <div key={u.uid} className="flex items-center justify-between p-4 bg-neutral-50 rounded-2xl border border-neutral-100">
@@ -243,6 +266,7 @@ export const Analytics: React.FC<AnalyticsProps> = ({ users, completions, busine
               </div>
             ))}
           </div>
+          )}
         </div>
 
         {/* Category Insights */}
@@ -254,6 +278,9 @@ export const Analytics: React.FC<AnalyticsProps> = ({ users, completions, busine
               <h3 className="font-bold uppercase tracking-widest text-xs text-neutral-400">Category Preferences</h3>
             </div>
 
+            {Object.keys(categoryStats).length === 0 ? (
+              <EmptyPanel icon={ShoppingBag} message="No visits recorded yet. Categories appear as visits come in." />
+            ) : (
             <div className="space-y-6">
               {Object.entries<number>(categoryStats).sort((a, b) => b[1] - a[1]).map(([cat, count]) => (
                 <div key={cat}>
@@ -270,6 +297,7 @@ export const Analytics: React.FC<AnalyticsProps> = ({ users, completions, busine
                 </div>
               ))}
             </div>
+            )}
           </div>
 
         {/* Top Businesses */}
@@ -281,6 +309,9 @@ export const Analytics: React.FC<AnalyticsProps> = ({ users, completions, busine
             <h3 className="font-bold uppercase tracking-widest text-xs text-neutral-400">Most Visited</h3>
           </div>
 
+          {topBusinesses.length === 0 ? (
+            <EmptyPanel icon={Eye} message="No visits recorded yet." />
+          ) : (
           <div className="space-y-4">
             {topBusinesses.map((item, idx) => (
               <div key={item.biz?.id} className="flex items-center justify-between p-4 bg-neutral-50 rounded-2xl border border-neutral-100">
@@ -300,6 +331,7 @@ export const Analytics: React.FC<AnalyticsProps> = ({ users, completions, busine
               </div>
             ))}
           </div>
+          )}
         </div>
       </div>
 
@@ -313,6 +345,9 @@ export const Analytics: React.FC<AnalyticsProps> = ({ users, completions, busine
             <h3 className="font-bold uppercase tracking-widest text-xs text-neutral-400">Town Distribution</h3>
           </div>
 
+          {Object.keys(townStats).length === 0 ? (
+            <EmptyPanel icon={MapPin} message="No visits recorded yet. Towns appear as visits come in." />
+          ) : (
           <div className="space-y-6">
             {Object.entries<number>(townStats).sort((a, b) => b[1] - a[1]).map(([town, count]) => (
               <div key={town}>
@@ -329,6 +364,7 @@ export const Analytics: React.FC<AnalyticsProps> = ({ users, completions, busine
               </div>
             ))}
           </div>
+          )}
         </div>
 
         {/* User Behavior Insights */}
