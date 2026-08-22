@@ -6,5 +6,8 @@ node_modules/
 /*.log
 .env*
 !.env.example
+# Deploy-time function params. Not secret: the database id already ships
+# to every browser in the client bundle.
+!functions/.env.sss-hvgcc-bingo
 /firebase-applet-config.json
 /.claude/
