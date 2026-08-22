@@ -194,7 +194,9 @@ export const Navbar: React.FC<NavbarProps> = ({ user, settings }) => {
     navItems.push({ to: '/raffle', icon: Ticket, label: 'Raffle' });
   }
 
-  if (user.role === 'chamber' || user.role === 'business') {
+  // Admin included: an admin is every role at once, so the Store tab belongs to
+  // them as much as to a chamber or business account.
+  if (user.role === 'admin' || user.role === 'chamber' || user.role === 'business') {
     navItems.push({ to: '/business', icon: Store, label: 'Store' });
   }
 

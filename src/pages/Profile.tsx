@@ -278,8 +278,8 @@ export const Profile: React.FC<ProfileProps> = ({ user }) => {
         )}
         {showInstall && <InstallPrompt force onClose={() => setShowInstall(false)} />}
 
-        {/* Replay tour -- chamber and business only */}
-        {(user.role === 'chamber' || user.role === 'business') && (
+        {/* Replay tour -- staff roles, admin included */}
+        {(user.role === 'admin' || user.role === 'chamber' || user.role === 'business') && (
           <button
             onClick={async () => {
               await setDoc(doc(db, 'users', user.uid), { tourCompleted: false }, { merge: true });
