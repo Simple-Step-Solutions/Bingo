@@ -10,8 +10,12 @@ initializeApp();
 
 // The app runs on a NAMED database. getFirestore() with no argument reads and
 // writes an empty (default) database with no error and no log, so every
-// function here must pass databaseId.value().
-const databaseId = defineString('FIRESTORE_DATABASE_ID', { default: '(default)' });
+// function here must pass databaseId.
+//
+// No default value, on purpose: a default of '(default)' turns a missing param
+// into exactly that silent empty-database deploy. Failing the deploy is
+// enormously preferable.
+const databaseId = defineString('FIRESTORE_DATABASE_ID');
 
 const TYPE_TITLES = {
   info: 'Chamber Bingo',

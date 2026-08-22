@@ -125,11 +125,18 @@ jobs:
   # Firestore and Storage rules were previously never deployed by CI, so the
   # rules in this repo could drift from the rules actually protecting the data.
   #
-  # firebase.json pins the named database explicitly (the array form with a
-  # "database" key). Without that this job deploys to (default) and reports
-  # success while changing nothing -- which is what used to happen by hand.
-  # --only firestore:rules applies to every entry in that array, so the named
-  # database is covered.
+  # firebase.json pins the named database explicitly via a "database" key.
+  # Without that this job deploys to (default) and reports success while
+  # changing nothing -- which is what used to happen by hand.
+  #
+  # That key MUST stay in the single-object form. In the array form,
+  # firebase-tools reads everything after "firestore:" in --only as a database
+  # or target name, so "firestore:rules" matches no entry and the config
+  # resolves to nothing. The prepare step then bails without ever loading the
+  # rules, and the deploy crashes with a bare "An unexpected error has
+  # occurred" (a TypeError on undefined indexes, not a permissions problem).
+  # Worse, --only firestore:rules on its own skips the crash and exits 0
+  # having deployed nothing at all. See firestore/fsConfig.ts upstream.
   #
   # Index deletion is not a risk: firebase-tools only removes indexes that are
   # absent from firestore.indexes.json when passed --force, which this omits.
@@ -152,11 +159,55 @@ jobs:
         with:
           credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
 
-      - name: Deploy Firestore and Storage rules
+      # Prints which identity is actually deploying. A service account email is
+      # not a secret, and without this a 403 leaves you guessing which of the
+      # project's service accounts to grant roles to -- the one in the secret is
+      # often not the one you assume.
+      - name: Show deploying identity
+        run: node -e "console.log('deploying as:', JSON.parse(require('fs').readFileSync(process.env.GOOGLE_APPLICATION_CREDENTIALS,'utf8')).client_email)"
+
+      # Firestore rules go FIRST and on their own.
+      #
+      # These were bundled with the Storage rules in a single command, which
+      # meant a missing Storage permission blocked the Firestore security rules
+      # from deploying at all -- the privilege escalation fixes sat undeployed
+      # behind an unrelated bucket grant. Split so the important half lands
+      # even when the other half cannot.
+      #
+      # The grep guards the silent-no-op case: when the firestore config fails
+      # to resolve, firebase-tools can exit 0 having released no ruleset at
+      # all. Shipping stale rules is a security regression that otherwise
+      # reads as a green build, so assert the release happened instead of
+      # trusting the exit code.
+      - name: Deploy Firestore rules and indexes
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx ${{ env.FIREBASE_TOOLS }} deploy \
+            --only firestore:rules,firestore:indexes \
+            --project sss-hvgcc-bingo --non-interactive 2>&1 | tee firestore-deploy.log
+          grep -q "released rules" firestore-deploy.log || {
+            echo "::error::Firestore deploy exited 0 but released no ruleset. The firestore entry in firebase.json is not resolving -- see the comment above this job."
+            exit 1
+          }
+
+      # Storage rules are secondary: nothing in the game loop depends on them,
+      # and they need firebasestorage.defaultBucket.get, which the Firebase
+      # Admin SDK service account does not carry by default. Runs after, so a
+      # failure here is visible without holding back Firestore.
+      - name: Deploy Storage rules
         run: >
           npx ${{ env.FIREBASE_TOOLS }} deploy
-          --only firestore:rules,firestore:indexes,storage
+          --only storage
           --project sss-hvgcc-bingo --non-interactive
+
+      # firebase-tools prints "An unexpected error has occurred" and nothing
+      # else when the real failure only reaches firebase-debug.log. Without
+      # this a rules deploy failure is undiagnosable from CI alone.
+      - name: Show firebase debug log
+        if: failure()
+        run: cat firebase-debug.log || echo "no firebase-debug.log produced"
+
 
   deploy-functions:
     needs: changes
@@ -175,6 +226,9 @@ jobs:
         with:
           credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
 
+      - name: Show deploying identity
+        run: node -e "console.log('deploying as:', JSON.parse(require('fs').readFileSync(process.env.GOOGLE_APPLICATION_CREDENTIALS,'utf8')).client_email)"
+
       - name: Install function dependencies
         run: npm ci
         working-directory: functions
@@ -185,3 +239,11 @@ jobs:
           --only functions --project sss-hvgcc-bingo --non-interactive
         env:
           FIRESTORE_DATABASE_ID: ${{ secrets.VITE_FIREBASE_DATABASE_ID }}
+
+      # firebase-tools prints "An unexpected error has occurred" and nothing
+      # else when the real failure only reaches firebase-debug.log. Without
+      # this a rules deploy failure is undiagnosable from CI alone.
+      - name: Show firebase debug log
+        if: failure()
+        run: cat firebase-debug.log || echo "no firebase-debug.log produced"
+
