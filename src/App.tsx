@@ -30,6 +30,15 @@ import { usePushNotifications } from './hooks/usePushNotifications';
 const DEFAULT_PRIMARY = '#1695B2';
 const DEFAULT_ACCENT = '#CC5500';
 
+/**
+ * Roles that get the staff-side surfaces (the Store page, the guided tour).
+ *
+ * Admin is deliberately in here. An admin is every role at once, so any page a
+ * chamber or business account can open, an admin can open too -- leaving admin
+ * out is what hid the Store tab from admins entirely.
+ */
+const isStaff = (role?: string) => role === 'admin' || role === 'chamber' || role === 'business';
+
 function App() {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [settings, setSettings] = useState<AppSettings | null>(null);
@@ -97,9 +106,11 @@ function App() {
             if (!profileReady) {
               profileReady = true;
               checkReady();
-              // Show tour for chamber/business users who just selected their role (roleSelected just became true)
-              // or existing users who haven't completed the tour
-              if ((profile.role === 'chamber' || profile.role === 'business') && !profile.tourCompleted && profile.roleSelected) {
+              // Show tour for staff who just selected their role (roleSelected
+              // just became true) or existing staff who haven't completed it.
+              // Admin is included: an admin is every role at once, so anything a
+              // chamber account can reach, an admin can reach too.
+              if (isStaff(profile.role) && !profile.tourCompleted && profile.roleSelected) {
                 setShowTour(true);
               }
             }
@@ -163,7 +174,7 @@ function App() {
 
   // When roleSelected flips to true, trigger tour for non-player roles
   useEffect(() => {
-    if (user?.roleSelected && (user.role === 'chamber' || user.role === 'business') && !user.tourCompleted) {
+    if (user?.roleSelected && isStaff(user.role) && !user.tourCompleted) {
       setShowTour(true);
     }
   }, [user?.roleSelected, user?.role, user?.tourCompleted]);
@@ -255,7 +266,7 @@ function App() {
               <Route path="/admin/*" element={<Admin user={user} businesses={businesses} towns={towns} settings={settings} />} />
             )}
 
-            {(user.role === 'chamber' || user.role === 'business') && (
+            {isStaff(user.role) && (
               <Route path="/business" element={<BusinessDashboard user={user} />} />
             )}
 
@@ -302,7 +313,7 @@ function App() {
             </div>
           </div>
         )}
-        {showTour && user?.role === 'chamber' && (
+        {showTour && (user?.role === 'chamber' || user?.role === 'admin') && (
           <ChamberTour
             chamberName={settings?.chamberName}
             onComplete={async () => {
