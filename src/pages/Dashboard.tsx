@@ -436,7 +436,21 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, settings
       )}
 
       {/* Board */}
-      <div className="flex-1 min-h-0 flex items-center justify-center relative">
+      {/*
+        The board sizes itself against this wrapper, not against the viewport.
+        It used to be min(100vw - 2rem, 100dvh - 16rem), where the 16rem was a
+        hardcoded guess at the chrome above and below it. That guess did not
+        include the "squares are still open" banner, which is conditional, so
+        whenever it rendered the board was ~60px too tall, overflowed this
+        wrapper, and painted over the banner -- exactly the text a player with
+        an incomplete board needs to read.
+
+        container-type: size makes cqw/cqh resolve against the space flexbox
+        actually leaves here, so the board fits whatever is left over and stays
+        square. Safe because this wrapper's height is definite: the page root
+        sets height: calc(100dvh - 6rem).
+      */}
+      <div className="flex-1 min-h-0 flex items-center justify-center relative" style={{ containerType: 'size' }}>
         <div
           role="group"
           aria-label={`Bingo board, ${size} by ${size}. ${completions.length} of ${board.filter(c => c !== 'FREE' && c !== 'EMPTY').length} businesses visited.`}
@@ -444,8 +458,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, settings
           style={{
             gridTemplateColumns: `repeat(${size}, 1fr)`,
             gridAutoRows: '1fr',
-            width: 'min(calc(100vw - 2rem), calc(100dvh - 16rem))',
-            height: 'min(calc(100vw - 2rem), calc(100dvh - 16rem))',
+            width: 'min(100cqw, 100cqh)',
+            height: 'min(100cqw, 100cqh)',
           }}
         >
           {board.map((bizId, idx) => {
