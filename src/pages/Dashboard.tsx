@@ -384,8 +384,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, settings
     </div>
   );
 
+  // Spacing below is deliberately md:-only. On mobile the navbar is docked to
+  // the BOTTOM -- it only becomes a top bar at md: -- so there is nothing above
+  // the title to clear and every pixel of height belongs to the board. Under
+  // md: this renders exactly as it did before.
   return (
-    <div className="flex flex-col max-w-4xl mx-auto" style={{ height: 'calc(100dvh - 6rem)', overflow: 'hidden', marginTop: '-2rem', marginBottom: '-2rem', paddingTop: '0.75rem' }}>
+    <div className="flex flex-col max-w-3xl mx-auto pt-3 md:pt-8" style={{ height: 'calc(100dvh - 6rem)', overflow: 'hidden', marginTop: '-2rem', marginBottom: '-2rem' }}>
 
       {settings?.gamePaused && (
         <div className="fixed top-16 md:top-20 inset-x-0 z-20 bg-red-500 text-white text-center py-2 px-4">
@@ -394,7 +398,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, settings
       )}
 
       {/* Header */}
-      <div className="flex justify-between items-center gap-3 mb-2 md:mb-10 shrink-0">
+      <div className="flex justify-between items-center gap-3 mb-2 md:mb-6 shrink-0">
         <div>
           <h2 className="font-serif italic text-3xl md:text-5xl leading-none mb-0.5">Your Board</h2>
           <p className="text-[9px] md:text-xs text-neutral-400 uppercase tracking-[0.2em] font-bold flex items-center gap-2">
