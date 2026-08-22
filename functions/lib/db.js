@@ -8,8 +8,13 @@ const { getFirestore } = require('firebase-admin/firestore');
  * with no error and no log line, so a function that forgets this appears to
  * work perfectly while touching nothing. Every Firestore handle in this
  * codebase must come from db() below.
+ *
+ * No default value, on purpose: a default of '(default)' turns a missing param
+ * into exactly that silent empty-database deploy. Failing the deploy is
+ * enormously preferable. The real value is committed in
+ * functions/.env.sss-hvgcc-bingo.
  */
-const databaseId = defineString('FIRESTORE_DATABASE_ID', { default: '(default)' });
+const databaseId = defineString('FIRESTORE_DATABASE_ID');
 
 const db = () => getFirestore(databaseId.value());
 
