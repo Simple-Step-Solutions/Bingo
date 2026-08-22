@@ -265,10 +265,10 @@ export const AdminMenu: React.FC<AdminMenuProps> = ({ users, businesses, current
                   <button
                     onClick={() => setImpersonating(u)}
                     className="text-[10px] font-bold uppercase tracking-widest transition-colors flex items-center gap-1 px-2 py-1 rounded-lg bg-neutral-100 text-neutral-500 hover:bg-neutral-200 hover:text-neutral-900"
-                    title="View / Edit Board"
+                    title="View / edit this player's board"
                   >
                     <LayoutGrid size={10} />
-                    Board
+                    View
                   </button>
                 ) : null}
                 <button
@@ -278,10 +278,10 @@ export const AdminMenu: React.FC<AdminMenuProps> = ({ users, businesses, current
                       ? 'bg-red-50 text-red-600'
                       : 'bg-neutral-100 text-neutral-500 hover:bg-neutral-200 hover:text-neutral-900'
                   }`}
-                  title="Reset Town and Board"
+                  title="Reset town and board"
                 >
                   <MapPin size={10} />
-                  Town
+                  Reset Town
                 </button>
                 <button
                   onClick={() => handleReset(u, 'progress')}
@@ -290,10 +290,10 @@ export const AdminMenu: React.FC<AdminMenuProps> = ({ users, businesses, current
                       ? 'bg-red-50 text-red-600'
                       : 'bg-neutral-100 text-neutral-500 hover:bg-neutral-200 hover:text-neutral-900'
                   }`}
-                  title="Reset Progress Only"
+                  title="Reset progress only"
                 >
                   <RefreshCw size={10} className={confirmAction?.uid === u.uid && confirmAction?.type === 'progress' ? 'animate-spin' : ''} />
-                  Progress
+                  Reset Progress
                 </button>
                 <button
                   onClick={() => handleReset(u, 'board')}
@@ -302,10 +302,10 @@ export const AdminMenu: React.FC<AdminMenuProps> = ({ users, businesses, current
                       ? 'bg-red-50 text-red-600'
                       : 'bg-neutral-100 text-neutral-500 hover:bg-neutral-200 hover:text-neutral-900'
                   }`}
-                  title="Reset Board Only"
+                  title="Reset board only"
                 >
                   <Gamepad2 size={10} />
-                  Board
+                  Reset Board
                 </button>
                 <button
                   onClick={() => handleReset(u, 'everything')}
@@ -314,7 +314,7 @@ export const AdminMenu: React.FC<AdminMenuProps> = ({ users, businesses, current
                       ? 'bg-red-50 text-red-600'
                       : 'bg-neutral-100 text-neutral-500 hover:bg-neutral-200 hover:text-red-500'
                   }`}
-                  title="Reset Town, Board and Progress"
+                  title="Reset town, board and progress"
                 >
                   <RotateCcw size={10} />
                   Reset All
