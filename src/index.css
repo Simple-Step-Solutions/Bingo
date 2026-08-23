@@ -52,3 +52,65 @@
 @utility mb-safe {
   margin-bottom: env(safe-area-inset-bottom, 0px);
 }
+
+/*
+ * Poster printing.
+ *
+ * The chamber has to get a code onto a wall in every member shop, so printing
+ * happens straight from the Businesses tab rather than through an export. When
+ * a poster sheet is on screen everything else is removed from the printed page,
+ * and each poster takes a page of its own.
+ */
+@media print {
+  @page {
+    size: portrait;
+    margin: 0.4in;
+  }
+
+  body.printing-posters > *:not(.poster-print-root) {
+    display: none !important;
+  }
+
+  body.printing-posters .poster-print-root {
+    position: static !important;
+    inset: auto !important;
+    display: block !important;
+    background: #fff !important;
+    padding: 0 !important;
+  }
+
+  body.printing-posters .poster-print-root .poster-screen-only {
+    display: none !important;
+  }
+
+  body.printing-posters .poster-print-root .poster-scroll {
+    overflow: visible !important;
+    max-height: none !important;
+    display: block !important;
+    padding: 0 !important;
+    border: 0 !important;
+  }
+
+  .poster-page {
+    break-after: page;
+    page-break-after: always;
+    border: 0 !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    width: 100% !important;
+    margin: 0 !important;
+  }
+
+  .poster-page:last-child {
+    break-after: auto;
+    page-break-after: auto;
+  }
+
+  /* The QR needs its quiet zone and the poster needs its rules, so keep the
+     browser from helpfully dropping backgrounds and borders. */
+  .poster-page,
+  .poster-page * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}

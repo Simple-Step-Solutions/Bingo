@@ -140,12 +140,18 @@ exports.drawRaffleWinner = onCall(callableOpts(), async (request) => {
  */
 exports.redeemWin = onCall(callableOpts(), async (request) => {
   const { uid, role, profile } = await requireRole(request, 'chamber');
-  const { userId, notes } = request.data || {};
-  if (typeof userId !== 'string' || !userId) {
-    throw new HttpsError('invalid-argument', 'userId is required.');
+  const { winId, userId, notes } = request.data || {};
+
+  // Win ids are event-scoped (`{eventId}_{uid}`), so the bare uid this used to
+  // take only ever resolved a legacy win. Every event-scoped bingo returned
+  // not-found, which made the whole redemption half unreachable. Callers pass
+  // the document id; userId stays accepted for legacy wins keyed by uid alone.
+  const docId = typeof winId === 'string' && winId ? winId : userId;
+  if (typeof docId !== 'string' || !docId) {
+    throw new HttpsError('invalid-argument', 'winId is required.');
   }
 
-  const ref = db().collection('wins').doc(userId);
+  const ref = db().collection('wins').doc(docId);
   const snap = await ref.get();
   if (!snap.exists) throw new HttpsError('not-found', 'That player has no recorded bingo.');
   if (snap.data().redeemed) throw new HttpsError('failed-precondition', 'Already redeemed.');
@@ -162,9 +168,9 @@ exports.redeemWin = onCall(callableOpts(), async (request) => {
     actorEmail: (profile && profile.email) || '',
     actorRole: role,
     action: 'redeem_win',
-    targetUid: userId,
+    targetUid: snap.data().userId || docId,
     targetEmail: snap.data().userEmail || '',
-    details: { prize: snap.data().prize || null },
+    details: { prize: snap.data().prize || null, winId: docId },
   });
 
   return { ok: true };

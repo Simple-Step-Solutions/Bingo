@@ -4,6 +4,7 @@ import { db } from '../../firebase';
 import { Business, UserProfile, Invite } from '../../types';
 import { createInvite, revokeInvite, errorMessage, isExpectedError } from '../../services/api';
 import { Link2, Copy, Check, Loader2, Ban } from 'lucide-react';
+import { HelpTip } from './HelpTip';
 
 interface InviteManagerProps {
   businesses: Business[];
@@ -103,12 +104,23 @@ export const InviteManager: React.FC<InviteManagerProps> = ({ businesses, curren
 
   return (
     <div className="bg-white border border-neutral-200 p-8 rounded-3xl shadow-sm">
-      <div className="flex items-center gap-3 mb-6">
+      <div className="flex items-center gap-3 mb-2">
         <div className="w-8 h-8 bg-[var(--color-primary)] rounded-xl flex items-center justify-center shrink-0">
-          <Link2 className="text-white" size={14} />
+          <Link2 className="text-white" size={14} aria-hidden="true" />
         </div>
-        <h3 className="font-bold uppercase tracking-widest text-xs text-neutral-400">Invite Users</h3>
+        <h3 className="flex items-center gap-1.5 font-bold uppercase tracking-widest text-xs text-neutral-400">
+          Invite Users
+          <HelpTip label="invites">
+            <p>Creates a one-time sign-in link. Whoever opens it and signs in gets the role you picked, so send it to one person and do not post it anywhere public.</p>
+            <p>Each link works once and expires 48 hours after you create it. If it goes stale, revoke it and make a new one.</p>
+            <p>The link is shown only at the moment you create it. It is stored scrambled, so nobody, including us, can look it up again afterwards.</p>
+          </HelpTip>
+        </h3>
       </div>
+      <p className="text-sm text-neutral-500 leading-relaxed mb-6">
+        Players do not need an invite: they can just sign up. Use these to give a
+        shop owner or a member of your staff their extra access.
+      </p>
 
       {error && (
         <div role="alert" className="mb-4 bg-red-50 border border-red-200 rounded-2xl px-4 py-3">
@@ -118,8 +130,9 @@ export const InviteManager: React.FC<InviteManagerProps> = ({ businesses, curren
 
       <div className="space-y-4 mb-6">
         <div>
-          <label className="block text-[10px] font-bold uppercase tracking-widest text-neutral-400 mb-2">Role</label>
+          <label htmlFor="invite-role" className="block text-[10px] font-bold uppercase tracking-widest text-neutral-400 mb-2">Role</label>
           <select
+            id="invite-role"
             value={role}
             onChange={e => { setRole(e.target.value as 'chamber' | 'business' | 'player'); setBusinessId(''); }}
             className="w-full border border-neutral-200 rounded-xl px-4 py-3 text-sm font-medium bg-neutral-50 outline-none focus:ring-2 focus:ring-neutral-900 transition-all"
@@ -132,8 +145,9 @@ export const InviteManager: React.FC<InviteManagerProps> = ({ businesses, curren
 
         {role === 'business' && (
           <div>
-            <label className="block text-[10px] font-bold uppercase tracking-widest text-neutral-400 mb-2">Business (optional)</label>
+            <label htmlFor="invite-business" className="block text-[10px] font-bold uppercase tracking-widest text-neutral-400 mb-2">Which business</label>
             <select
+              id="invite-business"
               value={businessId}
               onChange={e => setBusinessId(e.target.value)}
               className="w-full border border-neutral-200 rounded-xl px-4 py-3 text-sm font-medium bg-neutral-50 outline-none focus:ring-2 focus:ring-neutral-900 transition-all"
@@ -143,18 +157,27 @@ export const InviteManager: React.FC<InviteManagerProps> = ({ businesses, curren
                 <option key={b.id} value={b.id}>{b.name}</option>
               ))}
             </select>
+            <p className="text-[11px] text-neutral-500 mt-2 leading-relaxed">
+              Pick the shop so the owner lands on their own dashboard. Leave it blank
+              and they can claim their business themselves with the code on its poster.
+            </p>
           </div>
         )}
 
         <div>
-          <label className="block text-[10px] font-bold uppercase tracking-widest text-neutral-400 mb-2">Email hint (optional)</label>
+          <label htmlFor="invite-email" className="block text-[10px] font-bold uppercase tracking-widest text-neutral-400 mb-2">Their email (optional)</label>
           <input
+            id="invite-email"
             type="email"
             placeholder="person@example.com"
             value={emailHint}
             onChange={e => setEmailHint(e.target.value)}
             className="w-full border border-neutral-200 rounded-xl px-4 py-3 text-sm font-medium bg-neutral-50 outline-none focus:ring-2 focus:ring-neutral-900 transition-all"
           />
+          <p className="text-[11px] text-neutral-500 mt-2 leading-relaxed">
+            Only a label, so you can tell your pending invites apart in the list below.
+            It does not send anything or restrict who can use the link.
+          </p>
         </div>
 
         <button
@@ -169,9 +192,11 @@ export const InviteManager: React.FC<InviteManagerProps> = ({ businesses, curren
 
       {inviteUrl && (
         <div className="mb-8 bg-neutral-50 border border-neutral-200 rounded-2xl p-4">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-neutral-400 mb-1">Shareable Link</p>
-          <p className="text-[10px] text-neutral-500 mb-3 leading-relaxed">
-            Copy this now. Invites are stored hashed, so this link cannot be shown again.
+          <p className="text-[10px] font-bold uppercase tracking-widest text-neutral-400 mb-1">Their sign-in link</p>
+          <p className="text-[11px] text-neutral-500 mb-3 leading-relaxed">
+            <span className="font-bold text-neutral-700">Copy this now and send it.</span>{' '}
+            It is shown once and cannot be recovered, and it stops working 48 hours from
+            now. If you lose it, revoke the invite below and make another.
           </p>
           <div className="flex items-start gap-3">
             <p className="font-mono text-sm break-all text-neutral-700 flex-1 leading-relaxed">{inviteUrl}</p>

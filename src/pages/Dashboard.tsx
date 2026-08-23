@@ -63,6 +63,30 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, settings
   // there is no activeEventId and boards keep their bare uid key.
   const boardDocId = settings?.activeEventId ? `${settings.activeEventId}_${user.uid}` : user.uid;
 
+  /*
+   * The prize the server will actually award.
+   *
+   * Once a season is live, verifyVisit stamps the win with the season's
+   * bingoPrize, but this screen was reading settings/global. Set a prize on the
+   * season and the player was congratulated with the previous one, which is the
+   * kind of thing that gets argued about at the counter. Fall back to
+   * settings/global for the pre-season game, which is what the server does too.
+   */
+  const [eventPrize, setEventPrize] = useState<string | null>(null);
+  const activeEventId = settings?.activeEventId;
+
+  useEffect(() => {
+    if (!activeEventId) return;
+    const unsub = onSnapshot(
+      doc(db, 'events', activeEventId),
+      snap => setEventPrize(snap.exists() ? (snap.data().bingoPrize ?? null) : null),
+      err => console.error('Active event snapshot error:', err),
+    );
+    return unsub;
+  }, [activeEventId]);
+
+  const bingoPrize = eventPrize || settings?.bingoPrize;
+
   useEffect(() => {
     const unsub = onSnapshot(
       doc(db, 'boards', boardDocId),
@@ -715,7 +739,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, settings
               <p className="text-neutral-500 mb-8 leading-relaxed">Congratulations! You've completed a line on your bingo board.</p>
               <div className="bg-neutral-50 rounded-3xl p-8 mb-10 border border-neutral-100">
                 <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-neutral-400 block mb-3">Your Prize</span>
-                <p className="text-2xl font-serif italic text-neutral-900">{settings.bingoPrize || 'A special reward from the Chamber!'}</p>
+                <p className="text-2xl font-serif italic text-neutral-900">{bingoPrize || 'A special reward from the Chamber!'}</p>
                 <p className="text-[10px] text-neutral-400 mt-4 uppercase tracking-widest font-bold">Show this screen to a Chamber official to claim.</p>
               </div>
               <button onClick={() => setShowBingoFanfare(false)}

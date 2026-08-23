@@ -2,9 +2,10 @@ import React, { useState, useMemo } from 'react';
 import { UserProfile, Business, AppSettings } from '../../types';
 import { collection, getDocs, deleteDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
-import { RefreshCw, Trash2, RotateCcw, Gamepad2, MapPin, Search, ChevronLeft, ChevronRight, LayoutGrid, AlertTriangle } from 'lucide-react';
+import { RefreshCw, Trash2, RotateCcw, Gamepad2, MapPin, Search, ChevronLeft, ChevronRight, LayoutGrid, AlertTriangle, Loader2 } from 'lucide-react';
 import { BoardImpersonation } from './BoardImpersonation';
 import { InviteManager } from './InviteManager';
+import { HelpTip } from './HelpTip';
 import { setUserRole, adminResetUser, adminGlobalReset, errorMessage, isExpectedError } from '../../services/api';
 
 const USER_PAGE_SIZE = 25;
@@ -133,15 +134,28 @@ export const AdminMenu: React.FC<AdminMenuProps> = ({ users, businesses, current
     }
   };
 
-  const performGlobalReset = async () => {
-    if (!window.confirm("DANGER: This will reset town, board, and progress for ALL users. Continue?")) return;
+  // Previously a window.confirm followed by an alert, the only two of either in
+  // the app. A browser dialog gives no room to say what is about to happen, and
+  // "DANGER" is not a description.
+  const [globalResetArmed, setGlobalResetArmed] = useState(false);
+  const [globalResetting, setGlobalResetting] = useState(false);
+  const [globalResetNotice, setGlobalResetNotice] = useState<string | null>(null);
 
+  const performGlobalReset = async () => {
+    setGlobalResetting(true);
+    setGlobalResetArmed(false);
+    setRoleError(null);
+    setGlobalResetNotice(null);
     try {
       const res = await adminGlobalReset({});
-      alert(`System-wide reset complete. ${res.users} players, ${res.completions} completions, ${res.boards} boards cleared.`);
+      setGlobalResetNotice(
+        `Done. ${res.users} player${res.users === 1 ? '' : 's'}, ${res.completions} visit${res.completions === 1 ? '' : 's'} and ${res.boards} board${res.boards === 1 ? '' : 's'} cleared. Accounts and businesses were kept.`
+      );
     } catch (err) {
       if (!isExpectedError(err)) console.error('adminGlobalReset failed:', err);
-      alert(errorMessage(err, 'Error during global reset.'));
+      setRoleError(errorMessage(err, 'The reset did not finish. Some players may have been cleared already.'));
+    } finally {
+      setGlobalResetting(false);
     }
   };
 
@@ -156,17 +170,59 @@ export const AdminMenu: React.FC<AdminMenuProps> = ({ users, businesses, current
   return (
     <div className="space-y-6">
       <div className="bg-white border border-neutral-200 p-8 rounded-3xl shadow-sm">
-        <div className="flex justify-between items-center mb-6">
-          <h3 className="font-bold uppercase tracking-widest text-xs text-neutral-400">User Management</h3>
+        <div className="flex flex-wrap justify-between items-start gap-4 mb-2">
+          <h3 className="font-bold uppercase tracking-widest text-xs text-neutral-400">People</h3>
           {isAdmin && (
             <button
-              onClick={performGlobalReset}
-              className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-red-100 transition-all"
+              onClick={() => { setGlobalResetArmed(true); setGlobalResetNotice(null); }}
+              disabled={globalResetting}
+              className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-red-100 transition-all disabled:opacity-50"
             >
-              <RotateCcw size={12} /> Reset All Users
+              {globalResetting
+                ? <Loader2 size={12} className="animate-spin" aria-hidden="true" />
+                : <RotateCcw size={12} aria-hidden="true" />}
+              Start the game over
             </button>
           )}
         </div>
+        <p className="text-sm text-neutral-500 leading-relaxed mb-6">
+          Everyone with an account. Change what someone is allowed to do, look at a
+          player&rsquo;s board, or clear their progress if something has gone wrong.
+        </p>
+
+        {globalResetArmed && (
+          <div role="alertdialog" aria-label="Start the game over" className="mb-6 bg-red-50 border border-red-200 rounded-2xl p-5">
+            <p className="text-sm font-bold text-red-900 mb-1">
+              Clear every player&rsquo;s progress?
+            </p>
+            <p className="text-xs text-red-800 leading-relaxed mb-4">
+              Every board, every recorded visit and every bingo win is deleted, for
+              everyone. Accounts, businesses, towns and your settings are kept, and
+              players get a fresh board next time they open the app. There is no undo.
+              This is for starting a new run of the game, not for fixing one player.
+            </p>
+            <div className="flex flex-wrap gap-3">
+              <button
+                onClick={performGlobalReset}
+                className="bg-red-500 text-white px-5 py-2.5 rounded-xl font-bold text-[10px] uppercase tracking-widest hover:bg-red-600 transition-all"
+              >
+                Yes, clear all progress
+              </button>
+              <button
+                onClick={() => setGlobalResetArmed(false)}
+                className="px-5 py-2.5 rounded-xl font-bold text-[10px] uppercase tracking-widest border border-red-200 text-red-800 hover:bg-red-100 transition-all"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+
+        {globalResetNotice && (
+          <div role="status" className="mb-6 bg-green-50 border border-green-200 rounded-2xl px-5 py-4">
+            <p className="text-green-700 text-xs font-bold leading-relaxed">{globalResetNotice}</p>
+          </div>
+        )}
 
         {/* Search -- full width and prominent */}
         <div className="flex items-center gap-3 bg-neutral-50 border border-neutral-200 rounded-2xl px-4 py-3 mb-4">
@@ -205,6 +261,29 @@ export const AdminMenu: React.FC<AdminMenuProps> = ({ users, businesses, current
             <p className="text-red-600 text-xs font-bold">{roleError}</p>
           </div>
         )}
+
+        <div className="mb-6 flex flex-wrap items-center gap-x-6 gap-y-2 rounded-2xl bg-neutral-50 border border-neutral-100 px-5 py-4">
+          <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-neutral-500">
+            What the roles mean
+            <HelpTip label="the roles">
+              <p><strong>Player</strong> gets a board and visits businesses. This is everyone by default.</p>
+              <p><strong>Participating Business</strong> is a shop owner. They see who visited their own shop and can show their code, and nothing else.</p>
+              <p><strong>Chamber Manager</strong> is your staff and volunteers. They can do everything on these tabs except create other chamber accounts or start the game over.</p>
+              <p><strong>System Admin</strong> can do all of that plus manage chamber accounts. Keep this to one or two people.</p>
+              <p>A change takes effect at once, but someone already signed in may need up to an hour, or a sign out and back in, before it reaches them.</p>
+            </HelpTip>
+          </span>
+          <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-neutral-500">
+            What the reset buttons do
+            <HelpTip label="the reset buttons">
+              <p><strong>Town</strong> clears their home town and their board, so they choose a town again next time they open the app.</p>
+              <p><strong>Progress</strong> deletes their recorded visits but keeps the same board. Use this if they were credited for a shop by mistake.</p>
+              <p><strong>Board</strong> deals them a fresh set of squares and keeps their visits.</p>
+              <p><strong>Reset all</strong> does all three for that one person.</p>
+              <p>None of these touch anybody else. Every reset is recorded on the Activity tab with your name on it.</p>
+            </HelpTip>
+          </span>
+        </div>
 
         <div className="divide-y divide-neutral-100">
           {pagedUsers.map(u => (
@@ -368,12 +447,22 @@ export const AdminMenu: React.FC<AdminMenuProps> = ({ users, businesses, current
           <AlertTriangle className="text-red-500" size={18} />
           <h3 className="font-bold uppercase tracking-widest text-xs text-red-400">Danger Zone</h3>
         </div>
-        <p className="text-sm text-neutral-500 mb-6">
-          Clear all test data and start fresh. This deletes all users (except you), completions, raffle entries, winners, and notifications. Businesses, towns, and settings are kept.
+        <p className="text-sm text-neutral-500 leading-relaxed mb-2">
+          For clearing out a practice run before you go live. This deletes{' '}
+          <span className="font-bold text-neutral-700">every account except yours</span>,
+          along with all visits, boards, raffle entries, winners and notifications.
+          Businesses, towns and your settings are kept.
+        </p>
+        <p className="text-[11px] text-neutral-500 leading-relaxed mb-6">
+          Not the same as <span className="font-bold">Start the game over</span> above,
+          which clears progress but leaves everybody&rsquo;s account intact. If real
+          players have already signed up, you almost certainly want that one instead.
         </p>
         {clearConfirm ? (
-          <div className="flex items-center gap-3">
-            <span className="text-sm font-bold text-red-600 flex-1">Are you sure? This cannot be undone.</span>
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="text-sm font-bold text-red-600 flex-1">
+              Delete every other account and all game data? There is no undo.
+            </span>
             <button
               onClick={() => setClearConfirm(false)}
               className="px-4 py-2 text-xs font-bold uppercase tracking-widest border border-neutral-200 rounded-xl hover:border-neutral-400 transition-all"

@@ -63,7 +63,7 @@ export const EventManager: React.FC<EventManagerProps> = ({ settings, currentUse
 
   const [form, setForm] = useState({
     name: '', startsAt: '', endsAt: '', boardSize: 3, difficulty: 50,
-    bingoPrize: '', rafflePrize: '',
+    bingoPrize: '',
   });
 
   useEffect(() => {
@@ -98,10 +98,9 @@ export const EventManager: React.FC<EventManagerProps> = ({ settings, currentUse
       boardSize: Number(form.boardSize),
       difficulty: Number(form.difficulty),
       ...(form.bingoPrize.trim() ? { bingoPrize: form.bingoPrize.trim() } : {}),
-      ...(form.rafflePrize.trim() ? { rafflePrize: form.rafflePrize.trim() } : {}),
     } as never);
     setShowForm(false);
-    setForm({ name: '', startsAt: '', endsAt: '', boardSize: 3, difficulty: 50, bingoPrize: '', rafflePrize: '' });
+    setForm({ name: '', startsAt: '', endsAt: '', boardSize: 3, difficulty: 50, bingoPrize: '' });
   }, 'Event created as a draft. Activate it when you are ready.');
 
   return (
@@ -245,27 +244,20 @@ export const EventManager: React.FC<EventManagerProps> = ({ settings, currentUse
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="evt-bingo" className="block text-[10px] font-bold uppercase tracking-widest text-neutral-500 mb-2">
-                  Bingo prize
-                </label>
-                <input
-                  id="evt-bingo" value={form.bingoPrize}
-                  onChange={e => setForm({ ...form, bingoPrize: e.target.value })}
-                  className="w-full border border-neutral-200 rounded-xl px-4 py-3 text-sm bg-white outline-none focus:ring-2 focus:ring-neutral-900"
-                />
-              </div>
-              <div>
-                <label htmlFor="evt-raffle" className="block text-[10px] font-bold uppercase tracking-widest text-neutral-500 mb-2">
-                  Raffle prize
-                </label>
-                <input
-                  id="evt-raffle" value={form.rafflePrize}
-                  onChange={e => setForm({ ...form, rafflePrize: e.target.value })}
-                  className="w-full border border-neutral-200 rounded-xl px-4 py-3 text-sm bg-white outline-none focus:ring-2 focus:ring-neutral-900"
-                />
-              </div>
+            <div>
+              <label htmlFor="evt-bingo" className="block text-[10px] font-bold uppercase tracking-widest text-neutral-500 mb-2">
+                Bingo prize
+              </label>
+              <input
+                id="evt-bingo" value={form.bingoPrize}
+                onChange={e => setForm({ ...form, bingoPrize: e.target.value })}
+                placeholder="e.g. A $25 gift card to any member business"
+                className="w-full border border-neutral-200 rounded-xl px-4 py-3 text-sm bg-white outline-none focus:ring-2 focus:ring-neutral-900"
+              />
+              <p className="text-[11px] text-neutral-500 leading-relaxed mt-2">
+                What a player wins for filling a line. The raffle prize is separate and
+                lives under Raffle below, because it does not change between seasons.
+              </p>
             </div>
 
             <div className="flex gap-3 pt-2">
