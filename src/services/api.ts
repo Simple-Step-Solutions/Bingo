@@ -126,7 +126,7 @@ export const drawRaffleWinner = call<
   { ok: true; winner: { userId: string; userName: string; userEmail: string }; poolSize: number }
 >('drawRaffleWinner');
 
-export const redeemWin = call<{ userId: string; notes?: string }, { ok: true }>('redeemWin');
+export const redeemWin = call<{ winId: string; notes?: string }, { ok: true }>('redeemWin');
 
 export const adminResetUser = call<
   { userId: string; type: 'town' | 'progress' | 'board' | 'everything' },

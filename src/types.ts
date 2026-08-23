@@ -83,6 +83,11 @@ export interface AppSettings {
   raffleDescription?: string;
   raffleRequirement?: number;
   bingoPrize?: string;
+  /**
+   * Read by drawRaffleWinner and stamped onto the winner record. Chamber-wide
+   * rather than per-season, so it lives here and not on the event.
+   */
+  rafflePrize?: string;
   showRealtimeMapToChamber?: boolean;
   primaryColor?: string;
   accentColor?: string;
@@ -137,6 +142,28 @@ export interface RaffleEntry {
   userEmail: string;
   timestamp: string;
   completionsCount: number;
+}
+
+/**
+ * A recorded bingo. Written only by verifyVisit; `redeemed` is flipped by the
+ * redeemWin callable when the chamber actually hands the prize over.
+ *
+ * The document id is `{eventId}_{uid}`, or a bare `uid` for legacy wins, so it
+ * cannot be derived from the user alone. Always pass the document id around.
+ */
+export interface Win {
+  id: string;
+  userId: string;
+  eventId?: string;
+  userName?: string;
+  userEmail?: string;
+  completionsCount?: number;
+  prize?: string | null;
+  redeemed?: boolean;
+  redeemedAt?: string;
+  redeemedBy?: string;
+  redeemNotes?: string | null;
+  timestampIso?: string;
 }
 
 export interface Winner {
