@@ -11,6 +11,7 @@ import {
 import { auth } from '../firebase';
 import { ShieldCheck, Gamepad2, Store, LayoutGrid, Loader2, Mail, Lock, User, ChevronRight, ArrowLeft, Link2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { InstallButton } from '../components/InstallButton';
 
 interface AuthProps {
   onAuthSuccess: () => void;
@@ -413,6 +414,15 @@ export const Auth: React.FC<AuthProps> = () => {
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Install before signing in. On iPhone the home screen app does not
+            share Safari's login, so installing first means signing in once. */}
+        <div className="mt-6">
+          <InstallButton />
+          <p className="text-[10px] text-neutral-400 text-center mt-2 leading-relaxed">
+            Adds Chamber Bingo to your home screen. Free, no app store needed.
+          </p>
         </div>
 
         <a

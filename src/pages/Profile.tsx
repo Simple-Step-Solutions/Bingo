@@ -5,8 +5,8 @@ import { auth, db } from '../firebase';
 import { UserProfile, Completion } from '../types';
 import { checkBingo } from '../services/bingoService';
 import { motion } from 'motion/react';
-import { LogOut, RotateCcw, CheckCircle2, Trophy, MapPin, Loader2, Lock, Eye, EyeOff, PlayCircle, Download } from 'lucide-react';
-import { InstallPrompt, isStandalone } from '../components/InstallPrompt';
+import { LogOut, RotateCcw, CheckCircle2, Trophy, MapPin, Loader2, Lock, Eye, EyeOff, PlayCircle } from 'lucide-react';
+import { InstallButton } from '../components/InstallButton';
 
 interface ProfileProps {
   user: UserProfile;
@@ -30,7 +30,6 @@ export const Profile: React.FC<ProfileProps> = ({ user }) => {
   const [pwLoading, setPwLoading] = useState(false);
   const [pwError, setPwError] = useState('');
   const [pwSuccess, setPwSuccess] = useState(false);
-  const [showInstall, setShowInstall] = useState(false);
 
   useEffect(() => {
     const q = query(collection(db, 'completions'), where('userId', '==', user.uid));
@@ -267,16 +266,7 @@ export const Profile: React.FC<ProfileProps> = ({ user }) => {
         {/* Install to home screen. Surfaced explicitly so it can be walked
             through during an in-person onboarding, on any platform, rather than
             depending on the browser deciding to offer it. */}
-        {!isStandalone() && (
-          <button
-            onClick={() => setShowInstall(true)}
-            className="w-full flex items-center justify-center gap-3 bg-neutral-50 hover:bg-neutral-100 text-neutral-700 border border-neutral-200 py-4 rounded-2xl font-bold text-sm transition-all mb-3"
-          >
-            <Download size={18} aria-hidden="true" />
-            Install this app
-          </button>
-        )}
-        {showInstall && <InstallPrompt force onClose={() => setShowInstall(false)} />}
+        <InstallButton className="mb-3" />
 
         {/* Replay tour -- staff roles, admin included */}
         {(user.role === 'admin' || user.role === 'chamber' || user.role === 'business') && (
