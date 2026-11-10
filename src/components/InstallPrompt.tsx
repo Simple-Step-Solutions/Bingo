@@ -1,27 +1,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Download, X, Share, SquarePlus } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { isIosSafari, isStandalone, promptInstall, useInstallState } from '../lib/installPrompt';
+
+export { isIosSafari, isStandalone };
 
 const DISMISSED_KEY = 'installPromptDismissedAt';
 // Ask again after a couple of weeks rather than never, and rather than on
 // every single page load as it did before.
 const SNOOZE_MS = 14 * 24 * 60 * 60 * 1000;
-
-export const isStandalone = () =>
-  window.matchMedia('(display-mode: standalone)').matches ||
-  // iOS Safari does not implement display-mode, it sets navigator.standalone.
-  (window.navigator as unknown as { standalone?: boolean }).standalone === true;
-
-/** iOS Safari, where beforeinstallprompt does not and will not fire. */
-export const isIosSafari = () => {
-  const ua = window.navigator.userAgent;
-  const iOS = /iPad|iPhone|iPod/.test(ua) ||
-    // iPadOS 13+ reports as a Mac; the touch points check separates them.
-    (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
-  if (!iOS) return false;
-  // Chrome and Firefox on iOS cannot install to the home screen at all.
-  return !/CriOS|FxiOS|EdgiOS|OPiOS/.test(ua);
-};
 
 interface Props {
   /** Render regardless of snooze, for the manual "Install this app" entry. */
@@ -30,7 +17,7 @@ interface Props {
 }
 
 export const InstallPrompt: React.FC<Props> = ({ force = false, onClose }) => {
-  const [deferred, setDeferred] = useState<any>(null);
+  const { canPrompt: deferred, standalone } = useInstallState();
   const [dismissed, setDismissed] = useState(false);
   const [ios, setIos] = useState(false);
   const [snoozed, setSnoozed] = useState(true);
@@ -46,13 +33,6 @@ export const InstallPrompt: React.FC<Props> = ({ force = false, onClose }) => {
     } catch {
       setSnoozed(false); // Private mode or storage disabled: just show it.
     }
-
-    const handler = (e: Event) => {
-      e.preventDefault();
-      setDeferred(e);
-    };
-    window.addEventListener('beforeinstallprompt', handler);
-    return () => window.removeEventListener('beforeinstallprompt', handler);
   }, []);
 
   const close = useCallback(() => {
@@ -62,7 +42,7 @@ export const InstallPrompt: React.FC<Props> = ({ force = false, onClose }) => {
   }, [onClose]);
 
   if (dismissed) return null;
-  if (isStandalone()) return null;
+  if (standalone) return null;
   if (!force && snoozed) return null;
   // Android and desktop: only once the browser says it is installable.
   // iOS: there is no such signal, so offer the manual instructions instead.
@@ -126,9 +106,7 @@ export const InstallPrompt: React.FC<Props> = ({ force = false, onClose }) => {
         {deferred && (
           <button
             onClick={async () => {
-              deferred.prompt();
-              await deferred.userChoice;
-              setDeferred(null);
+              await promptInstall();
               close();
             }}
             className="mt-4 w-full bg-white text-neutral-900 px-4 py-3 rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-neutral-100 transition-all"

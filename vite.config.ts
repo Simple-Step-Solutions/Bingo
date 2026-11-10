@@ -39,7 +39,7 @@ export default defineConfig(() => {
           ],
         },
         workbox: {
-          globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+          globPatterns: ['**/*.{js,css,html,ico,png,svg,webp,woff2}'],
           // The variable fonts ship one woff2 per unicode-range subset. Only the
           // Latin ones are ever needed here, and precaching all 24 added ~675KB
           // to the install for nothing. The rest stay in the build and are still

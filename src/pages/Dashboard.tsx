@@ -9,6 +9,8 @@ import { checkBingo, boardIsIncomplete } from '../services/bingoService';
 import { Link } from 'react-router-dom';
 import { Html5Qrcode } from 'html5-qrcode';
 import { useModalA11y, prefersReducedMotion } from '../lib/a11y';
+import { InstallButton } from '../components/InstallButton';
+import boardBackdrop from '../assets/board-backdrop-winter.webp';
 import { verifyVisit, ensureBoard, regenerateBoard as regenerateBoardCall, errorMessage, isExpectedError } from '../services/api';
 
 interface DashboardProps {
@@ -409,6 +411,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, settings
           </p>
         </div>
         <div className="flex gap-2 shrink-0">
+          <InstallButton variant="compact" />
           <button
             onClick={() => { setShowManual(!showManual); setError(null); }}
             className={`px-4 py-2.5 rounded-2xl text-[10px] font-bold uppercase tracking-widest transition-all shadow-sm ${
@@ -455,15 +458,31 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, settings
         sets height: calc(100dvh - 6rem).
       */}
       <div className="flex-1 min-h-0 flex items-center justify-center relative" style={{ containerType: 'size' }}>
+        {/*
+          The card backdrop, from the chamber's printed bingo cards. The image
+          is cropped inside its printed gold frame so it can fill any shape;
+          the frame is redrawn here as an inset line so it always fits.
+        */}
+        <div
+          className="relative rounded-2xl md:rounded-[2rem] p-2.5 md:p-5 shadow-sm bg-center bg-cover"
+          style={{
+            backgroundImage: `url(${boardBackdrop})`,
+            width: 'min(100cqw, 100cqh)',
+            height: 'min(100cqw, 100cqh)',
+          }}
+        >
+        <div
+          aria-hidden="true"
+          className="absolute inset-1 md:inset-2 rounded-xl md:rounded-[1.6rem] border pointer-events-none"
+          style={{ borderColor: '#BC9C22' }}
+        />
         <div
           role="group"
           aria-label={`Bingo board, ${size} by ${size}. ${completions.length} of ${board.filter(c => c !== 'FREE' && c !== 'EMPTY').length} businesses visited.`}
-          className="grid gap-1.5 md:gap-3"
+          className="relative grid gap-1.5 md:gap-3 w-full h-full"
           style={{
             gridTemplateColumns: `repeat(${size}, 1fr)`,
             gridAutoRows: '1fr',
-            width: 'min(100cqw, 100cqh)',
-            height: 'min(100cqw, 100cqh)',
           }}
         >
           {board.map((bizId, idx) => {
@@ -471,7 +490,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, settings
               return (
                 <div key="free"
                   aria-label={`Free space: ${settings.freeSpaceName}. Already counted.`}
-                  className="bg-orange-50 border-2 border-orange-200 rounded-xl md:rounded-3xl flex flex-col items-center justify-center text-center p-1 shadow-sm relative overflow-hidden group">
+                  className="bg-orange-50/85 border-2 border-orange-200 rounded-xl md:rounded-3xl flex flex-col items-center justify-center text-center p-1 shadow-sm relative overflow-hidden group">
                   <div className="absolute inset-0 bg-orange-100/50 opacity-0 group-hover:opacity-100 transition-opacity" aria-hidden="true" />
                   <Trophy className="text-orange-500 mb-1 relative z-10 w-5 h-5 md:w-8 md:h-8" aria-hidden="true" />
                   <p className="text-[9px] md:text-sm font-black text-orange-900 uppercase tracking-tighter relative z-10 leading-none px-1">{settings.freeSpaceName}</p>
@@ -484,7 +503,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, settings
               return (
                 <div
                   key={idx}
-                  className="rounded-xl md:rounded-3xl bg-neutral-50 border border-dashed border-neutral-300 flex items-center justify-center p-1"
+                  className="rounded-xl md:rounded-3xl bg-white/50 border border-dashed border-neutral-300 flex items-center justify-center p-1"
                   aria-label="Empty square. Not enough businesses in your town to fill this one, so it cannot be completed."
                 >
                   <span className="text-[10px] md:text-xs text-neutral-500 font-bold uppercase tracking-wider text-center leading-tight">
@@ -512,7 +531,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, settings
                   if (biz) { setSelectedBusiness(biz); }
                 }}
                 className={`rounded-xl md:rounded-3xl flex flex-col items-center justify-center text-center transition-all relative overflow-hidden group cursor-pointer p-1 md:p-3 focus:outline-none focus-visible:ring-4 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-2 ${
-                  isDone ? 'bg-neutral-900 text-white shadow-lg' : 'bg-white border border-neutral-100 text-neutral-900 hover:border-neutral-300 hover:shadow-sm shadow-sm'
+                  isDone ? 'bg-neutral-900 text-white shadow-lg' : 'bg-white/70 border border-white text-neutral-900 hover:bg-white/90 hover:shadow-sm shadow-sm'
                 }`}
               >
                 {isDone ? (
@@ -530,6 +549,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, settings
               </button>
             );
           })}
+        </div>
         </div>
       </div>
 
