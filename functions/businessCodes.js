@@ -130,6 +130,47 @@ exports.rotateAllCodes = onCall(callableOpts({ timeoutSeconds: 540 }), async (re
 });
 
 /**
+ * Every business's current code in one call, for the "download all QR codes"
+ * button. The chamber designs a poster per business and was otherwise clicking
+ * through them one at a time.
+ *
+ * Never rotates: issuing a code to any business that does not have one yet is
+ * the only write, the same as opening its QR dialog. Chamber, not admin, for
+ * that reason. Audited because it puts every live code in one file.
+ */
+exports.exportBusinessCodes = onCall(callableOpts({ timeoutSeconds: 300 }), async (request) => {
+  const { uid, role, profile } = await requireRole(request, 'chamber');
+
+  const bizSnap = await db().collection('businesses').get();
+  const results = [];
+  let issued = 0;
+  let failed = 0;
+
+  for (const doc of bizSnap.docs) {
+    const biz = doc.data();
+    try {
+      const r = await writeCodePair(doc.id, { rotate: false });
+      if (r.created) issued += 1;
+      results.push({ businessId: doc.id, name: biz.name || doc.id, town: biz.town || '', code: r.code });
+    } catch (err) {
+      failed += 1;
+      logger.error('exportBusinessCodes failed for business', { businessId: doc.id, error: err.message });
+    }
+  }
+
+  await writeAudit({
+    actorUid: uid,
+    actorEmail: (profile && profile.email) || '',
+    actorRole: role,
+    action: 'export_business_codes',
+    targetUid: 'ALL',
+    details: { exported: results.length, issued, failed },
+  });
+
+  return { results, issued, failed };
+});
+
+/**
  * Attach or replace an NFC tag serial for a business.
  *
  * NFC serials are not secret -- anyone with a phone can read one off a tag --

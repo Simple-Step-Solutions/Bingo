@@ -197,6 +197,7 @@ exports.regenerateBoard = boards.regenerateBoard;
 
 exports.provisionBusinessCode = businessCodes.provisionBusinessCode;
 exports.rotateAllCodes = businessCodes.rotateAllCodes;
+exports.exportBusinessCodes = businessCodes.exportBusinessCodes;
 exports.setBusinessNfc = businessCodes.setBusinessNfc;
 
 // Invites, business claiming, admin bootstrap (Phase 2e)
