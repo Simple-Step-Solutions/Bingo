@@ -17,6 +17,7 @@ import { AddressSearch } from '../AddressSearch';
 import { geocodeAddress } from '../../lib/geocoding';
 import { newDocId } from '../../lib/utils';
 import { QRModal } from '../QRModal';
+import { FreeSpaceLogos } from './FreeSpaceLogos';
 
 interface ChamberManagerProps {
   businesses: Business[];
@@ -406,6 +407,8 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
           <p className="text-[10px] text-neutral-400 font-bold uppercase tracking-widest">Color changes apply instantly for all users.</p>
         </div>
       </div>
+
+      <FreeSpaceLogos towns={towns} currentUser={currentUser} />
 
       {/* Business Management */}
       <div className="lg:col-span-2 space-y-8">

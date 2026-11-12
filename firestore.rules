@@ -162,6 +162,22 @@ service cloud.firestore {
       allow write: if isChamber();
     }
 
+    // Free space logos. One per town plus '_all', stored as a small data
+    // URL because Storage rules cannot see roles in this project's named
+    // database. Raster formats only: an SVG data URL can carry script.
+    // The size cap matches MAX_LOGO_DATA_URL_LENGTH in the client.
+    match /free_space_logos/{logoId} {
+      allow read:   if isAuthenticated();
+      allow delete: if isChamber();
+      allow create, update: if isChamber()
+        && request.resource.data.keys().hasOnly(['dataUrl', 'updatedBy', 'updatedAt'])
+        && request.resource.data.dataUrl is string
+        && request.resource.data.dataUrl.size() <= 250000
+        && request.resource.data.dataUrl.matches('^data:image/(png|webp|jpeg);base64,[A-Za-z0-9+/=]+$')
+        && request.resource.data.updatedBy == request.auth.uid
+        && request.resource.data.updatedAt == request.time;
+    }
+
     match /winners/{winnerId} {
       allow read:  if isAuthenticated();
       allow write: if isChamber();

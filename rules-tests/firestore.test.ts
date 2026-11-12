@@ -19,7 +19,7 @@ import {
 import { readFileSync } from 'node:fs';
 import {
   doc, getDoc, setDoc, updateDoc, deleteDoc,
-  collection, getDocs, addDoc, query, where,
+  collection, getDocs, addDoc, query, where, serverTimestamp,
 } from 'firebase/firestore';
 
 const PROJECT_ID = 'sss-hvgcc-bingo-rules-test';
@@ -658,6 +658,54 @@ describe('settings and businesses', () => {
     const db = authed('chamber1');
     await assertSucceeds(setDoc(doc(db, 'settings/global'), { boardSize: 4 }, { merge: true }));
     await assertSucceeds(setDoc(doc(db, 'businesses/bizA'), { task: 'Buy a coffee' }, { merge: true }));
+  });
+});
+
+describe('free space logos', () => {
+  const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+  const logo = (uid: string, dataUrl = PNG) => ({ dataUrl, updatedBy: uid, updatedAt: serverTimestamp() });
+
+  test('chamber staff can set, replace and remove a town logo', async () => {
+    const db = authed('chamber1');
+    await assertSucceeds(setDoc(doc(db, 'free_space_logos/Peekskill'), logo('chamber1')));
+    await assertSucceeds(setDoc(doc(db, 'free_space_logos/Peekskill'), logo('chamber1')));
+    await assertSucceeds(deleteDoc(doc(db, 'free_space_logos/Peekskill')));
+  });
+
+  test('the chamber claim alone is enough', async () => {
+    const db = authedAs('claimchamber', { role: 'chamber' });
+    await assertSucceeds(setDoc(doc(db, 'free_space_logos/_all'), logo('claimchamber')));
+  });
+
+  test('players and business owners cannot set or remove one', async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'free_space_logos/_all'), { dataUrl: PNG, updatedBy: 'chamber1' });
+    });
+    await assertFails(setDoc(doc(authed('player1'), 'free_space_logos/Yorktown'), logo('player1')));
+    await assertFails(setDoc(doc(authed('bizowner'), 'free_space_logos/Yorktown'), logo('bizowner')));
+    await assertFails(deleteDoc(doc(authed('player1'), 'free_space_logos/_all')));
+  });
+
+  test('any signed-in player can read one, a signed-out visitor cannot', async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'free_space_logos/_all'), { dataUrl: PNG, updatedBy: 'chamber1' });
+    });
+    await assertSucceeds(getDoc(doc(authed('player1'), 'free_space_logos/_all')));
+    await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), 'free_space_logos/_all')));
+  });
+
+  test('only raster image data URLs are accepted', async () => {
+    const db = authed('chamber1');
+    const svg = 'data:image/svg+xml;base64,PHN2ZyBvbmxvYWQ9YWxlcnQoMSk+';
+    await assertFails(setDoc(doc(db, 'free_space_logos/_all'), logo('chamber1', svg)));
+    await assertFails(setDoc(doc(db, 'free_space_logos/_all'), logo('chamber1', 'https://example.com/logo.png')));
+    await assertFails(setDoc(doc(db, 'free_space_logos/_all'), logo('chamber1', 'data:image/png;base64,' + 'A'.repeat(250000))));
+  });
+
+  test('the document carries nothing else and names its real author', async () => {
+    const db = authed('chamber1');
+    await assertFails(setDoc(doc(db, 'free_space_logos/_all'), { ...logo('chamber1'), extra: true }));
+    await assertFails(setDoc(doc(db, 'free_space_logos/_all'), logo('admin1')));
   });
 });
 

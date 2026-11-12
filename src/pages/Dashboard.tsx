@@ -12,6 +12,7 @@ import { useModalA11y, prefersReducedMotion } from '../lib/a11y';
 import { InstallButton } from '../components/InstallButton';
 import boardBackdrop from '../assets/board-backdrop-winter.webp';
 import { verifyVisit, ensureBoard, regenerateBoard as regenerateBoardCall, errorMessage, isExpectedError } from '../services/api';
+import { useFreeSpaceLogo } from '../services/freeSpaceLogos';
 
 interface DashboardProps {
   user: UserProfile;
@@ -98,6 +99,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, settings
       .finally(() => { ensuringRef.current = false; });
   }, [boardLoaded, serverBoard, user.town]);
 
+  const freeSpaceLogo = useFreeSpaceLogo(user.town);
   const size = serverBoard?.size || user.boardSize || settings?.boardSize || 3;
   const board = serverBoard?.cells || user.bingoBoard || [];
 
@@ -492,9 +494,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, settings
                   aria-label={`Free space: ${settings.freeSpaceName}. Already counted.`}
                   className="bg-orange-50/85 border-2 border-orange-200 rounded-xl md:rounded-3xl flex flex-col items-center justify-center text-center p-1 shadow-sm relative overflow-hidden group">
                   <div className="absolute inset-0 bg-orange-100/50 opacity-0 group-hover:opacity-100 transition-opacity" aria-hidden="true" />
-                  <Trophy className="text-orange-500 mb-1 relative z-10 w-5 h-5 md:w-8 md:h-8" aria-hidden="true" />
-                  <p className="text-[9px] md:text-sm font-black text-orange-900 uppercase tracking-tighter relative z-10 leading-none px-1">{settings.freeSpaceName}</p>
-                  <p className="text-[10px] md:text-[10px] text-orange-600 font-bold uppercase tracking-widest mt-0.5 relative z-10 opacity-60 px-1 leading-tight hidden sm:block">{settings.freeSpaceTask}</p>
+                  {freeSpaceLogo ? (
+                    // The tile's aria-label already names the space, so the logo is decorative.
+                    <img src={freeSpaceLogo} alt="" className="relative z-10 w-full h-full object-contain p-1 md:p-2" />
+                  ) : (
+                    <>
+                      <Trophy className="text-orange-500 mb-1 relative z-10 w-5 h-5 md:w-8 md:h-8" aria-hidden="true" />
+                      <p className="text-[9px] md:text-sm font-black text-orange-900 uppercase tracking-tighter relative z-10 leading-none px-1">{settings.freeSpaceName}</p>
+                      <p className="text-[10px] md:text-[10px] text-orange-600 font-bold uppercase tracking-widest mt-0.5 relative z-10 opacity-60 px-1 leading-tight hidden sm:block">{settings.freeSpaceTask}</p>
+                    </>
+                  )}
                 </div>
               );
             }
