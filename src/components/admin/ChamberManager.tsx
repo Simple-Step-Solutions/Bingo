@@ -4,7 +4,7 @@ import { doc, setDoc, deleteDoc, addDoc, collection } from 'firebase/firestore';
 import { db, storage } from '../../firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { Store, Trash2, Plus, Nfc, QrCode, Search, Users, Ticket, Pencil, Trophy, Sparkles, Loader2, ChevronLeft, ChevronRight, Palette, ImagePlus, Download } from 'lucide-react';
-import { provisionBusinessCode, setBusinessNfc, createInvite, errorMessage, isExpectedError } from '../../services/api';
+import { provisionBusinessCode, setBusinessNfc, createInvite, exportBusinessCodes, errorMessage, isExpectedError } from '../../services/api';
 import { shuffle } from '../../services/bingoService';
 import { logAudit } from '../../services/auditService';
 
@@ -45,6 +45,9 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
   });
   const [newTown, setNewTown] = useState('');
   const [exporting, setExporting] = useState(false);
+  const [qrExport, setQrExport] = useState<string | null>(null);
+  // Shown next to the button. saveError renders down in the raffle panel, out of sight from here.
+  const [qrExportNote, setQrExportNote] = useState<{ text: string; error: boolean } | null>(null);
   const [selectedQR, setSelectedQR] = useState<{ value: string; title: string } | null>(null);
 
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -260,6 +263,39 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
     }
   };
 
+  const downloadAllQrCodes = async () => {
+    setQrExportNote(null);
+    setQrExport('Fetching codes...');
+    try {
+      const [{ results, failed }, { buildQrZip }] = await Promise.all([
+        exportBusinessCodes({}),
+        // Loaded on demand so the QR and zip libraries stay out of the main bundle.
+        import('../../lib/qrExport'),
+      ]);
+      if (results.length === 0) {
+        setQrExportNote({ text: 'There are no businesses to export yet.', error: true });
+        return;
+      }
+      const zip = await buildQrZip(results, (done, total) => setQrExport(`Building ${done} of ${total}...`));
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(zip);
+      a.download = 'chamber-bingo-qr-codes.zip';
+      a.click();
+      URL.revokeObjectURL(a.href);
+      setQrExportNote({
+        error: failed > 0,
+        text: failed > 0
+          ? `Downloaded ${results.length} QR codes. ${failed} could not be included, try again or open those businesses one at a time.`
+          : `Downloaded ${results.length} QR codes, plus codes.csv with each typed code.`,
+      });
+    } catch (err) {
+      if (!isExpectedError(err)) console.error('QR export failed:', err);
+      setQrExportNote({ text: errorMessage(err, 'Could not build the QR code download. Try again.'), error: true });
+    } finally {
+      setQrExport(null);
+    }
+  };
+
   const addTown = async () => {
     if (!newTown) return;
     await addDoc(collection(db, 'towns'), { name: newTown });
@@ -437,7 +473,22 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
               <Download size={14} />
               {exporting ? 'Exporting...' : 'Mail Merge'}
             </button>
+            <button
+              onClick={downloadAllQrCodes}
+              disabled={qrExport !== null || businesses.length === 0}
+              className="shrink-0 flex items-center gap-2 px-4 py-3 bg-white border border-neutral-200 text-neutral-900 rounded-2xl text-xs font-bold uppercase tracking-widest disabled:opacity-40 hover:border-neutral-900 transition-all"
+              title="Download a zip with a QR code image for every business"
+            >
+              {qrExport !== null ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : <QrCode size={14} aria-hidden="true" />}
+              {qrExport ?? 'All QR Codes'}
+            </button>
           </div>
+          {qrExportNote && (
+            <p role={qrExportNote.error ? 'alert' : 'status'}
+              className={`mt-2 text-[11px] font-medium ${qrExportNote.error ? 'text-red-600' : 'text-neutral-500'}`}>
+              {qrExportNote.text}
+            </p>
+          )}
           <div className="mt-3 flex items-center gap-3 bg-neutral-50 border border-neutral-100 rounded-2xl px-4 py-3">
             <Search size={16} className="text-neutral-400 shrink-0" />
             <input

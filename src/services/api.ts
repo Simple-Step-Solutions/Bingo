@@ -114,6 +114,18 @@ export const rotateAllCodes = call<
   { rotated: number; failed: number; results: { businessId: string; name: string; code: string }[] }
 >('rotateAllCodes');
 
+export interface ExportedBusinessCode {
+  businessId: string;
+  name: string;
+  town: string;
+  code: string;
+}
+
+export const exportBusinessCodes = call<
+  Record<string, never>,
+  { results: ExportedBusinessCode[]; issued: number; failed: number }
+>('exportBusinessCodes');
+
 export const setBusinessNfc = call<{ businessId: string; nfcId: string | null }, { ok: true }>('setBusinessNfc');
 
 export const adminGrantCompletion = call<
