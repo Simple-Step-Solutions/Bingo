@@ -371,7 +371,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, settings
         <h3 className="font-bold uppercase tracking-widest text-[10px] md:text-xs mb-4">Manual Entry</h3>
         <div className="flex flex-col gap-3">
           <input
-            placeholder="Enter business code (e.g. CHAMBER_abc123)"
+            placeholder="Enter business code (e.g. HVG-A2K7-QW9Z-M4TR-P8XN)"
             value={manualCode}
             onChange={e => setManualCode(e.target.value)}
             className="w-full p-4 bg-neutral-50 border border-neutral-100 rounded-2xl text-xs font-medium focus:ring-2 focus:ring-neutral-900 transition-all outline-none"
