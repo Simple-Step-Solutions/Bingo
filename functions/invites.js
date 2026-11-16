@@ -7,6 +7,7 @@ const crypto = require('node:crypto');
 const { db, callableOpts } = require('./lib/db');
 const { requireVerifiedEmail, requireRole, writeAudit, fingerprint } = require('./lib/guards');
 const { consume } = require('./lib/ratelimit');
+const { claimDecision, claimRequestId } = require('./lib/claims');
 
 /**
  * Invites (Phase 2e).
@@ -25,7 +26,10 @@ const { consume } = require('./lib/ratelimit');
  *      The user could simply write role: 'chamber' themselves.
  */
 
-const INVITE_TTL_HOURS = 48;
+// Two weeks. Business invites go out in the chamber's launch letter, and an
+// owner who opens it on day three should not hit a dead link. The link is
+// still single use and bound to the owner's email.
+const INVITE_TTL_HOURS = 14 * 24;
 
 // The default only pre-fills the interactive prompt. firebase-tools checks the
 // dotenv files first and, under --non-interactive, fails on any param missing
@@ -48,6 +52,61 @@ const isExpired = (data) => {
   return Number.isFinite(ms) && ms < Date.now();
 };
 
+/** Make uid the owner of businessId: user document and custom claim together. */
+const grantBusiness = async (uid, businessId) => {
+  await db().collection('users').doc(uid).set({
+    role: 'business',
+    businessId,
+    roleSelected: true,
+    onboardingComplete: true,
+  }, { merge: true });
+
+  const user = await getAuth().getUser(uid);
+  await getAuth().setCustomUserClaims(uid, {
+    ...(user.customClaims || {}), role: 'business', bid: businessId,
+  });
+};
+
+const ownedBySomeoneElse = async (businessId, uid) => {
+  const owners = await db().collection('users')
+    .where('businessId', '==', businessId)
+    .where('role', '==', 'business')
+    .limit(2)
+    .get();
+  return owners.docs.some(d => d.id !== uid);
+};
+
+/**
+ * Tell every chamber and admin account a claim is waiting. Notifications are
+ * readable by every signed-in user, so the message names the business only,
+ * never the person asking.
+ */
+const notifyChamberOfClaim = async (businessName) => {
+  const staff = await db().collection('users').where('role', 'in', ['chamber', 'admin']).get();
+  const batch = db().batch();
+  staff.docs.forEach(u => batch.set(db().collection('notifications').doc(), {
+    userId: u.id,
+    type: 'info',
+    message: `Someone asked to manage ${businessName}. Review it under Claim Requests in the admin panel.`,
+    timestamp: new Date().toISOString(),
+    createdBy: 'system',
+  }));
+  await batch.commit();
+};
+
+/** The pending request document. `source` tells the chamber how they got here. */
+const claimRequestDoc = ({ uid, email, displayName, businessId, businessName, source, fp }) => ({
+  uid,
+  email,
+  displayName: displayName || null,
+  businessId,
+  businessName,
+  source, // 'code' (typed the poster code) or 'invite' (had the emailed link)
+  status: 'pending',
+  createdAt: FieldValue.serverTimestamp(),
+  ...fp,
+});
+
 /**
  * Issue an invite.
  *
@@ -57,7 +116,8 @@ const isExpired = (data) => {
  */
 exports.createInvite = onCall(callableOpts(), async (request) => {
   const { uid, role: actorRole, profile } = await requireRole(request, 'chamber');
-  const { role, businessId, businessName, emailHint } = request.data || {};
+  const { role, businessId, businessName } = request.data || {};
+  let { emailHint } = request.data || {};
 
   if (!['player', 'business', 'chamber'].includes(role)) {
     throw new HttpsError('invalid-argument', 'Pick a valid role for the invite.');
@@ -71,6 +131,12 @@ exports.createInvite = onCall(callableOpts(), async (request) => {
     }
     const bizSnap = await db().collection('businesses').doc(businessId).get();
     if (!bizSnap.exists) throw new HttpsError('not-found', 'No such business.');
+    // The owner's private login email, set from the CSV's login_email column.
+    // The public contact address (info@...) is often not who signs up.
+    if (!emailHint) {
+      const secret = await db().collection('business_secrets').doc(businessId).get();
+      emailHint = (secret.exists && secret.data().loginEmail) || null;
+    }
   }
   if (emailHint != null && (typeof emailHint !== 'string' || emailHint.length > 254)) {
     throw new HttpsError('invalid-argument', 'That email does not look right.');
@@ -173,13 +239,36 @@ exports.redeemInvite = onCall(callableOpts(), async (request) => {
     if (data.revoked) throw new HttpsError('failed-precondition', 'That invite was revoked.');
     if (isExpired(data)) throw new HttpsError('failed-precondition', 'That invite has expired.');
 
+    const userSnap = await tx.get(userRef);
+    if (!userSnap.exists) throw new HttpsError('failed-precondition', 'Finish signing up first.');
+
     if (data.emailHint && data.emailHint !== email) {
+      // A business invite opened with a different address is usually the
+      // owner using their personal Gmail. Rather than a dead end, it becomes
+      // a request the chamber confirms. The link is used up either way, so a
+      // forwarded link cannot be tried again by someone else.
+      if (data.role === 'business' && data.businessId) {
+        tx.update(inviteRef, {
+          used: true,
+          usedBy: uid,
+          usedByEmail: email,
+          usedAt: FieldValue.serverTimestamp(),
+          outcome: 'claim_request',
+        });
+        tx.set(db().collection('claim_requests').doc(claimRequestId(data.businessId, uid)), claimRequestDoc({
+          uid,
+          email,
+          displayName: auth.token.name,
+          businessId: data.businessId,
+          businessName: data.businessName || '',
+          source: 'invite',
+          fp: fingerprint(request),
+        }));
+        return { pending: true, role: 'player', businessId: data.businessId, businessName: data.businessName || '' };
+      }
       throw new HttpsError('permission-denied',
         'This invite was issued to a different email address.');
     }
-
-    const userSnap = await tx.get(userRef);
-    if (!userSnap.exists) throw new HttpsError('failed-precondition', 'Finish signing up first.');
 
     tx.update(inviteRef, {
       used: true,
@@ -197,6 +286,19 @@ exports.redeemInvite = onCall(callableOpts(), async (request) => {
 
     return { role: data.role, businessId: data.businessId || null };
   });
+
+  if (result.pending) {
+    await notifyChamberOfClaim(result.businessName || 'a business');
+    await writeAudit({
+      actorUid: uid,
+      actorEmail: email,
+      actorRole: 'player',
+      action: 'claim_request',
+      targetUid: result.businessId,
+      details: { source: 'invite', businessName: result.businessName, ...fingerprint(request) },
+    });
+    return { ok: true, pending: true, role: 'player', businessId: result.businessId };
+  }
 
   // Claims, set here rather than waiting for the trigger, so the client can
   // refresh its token straight away.
@@ -279,28 +381,42 @@ exports.claimBusiness = onCall(callableOpts(), async (request) => {
 
   // One owner per business. Previously nothing stopped a second account
   // claiming a business that was already spoken for.
-  const existingOwners = await db().collection('users')
-    .where('businessId', '==', businessId)
-    .where('role', '==', 'business')
-    .limit(2)
-    .get();
-  const otherOwner = existingOwners.docs.find(d => d.id !== uid);
-  if (otherOwner) {
+  if (await ownedBySomeoneElse(businessId, uid)) {
     throw new HttpsError('already-exists',
       'That business has already been claimed. Contact the Chamber if this is wrong.');
   }
 
-  await db().collection('users').doc(uid).set({
-    role: 'business',
-    businessId,
-    roleSelected: true,
-    onboardingComplete: true,
-  }, { merge: true });
+  // The code is on a poster by the register, so it proves nothing on its own.
+  // Only the email the chamber has on file gets the business immediately.
+  const secret = await db().collection('business_secrets').doc(businessId).get();
+  const decision = claimDecision({ callerEmail: email, loginEmail: secret.exists ? secret.data().loginEmail : null });
+  if (decision === 'review') {
+    const ref = db().collection('claim_requests').doc(claimRequestId(businessId, uid));
+    const existing = await ref.get();
+    if (!existing.exists || existing.data().status !== 'pending') {
+      await ref.set(claimRequestDoc({
+        uid,
+        email,
+        displayName: auth.token.name,
+        businessId,
+        businessName: bizSnap.data().name,
+        source: 'code',
+        fp: fingerprint(request),
+      }));
+      await notifyChamberOfClaim(bizSnap.data().name);
+      await writeAudit({
+        actorUid: uid,
+        actorEmail: email,
+        actorRole: 'player',
+        action: 'claim_request',
+        targetUid: businessId,
+        details: { source: 'code', businessName: bizSnap.data().name, ...fingerprint(request) },
+      });
+    }
+    return { ok: true, pending: true, businessId, businessName: bizSnap.data().name };
+  }
 
-  const user = await getAuth().getUser(uid);
-  await getAuth().setCustomUserClaims(uid, {
-    ...(user.customClaims || {}), role: 'business', bid: businessId,
-  });
+  await grantBusiness(uid, businessId);
 
   await writeAudit({
     actorUid: uid,
@@ -312,6 +428,63 @@ exports.claimBusiness = onCall(callableOpts(), async (request) => {
   });
 
   return { ok: true, businessId, businessName: bizSnap.data().name };
+});
+
+/**
+ * Approve or deny a pending claim. Grants a role, so it is a callable: it
+ * checks the chamber member's live role and tokensValidAfterTime, which rules
+ * cannot do.
+ */
+exports.decideClaimRequest = onCall(callableOpts(), async (request) => {
+  const { uid: actorUid, role: actorRole, profile } = await requireRole(request, 'chamber');
+  const { requestId, approve } = request.data || {};
+  if (typeof requestId !== 'string' || !requestId || typeof approve !== 'boolean') {
+    throw new HttpsError('invalid-argument', 'requestId and approve are required.');
+  }
+
+  const ref = db().collection('claim_requests').doc(requestId);
+  const snap = await ref.get();
+  if (!snap.exists) throw new HttpsError('not-found', 'No such request.');
+  const req = snap.data();
+  if (req.status !== 'pending') throw new HttpsError('failed-precondition', 'That request was already decided.');
+
+  if (approve) {
+    const biz = await db().collection('businesses').doc(req.businessId).get();
+    if (!biz.exists) throw new HttpsError('not-found', 'That business no longer exists.');
+    if (await ownedBySomeoneElse(req.businessId, req.uid)) {
+      throw new HttpsError('already-exists', 'That business already has an owner. Remove them under Players first.');
+    }
+    await grantBusiness(req.uid, req.businessId);
+  }
+
+  await ref.update({
+    status: approve ? 'approved' : 'denied',
+    decidedBy: actorUid,
+    decidedByEmail: (profile && profile.email) || '',
+    decidedAt: FieldValue.serverTimestamp(),
+  });
+
+  await db().collection('notifications').add({
+    userId: req.uid,
+    type: 'info',
+    message: approve
+      ? `You're all set. You now manage ${req.businessName} in Chamber Bingo. Sign out and back in if you don't see it yet.`
+      : `The Chamber couldn't confirm your request to manage ${req.businessName}. Contact them if you think this is a mistake.`,
+    timestamp: new Date().toISOString(),
+    createdBy: actorUid,
+  });
+
+  await writeAudit({
+    actorUid,
+    actorEmail: (profile && profile.email) || '',
+    actorRole,
+    action: approve ? 'approve_claim_request' : 'deny_claim_request',
+    targetUid: req.uid,
+    targetEmail: req.email,
+    details: { businessId: req.businessId, businessName: req.businessName, source: req.source },
+  });
+
+  return { ok: true };
 });
 
 /**

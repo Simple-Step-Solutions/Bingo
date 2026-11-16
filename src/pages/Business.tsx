@@ -7,6 +7,7 @@ import { useBusinessSecret } from '../services/secrets';
 import { Store, Users, CheckCircle2, Loader2, Download, MapPin, Printer, Hash, KeyRound } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { svgToDataUrl } from '../lib/utils';
+import { formatWhen, isToday, whenMs } from '../lib/time';
 
 interface BusinessDashboardProps {
   user: UserProfile;
@@ -19,6 +20,7 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ user }) =>
   const [claimCode, setClaimCode] = useState('');
   const [claiming, setClaiming] = useState(false);
   const [claimError, setClaimError] = useState<string | null>(null);
+  const [claimPending, setClaimPending] = useState<string | null>(null);
   const printQR = () => {
     const printWindow = window.open('', '_blank');
     if (!printWindow || !business) return;
@@ -159,7 +161,11 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ user }) =>
     setClaiming(true);
     setClaimError(null);
     try {
-      await claimBusiness({ code: claimCode.trim() });
+      const res = await claimBusiness({ code: claimCode.trim() });
+      if (res.pending) {
+        setClaimPending(res.businessName);
+        return;
+      }
       // Refresh the token so the new business claim is present before the next
       // Firestore read runs against it.
       await auth.currentUser?.getIdToken(true);
@@ -181,15 +187,26 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ user }) =>
           </div>
           <p className="text-[10px] font-black uppercase tracking-[0.25em] text-[var(--color-primary)] mb-2">Business Setup</p>
           <h2 className="font-serif italic text-3xl mb-3">Claim your business</h2>
+          {claimPending ? (
+            <div role="status" className="bg-[var(--color-primary)]/5 border border-[var(--color-primary)]/20 rounded-2xl p-5 text-left">
+              <p className="font-bold text-neutral-900 mb-1">Request sent</p>
+              <p className="text-sm text-neutral-600 leading-relaxed">
+                The Chamber will confirm you manage {claimPending} and you'll get a notification once they do. To skip the wait
+                next time, sign in with the email address the Chamber has on file for your business.
+              </p>
+            </div>
+          ) : (
+          <>
           <p className="text-neutral-500 text-sm leading-relaxed mb-8">
-            Enter the claim code your Chamber administrator gave you. It's the same as the manual code on your setup sheet.
+            Enter the code printed under your business's QR code. If you signed in with the email the Chamber has on file,
+            you're in right away. Otherwise the Chamber will confirm it's you first.
           </p>
           <form onSubmit={handleClaim} className="space-y-4 text-left">
             <div>
               <label className="block text-[10px] font-bold uppercase tracking-widest text-neutral-400 mb-2">Claim Code</label>
               <input
                 type="text"
-                placeholder="e.g. CHAMBER_abc123"
+                placeholder="e.g. HVG-A2K7-QW9Z-M4TR-P8XN"
                 value={claimCode}
                 onChange={e => setClaimCode(e.target.value)}
                 className="w-full px-4 py-4 bg-neutral-50 border border-neutral-200 rounded-2xl text-sm font-mono font-bold focus:ring-2 focus:ring-neutral-900 outline-none transition-all"
@@ -212,12 +229,14 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ user }) =>
           <p className="text-[9px] text-neutral-400 mt-6 leading-relaxed">
             Don't have a code? Contact your Chamber administrator to get set up.
           </p>
+          </>
+          )}
         </div>
       </div>
     </div>
   );
 
-  const todayCompletions = completions.filter(c => new Date(c.timestamp).toDateString() === new Date().toDateString());
+  const todayCompletions = completions.filter(c => isToday(c));
 
   return (
     <div className="max-w-4xl mx-auto">
@@ -268,7 +287,7 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ user }) =>
                 <p className="text-neutral-400 text-sm italic">No visitors yet.</p>
               </div>
             ) : (
-              completions.slice().reverse().slice(0, 10).map(c => (
+              completions.slice().sort((a, b) => whenMs(b) - whenMs(a)).slice(0, 10).map(c => (
                 <div key={c.id} className="flex items-center justify-between p-6 bg-neutral-50 rounded-3xl border border-neutral-100 group hover:border-neutral-900 transition-all">
                   <div className="flex items-center gap-4">
                     <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-neutral-400 group-hover:text-neutral-900 transition-colors shadow-sm">
@@ -277,7 +296,7 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ user }) =>
                     <div>
                       <p className="font-bold text-sm">{c.userName || `Visitor #${c.userId.slice(-4).toUpperCase()}`}</p>
                       <p className="text-[10px] text-neutral-400 uppercase tracking-widest font-bold">
-                        {new Date(c.timestamp).toLocaleString()}
+                        {formatWhen(c)}
                       </p>
                     </div>
                   </div>

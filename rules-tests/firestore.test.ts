@@ -97,6 +97,10 @@ beforeEach(async () => {
       businessId: 'bizB', code: 'HVG-ZZZZ-ZZZZ-ZZZZ-ZZZZ', codeHash: 'cafebabe',
     });
     await setDoc(doc(db, 'code_index/deadbeef'), { businessId: 'bizA', active: true });
+    await setDoc(doc(db, 'claim_requests/bizA_player2'), {
+      uid: 'player2', email: 'player2@example.com', businessId: 'bizA', businessName: 'Cafe A',
+      source: 'code', status: 'pending',
+    });
 
     // Pre-event board, keyed by uid alone.
     await setDoc(doc(db, 'boards/player1'), {
@@ -414,6 +418,24 @@ describe('business codes are unguessable', () => {
       const db = authed(uid);
       await assertFails(getDoc(doc(db, 'code_index/deadbeef')));
     }
+  });
+
+  test('claim requests: chamber reads them, the requester reads their own, nobody else', async () => {
+    await assertSucceeds(getDoc(doc(authed('chamber1'), 'claim_requests/bizA_player2')));
+    await assertSucceeds(getDocs(collection(authed('chamber1'), 'claim_requests')));
+    await assertSucceeds(getDoc(doc(authed('player2'), 'claim_requests/bizA_player2')));
+    // It carries the requester's email.
+    await assertFails(getDoc(doc(authed('player1'), 'claim_requests/bizA_player2')));
+    await assertFails(getDocs(collection(authed('player1'), 'claim_requests')));
+  });
+
+  test('nobody can create or approve a claim request from the browser', async () => {
+    // Approving one grants the business role, so it only happens in decideClaimRequest.
+    await assertFails(setDoc(doc(authed('player1'), 'claim_requests/bizB_player1'), {
+      uid: 'player1', businessId: 'bizB', status: 'pending',
+    }));
+    await assertFails(setDoc(doc(authed('chamber1'), 'claim_requests/bizA_player2'), { status: 'approved' }, { merge: true }));
+    await assertFails(setDoc(doc(authed('player2'), 'claim_requests/bizA_player2'), { status: 'approved' }, { merge: true }));
   });
 
   test('nobody can write a secret or an index entry', async () => {

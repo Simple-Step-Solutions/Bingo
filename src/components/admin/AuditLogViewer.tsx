@@ -1,6 +1,7 @@
 import React from 'react';
 import { AuditLog } from '../../types';
 import { Clock } from 'lucide-react';
+import { formatWhen, whenMs } from '../../lib/time';
 
 interface AuditLogViewerProps {
   logs: AuditLog[];
@@ -16,7 +17,7 @@ const actionBadge = (action: string) => {
 
 export const AuditLogViewer: React.FC<AuditLogViewerProps> = ({ logs }) => {
   const sorted = [...logs]
-    .sort((a, b) => b.timestamp.localeCompare(a.timestamp))
+    .sort((a, b) => whenMs(b) - whenMs(a))
     .slice(0, 200);
 
   return (
@@ -42,7 +43,7 @@ export const AuditLogViewer: React.FC<AuditLogViewerProps> = ({ logs }) => {
             <div key={log.id} className="py-3 first:pt-0 last:pb-0">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="font-mono text-xs text-neutral-400 shrink-0">
-                  {new Date(log.timestamp).toLocaleString()}
+                  {formatWhen(log)}
                 </span>
                 <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest shrink-0 ${actionBadge(log.action)}`}>
                   {log.action}

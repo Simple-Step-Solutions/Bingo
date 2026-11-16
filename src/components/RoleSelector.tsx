@@ -25,6 +25,9 @@ export const RoleSelector: React.FC<RoleSelectorProps> = ({ user }) => {
   >(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Business name, set when the invite was opened with a different email and
+  // became a request for the chamber to confirm.
+  const [invitePending, setInvitePending] = useState<string | null>(null);
 
   // Pre-fill and lock from localStorage if they arrived via an invite link.
   //
@@ -51,8 +54,13 @@ export const RoleSelector: React.FC<RoleSelectorProps> = ({ user }) => {
         // The server validates the token, sets the role, and moves the custom
         // claim in one transaction. This used to be a client-side setDoc, so
         // the invite requirement could be skipped by writing role directly.
-        await redeemInvite({ token: lockedInvite.token });
+        const res = await redeemInvite({ token: lockedInvite.token });
         localStorage.removeItem('pendingInvite');
+        if (res.pending) {
+          setInvitePending(lockedInvite.businessName || 'your business');
+          setLoading(false);
+          return;
+        }
         // Pick up the new claim now rather than waiting up to an hour for the
         // token to refresh on its own.
         await auth.currentUser?.getIdToken(true);
@@ -72,6 +80,40 @@ export const RoleSelector: React.FC<RoleSelectorProps> = ({ user }) => {
       setLoading(false);
     }
   };
+
+  const continueWhilePending = async () => {
+    setLoading(true);
+    try {
+      await setDoc(doc(db, 'users', user.uid), { role: 'player', roleSelected: true }, { merge: true });
+    } catch (err) {
+      if (!isExpectedError(err)) console.error(err);
+      setError(errorMessage(err));
+      setLoading(false);
+    }
+  };
+
+  if (invitePending) {
+    return (
+      <div className="min-h-screen bg-[#F5F5F0] flex items-center justify-center p-6">
+        <div className="max-w-md w-full bg-white rounded-[3rem] p-8 shadow-xl border border-neutral-100" role="status">
+          <p className="text-[10px] font-black uppercase tracking-[0.25em] text-[var(--color-primary)] mb-2">Almost there</p>
+          <h2 className="font-serif italic text-3xl mb-3">Request sent to the Chamber</h2>
+          <p className="text-neutral-500 text-sm leading-relaxed mb-6">
+            This invite was sent to a different email address than the one you signed in with, so the Chamber will confirm
+            you manage {invitePending} first. You'll get a notification once they do. In the meantime you can look around the app.
+          </p>
+          {error && <p className="text-xs text-red-600 font-bold mb-4">{error}</p>}
+          <button
+            onClick={continueWhilePending}
+            disabled={loading}
+            className="w-full bg-neutral-900 text-white py-4 rounded-2xl font-bold text-sm disabled:opacity-50"
+          >
+            Continue
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const meta = ROLE_META[role];
 

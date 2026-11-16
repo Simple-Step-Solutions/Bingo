@@ -11,6 +11,7 @@
     "lint": "tsc --noEmit && eslint .",
     "test:rules": "npx --yes firebase-tools@14 emulators:exec --only firestore --project sss-hvgcc-bingo-rules-test \"node --import tsx --test rules-tests/firestore.test.ts\"",
     "test:functions": "node --test \"functions/test/**/*.test.js\"",
+    "test:client": "node --import tsx --test \"src/**/*.test.ts\"",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

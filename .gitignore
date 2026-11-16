@@ -11,3 +11,5 @@ node_modules/
 !functions/.env.sss-hvgcc-bingo
 /firebase-applet-config.json
 /.claude/
+.calls/
+.artifacts/

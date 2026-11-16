@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { collection, query, where, onSnapshot, addDoc, doc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { UserProfile, AppSettings, RaffleEntry, Completion } from '../types';
+import { formatWhen } from '../lib/time';
 
 interface RaffleProps {
   user: UserProfile;
@@ -199,7 +200,7 @@ export const Raffle: React.FC<RaffleProps> = ({ user }) => {
                   <div>
                     <p className="text-sm font-bold">Entry #{entry.id.slice(-4).toUpperCase()}</p>
                     <p className="text-[10px] text-neutral-400 uppercase tracking-widest">
-                      {new Date(entry.timestamp).toLocaleDateString()}
+                      {formatWhen(entry, 'date')}
                     </p>
                   </div>
                   <div className="bg-white px-3 py-1 rounded-full border border-neutral-200">

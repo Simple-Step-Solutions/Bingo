@@ -204,6 +204,16 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Someone asking to manage a business whose code they hold but whose
+    // login email they do not match. Holds their email, so players cannot
+    // read it. Created and decided only by callables (claimBusiness,
+    // redeemInvite, decideClaimRequest).
+    match /claim_requests/{requestId} {
+      allow read: if isChamber()
+        || (isAuthenticated() && resource.data.uid == request.auth.uid);
+      allow write: if false;
+    }
+
     // ===============================================================
     // Boards
     //

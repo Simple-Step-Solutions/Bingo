@@ -5,6 +5,7 @@ const logger = require('firebase-functions/logger');
 const { db, callableOpts } = require('./lib/db');
 const { generateCode, normalizeCode, hashCode } = require('./lib/codes');
 const { requireRole, writeAudit } = require('./lib/guards');
+const { normalizeLoginEmail } = require('./lib/email');
 
 /**
  * Business verification codes, split across three documents:
@@ -220,6 +221,44 @@ exports.setBusinessNfc = onCall(callableOpts(), async (request) => {
     action: nfcId ? 'set_business_nfc' : 'clear_business_nfc',
     targetUid: businessId,
     details: { businessName: bizSnap.data().name },
+  });
+
+  return { ok: true };
+});
+
+/**
+ * The address the owner signs up with. Private, so it lives on
+ * business_secrets next to the code rather than on the public business
+ * document every player can read. The public contact address stays on
+ * businesses/{id}.email. createInvite uses this as the invite's email.
+ */
+exports.setBusinessLoginEmail = onCall(callableOpts(), async (request) => {
+  const { uid, role, profile } = await requireRole(request, 'chamber');
+  const { businessId, loginEmail } = request.data || {};
+
+  if (typeof businessId !== 'string' || !businessId) {
+    throw new HttpsError('invalid-argument', 'businessId is required.');
+  }
+  const email = normalizeLoginEmail(loginEmail);
+  if (email === undefined) {
+    throw new HttpsError('invalid-argument', 'That login email does not look right.');
+  }
+  const bizSnap = await db().collection('businesses').doc(businessId).get();
+  if (!bizSnap.exists) throw new HttpsError('not-found', 'No such business.');
+
+  const secretRef = db().collection('business_secrets').doc(businessId);
+  const previous = (await secretRef.get()).data()?.loginEmail || null;
+  if (previous === email) return { ok: true };
+
+  await secretRef.set({ businessId, loginEmail: email }, { merge: true });
+
+  await writeAudit({
+    actorUid: uid,
+    actorEmail: (profile && profile.email) || '',
+    actorRole: role,
+    action: email ? 'set_business_login_email' : 'clear_business_login_email',
+    targetUid: businessId,
+    details: { businessName: bizSnap.data().name, from: previous, to: email },
   });
 
   return { ok: true };
