@@ -1,10 +1,10 @@
 import React, { useState, useMemo, useRef } from 'react';
 import { Business, Town, RaffleEntry, Winner, AppSettings, UserProfile } from '../../types';
-import { doc, setDoc, deleteDoc, addDoc, collection } from 'firebase/firestore';
+import { doc, getDoc, setDoc, deleteDoc, addDoc, collection } from 'firebase/firestore';
 import { db, storage } from '../../firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { Store, Trash2, Plus, Nfc, QrCode, Search, Users, Ticket, Pencil, Trophy, Sparkles, Loader2, ChevronLeft, ChevronRight, Palette, ImagePlus, Download } from 'lucide-react';
-import { provisionBusinessCode, setBusinessNfc, createInvite, exportBusinessCodes, errorMessage, isExpectedError } from '../../services/api';
+import { provisionBusinessCode, setBusinessNfc, setBusinessLoginEmail, createInvite, exportBusinessCodes, errorMessage, isExpectedError } from '../../services/api';
 import { shuffle } from '../../services/bingoService';
 import { logAudit } from '../../services/auditService';
 
@@ -12,12 +12,33 @@ const DEFAULT_PRIMARY = '#1695B2';
 const DEFAULT_ACCENT = '#CC5500';
 
 const BIZ_PAGE_SIZE = 20;
+
+const EMPTY_BIZ = {
+  name: '',
+  town: 'Yorktown',
+  task: '',
+  category: 'Retail',
+  address: '',
+  lat: 0,
+  lng: 0,
+  nfcId: '',
+  description: '',
+  image: '',
+  website: '',
+  email: '',
+  phone: '',
+  online: false,
+  /** Private. Saved to business_secrets through a callable, never to the public document. */
+  loginEmail: '',
+};
 import { CSVImport } from '../CSVImport';
 import { AddressSearch } from '../AddressSearch';
 import { geocodeAddress } from '../../lib/geocoding';
 import { newDocId } from '../../lib/utils';
+import { normalizeWebsite } from '../../lib/businessImport';
 import { QRModal } from '../QRModal';
 import { FreeSpaceLogos } from './FreeSpaceLogos';
+import { ClaimRequests } from './ClaimRequests';
 
 interface ChamberManagerProps {
   businesses: Business[];
@@ -29,20 +50,7 @@ interface ChamberManagerProps {
 }
 
 export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, towns, raffleEntries, winners, settings, currentUser }) => {
-  const [newBiz, setNewBiz] = useState({ 
-    name: '', 
-    town: 'Yorktown', 
-    task: '', 
-    category: 'Retail',
-    address: '', 
-    lat: 0, 
-    lng: 0, 
-    nfcId: '',
-    description: '',
-    image: '',
-    website: '',
-    email: ''
-  });
+  const [newBiz, setNewBiz] = useState({ ...EMPTY_BIZ });
   const [newTown, setNewTown] = useState('');
   const [exporting, setExporting] = useState(false);
   const [qrExport, setQrExport] = useState<string | null>(null);
@@ -142,12 +150,12 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
   };
 
   const addBusiness = async () => {
-    if (!newBiz.name || !newBiz.task || !newBiz.address) return;
-    
-    let finalLat = newBiz.lat;
-    let finalLng = newBiz.lng;
+    if (!newBiz.name || !newBiz.task || (!newBiz.address && !newBiz.online)) return;
 
-    if (!finalLat || !finalLng) {
+    let finalLat = newBiz.online ? 0 : newBiz.lat;
+    let finalLng = newBiz.online ? 0 : newBiz.lng;
+
+    if (!newBiz.online && (!finalLat || !finalLng)) {
       setIsGeocoding(true);
       const coords = await geocodeAddress(newBiz.address);
       if (coords) {
@@ -162,9 +170,12 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
     // The business document no longer carries a code or an NFC serial. The code
     // is provisioned server-side into business_secrets, and the NFC serial is
     // registered in the code index, so neither is readable by a player.
-    const { nfcId, ...publicFields } = newBiz;
+    const { nfcId, loginEmail, ...publicFields } = newBiz;
     await setDoc(doc(db, 'businesses', id), {
       ...publicFields,
+      website: normalizeWebsite(publicFields.website),
+      email: publicFields.email.trim(),
+      phone: publicFields.phone.trim(),
       lat: finalLat,
       lng: finalLng,
       id,
@@ -174,24 +185,12 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
       // Idempotent: returns the existing code when there already is one.
       await provisionBusinessCode({ businessId: id });
       await setBusinessNfc({ businessId: id, nfcId: nfcId?.trim() || null });
+      await setBusinessLoginEmail({ businessId: id, loginEmail: loginEmail.trim() || null });
     } catch (err) {
       if (!isExpectedError(err)) console.error('Code provisioning failed:', err);
       setSaveError(errorMessage(err, 'The business was saved but its code could not be issued.'));
     }
-    setNewBiz({ 
-      name: '', 
-      town: 'Yorktown', 
-      task: '', 
-      category: 'Retail',
-      address: '', 
-      lat: 0, 
-      lng: 0, 
-      nfcId: '',
-      description: '',
-      image: '',
-      website: '',
-      email: ''
-    });
+    setNewBiz({ ...EMPTY_BIZ });
     setEditingId(null);
   };
 
@@ -211,7 +210,7 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
     }
   };
 
-  const editBusiness = (biz: Business) => {
+  const editBusiness = async (biz: Business) => {
     setNewBiz({
       name: biz.name,
       town: biz.town,
@@ -224,10 +223,26 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
       description: biz.description || '',
       image: biz.image || '',
       website: biz.website || '',
-      email: biz.email || ''
+      email: biz.email || '',
+      phone: biz.phone || '',
+      online: biz.online === true,
+      loginEmail: '',
     });
     setEditingId(biz.id);
     setTimeout(() => formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+
+    // The NFC serial and login email are private, so they are not on the
+    // business document. Without loading them here, saving the form wrote a
+    // blank NFC serial back and quietly unregistered the business's tag.
+    try {
+      const secret = await getDoc(doc(db, 'business_secrets', biz.id));
+      const data = secret.data();
+      if (data) {
+        setNewBiz(prev => ({ ...prev, nfcId: data.nfcId || '', loginEmail: data.loginEmail || '' }));
+      }
+    } catch (err) {
+      if (!isExpectedError(err)) console.error('Could not load private business fields:', err);
+    }
   };
 
   const deleteBusiness = async (id: string) => {
@@ -235,20 +250,29 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
   };
 
   const exportMailMerge = async () => {
-    const bizWithEmail = businesses.filter((b: Business) => b.email?.trim());
-    if (bizWithEmail.length === 0) return;
     setExporting(true);
     try {
+      // The invite goes to the owner's private login email when there is one,
+      // otherwise to the public contact email, as before the two were split.
+      const withEmail = (await Promise.all(
+        businesses.map(async (biz: Business) => {
+          const secret = await getDoc(doc(db, 'business_secrets', biz.id));
+          const email = (secret.data()?.loginEmail as string | undefined) || biz.email?.trim() || '';
+          return { biz, email };
+        })
+      )).filter(x => x.email);
+      if (withEmail.length === 0) return;
+
       const rows = await Promise.all(
-        bizWithEmail.map(async (biz: Business) => {
+        withEmail.map(async ({ biz, email }) => {
           const { token } = await createInvite({
             role: 'business',
             businessId: biz.id,
             businessName: biz.name,
-            ...(biz.email ? { emailHint: biz.email } : {}),
+            emailHint: email,
           });
           const url = `${window.location.origin}/?invite=${token}`;
-          return [biz.name, biz.email ?? '', url];
+          return [biz.name, email, url];
         })
       );
       const csv = ['Business Name,Email,Invite URL', ...rows.map((r: string[]) => r.map((v: string) => `"${v}"`).join(','))].join('\n');
@@ -444,6 +468,8 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
         </div>
       </div>
 
+      <ClaimRequests />
+
       <FreeSpaceLogos towns={towns} currentUser={currentUser} />
 
       {/* Business Management */}
@@ -461,14 +487,14 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
             </span>
           </div>
 
-          <CSVImport onComplete={() => {}} />
+          <CSVImport businesses={businesses} towns={towns} />
 
           <div className="mt-8 flex items-center gap-3">
             <button
               onClick={exportMailMerge}
-              disabled={exporting || businesses.filter(b => b.email?.trim()).length === 0}
+              disabled={exporting || businesses.length === 0}
               className="shrink-0 flex items-center gap-2 px-4 py-3 bg-neutral-900 text-white rounded-2xl text-xs font-bold uppercase tracking-widest disabled:opacity-40 hover:bg-neutral-700 transition-all"
-              title={`Export ${businesses.filter(b => b.email?.trim()).length} businesses with emails`}
+              title="Export a sign-up link for every business with a login or contact email"
             >
               <Download size={14} />
               {exporting ? 'Exporting...' : 'Mail Merge'}
@@ -722,10 +748,7 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
               <button
                 onClick={() => {
                   setEditingId(null);
-                  setNewBiz({
-                    name: '', town: 'Yorktown', task: '', category: 'Retail', address: '', lat: 0, lng: 0, nfcId: '',
-                    description: '', image: '', website: '', email: ''
-                  });
+                  setNewBiz({ ...EMPTY_BIZ });
                 }}
                 className="text-[10px] uppercase tracking-widest font-bold text-neutral-400 hover:text-neutral-900"
               >
@@ -744,10 +767,30 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
               />
             </div>
 
-            <div>
-              <label className="block text-[10px] text-neutral-400 uppercase tracking-widest mb-2 font-bold">Location Search</label>
-              <AddressSearch onSelect={(lat, lng, address) => setNewBiz({...newBiz, lat, lng, address})} />
-            </div>
+            <label className="flex items-center gap-3 text-sm text-neutral-700 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={newBiz.online}
+                onChange={e => setNewBiz({...newBiz, online: e.target.checked, ...(e.target.checked ? { address: '', lat: 0, lng: 0 } : {})})}
+                className="w-4 h-4 accent-[var(--color-primary)]"
+              />
+              Online only, no storefront
+            </label>
+            {newBiz.online ? (
+              <p className="text-xs text-neutral-500 -mt-3">
+                No map pin or directions, and the code works from anywhere, so share it only with customers.
+              </p>
+            ) : (
+              <div>
+                <label className="block text-[10px] text-neutral-400 uppercase tracking-widest mb-2 font-bold">Location Search</label>
+                <AddressSearch onSelect={(lat, lng, address) => setNewBiz({...newBiz, lat, lng, address})} />
+                {editingId && newBiz.address && (!newBiz.lat || !newBiz.lng) && (
+                  <p className="text-xs text-orange-700 mt-2">
+                    No map pin for "{newBiz.address}", so the app cannot check that players are there. Search for the address above and pick it from the list.
+                  </p>
+                )}
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -757,6 +800,7 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
                   onChange={e => setNewBiz({...newBiz, town: e.target.value})}
                   className="w-full px-4 py-3 bg-neutral-50 border border-neutral-200 rounded-2xl text-sm focus:ring-2 focus:ring-[var(--color-primary)] outline-none transition-all"
                 >
+                  <option value="">No town (out-of-town square only)</option>
                   {towns.map(t => <option key={t.id} value={t.name}>{t.name}</option>)}
                 </select>
               </div>
@@ -835,7 +879,31 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
                   onChange={e => setNewBiz({...newBiz, email: e.target.value})}
                   className="w-full px-4 py-3 bg-neutral-50 border border-neutral-200 rounded-2xl text-sm focus:ring-2 focus:ring-[var(--color-primary)] outline-none transition-all"
                 />
-                <p className="text-[9px] text-neutral-400 mt-1">Used for mail merge invite export.</p>
+                <p className="text-[9px] text-neutral-400 mt-1">Shown to players.</p>
+              </div>
+              <div>
+                <label htmlFor="biz-phone" className="block text-[10px] text-neutral-400 uppercase tracking-widest mb-2 font-bold">Phone (Optional)</label>
+                <input
+                  id="biz-phone"
+                  type="tel"
+                  placeholder="914-555-0100"
+                  value={newBiz.phone}
+                  onChange={e => setNewBiz({...newBiz, phone: e.target.value})}
+                  className="w-full px-4 py-3 bg-neutral-50 border border-neutral-200 rounded-2xl text-sm focus:ring-2 focus:ring-[var(--color-primary)] outline-none transition-all"
+                />
+                <p className="text-[9px] text-neutral-400 mt-1">Shown to players as a Call button.</p>
+              </div>
+              <div className="sm:col-span-2">
+                <label htmlFor="biz-login-email" className="block text-[10px] text-neutral-400 uppercase tracking-widest mb-2 font-bold">Owner Login Email (Private)</label>
+                <input
+                  id="biz-login-email"
+                  type="email"
+                  placeholder="owner@business.com"
+                  value={newBiz.loginEmail}
+                  onChange={e => setNewBiz({...newBiz, loginEmail: e.target.value})}
+                  className="w-full px-4 py-3 bg-neutral-50 border border-neutral-200 rounded-2xl text-sm focus:ring-2 focus:ring-[var(--color-primary)] outline-none transition-all"
+                />
+                <p className="text-[9px] text-neutral-400 mt-1">The address the owner signs up with. Mail Merge sends their invite here. Players never see it.</p>
               </div>
             </div>
 

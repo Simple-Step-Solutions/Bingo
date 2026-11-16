@@ -4,11 +4,12 @@ import { collection, onSnapshot, query, where, doc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { motion, AnimatePresence } from 'motion/react';
 import confetti from 'canvas-confetti';
-import { Trophy, CheckCircle2, MapPin, Store, RefreshCw, Loader2, ExternalLink, Ticket, QrCode, Radio, X, Navigation, Globe, Info, Star } from 'lucide-react';
+import { Trophy, CheckCircle2, MapPin, Store, RefreshCw, Loader2, ExternalLink, Ticket, QrCode, Radio, X, Navigation, Globe, Info, Star, Phone } from 'lucide-react';
 import { checkBingo, boardIsIncomplete } from '../services/bingoService';
 import { Link } from 'react-router-dom';
 import { Html5Qrcode } from 'html5-qrcode';
 import { useModalA11y, prefersReducedMotion } from '../lib/a11y';
+import { normalizeWebsite } from '../lib/businessImport';
 import { InstallButton } from '../components/InstallButton';
 import boardBackdrop from '../assets/board-backdrop-winter.webp';
 import { verifyVisit, ensureBoard, regenerateBoard as regenerateBoardCall, errorMessage, isExpectedError } from '../services/api';
@@ -686,19 +687,29 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, settings
                     )}
 
                     <div className="grid grid-cols-2 gap-3">
-                      <a
-                        href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(selectedBusiness.address || selectedBusiness.name + ' ' + selectedBusiness.town)}`}
-                        target="_blank" rel="noopener noreferrer"
-                        className="flex items-center justify-center gap-2 bg-neutral-100 p-4 rounded-2xl hover:bg-neutral-200 transition-all group"
-                      >
-                        <Navigation size={18} className="text-neutral-400 group-hover:text-neutral-900 transition-colors" />
-                        <span className="text-xs font-bold uppercase tracking-widest">Directions</span>
-                      </a>
-                      {selectedBusiness.website && (
-                        <a href={selectedBusiness.website} target="_blank" rel="noopener noreferrer"
+                      {!selectedBusiness.online && (
+                        <a
+                          href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(selectedBusiness.address || selectedBusiness.name + ' ' + selectedBusiness.town)}`}
+                          target="_blank" rel="noopener noreferrer"
+                          className="flex items-center justify-center gap-2 bg-neutral-100 p-4 rounded-2xl hover:bg-neutral-200 transition-all group"
+                        >
+                          <Navigation size={18} className="text-neutral-400 group-hover:text-neutral-900 transition-colors" />
+                          <span className="text-xs font-bold uppercase tracking-widest">Directions</span>
+                        </a>
+                      )}
+                      {/* Normalised here too: businesses added before the importer did it have "www.shop.com", which is a relative link. */}
+                      {normalizeWebsite(selectedBusiness.website) && (
+                        <a href={normalizeWebsite(selectedBusiness.website)} target="_blank" rel="noopener noreferrer"
                           className="flex items-center justify-center gap-2 bg-neutral-100 p-4 rounded-2xl hover:bg-neutral-200 transition-all group">
                           <Globe size={18} className="text-neutral-400 group-hover:text-neutral-900 transition-colors" />
                           <span className="text-xs font-bold uppercase tracking-widest">Website</span>
+                        </a>
+                      )}
+                      {selectedBusiness.phone && (
+                        <a href={`tel:${selectedBusiness.phone.replace(/[^\d+]/g, '')}`}
+                          className="flex items-center justify-center gap-2 bg-neutral-100 p-4 rounded-2xl hover:bg-neutral-200 transition-all group">
+                          <Phone size={18} className="text-neutral-400 group-hover:text-neutral-900 transition-colors" />
+                          <span className="text-xs font-bold uppercase tracking-widest">Call</span>
                         </a>
                       )}
                     </div>

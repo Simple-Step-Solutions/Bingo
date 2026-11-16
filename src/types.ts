@@ -41,7 +41,24 @@ export interface Business {
   description?: string;
   image?: string;
   website?: string;
+  /** Public contact address shown to players. The owner's login email is private, on business_secrets. */
   email?: string;
+  phone?: string;
+  /** No storefront: no map pin, no directions, no distance check. */
+  online?: boolean;
+}
+
+/** Someone asking to manage a business. Written and decided only by callables. */
+export interface ClaimRequest {
+  id: string;
+  uid: string;
+  email: string;
+  displayName: string | null;
+  businessId: string;
+  businessName: string;
+  /** 'code': typed the poster code. 'invite': had the emailed link but signed in with another address. */
+  source: 'code' | 'invite';
+  status: 'pending' | 'approved' | 'denied';
 }
 
 export interface Town {

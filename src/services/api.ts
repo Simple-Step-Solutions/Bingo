@@ -75,7 +75,9 @@ export const peekInvite = call<
 
 export const redeemInvite = call<
   { token: string },
-  { ok: true; role: string; businessId: string | null }
+  // pending: the link was opened with a different email than the one it was
+  // sent to, so it became a claim request for the chamber to confirm.
+  { ok: true; role: string; businessId: string | null; pending?: boolean }
 >('redeemInvite');
 
 export const createInvite = call<
@@ -92,8 +94,12 @@ export const revokeInvite = call<{ inviteId: string }, { ok: true }>('revokeInvi
 
 export const claimBusiness = call<
   { code: string },
-  { ok: true; businessId: string; businessName: string }
+  // pending: the caller's email is not the login email on file, so the chamber
+  // has to approve it. The code is on a public poster and proves nothing alone.
+  { ok: true; businessId: string; businessName: string; pending?: boolean }
 >('claimBusiness');
+
+export const decideClaimRequest = call<{ requestId: string; approve: boolean }, { ok: true }>('decideClaimRequest');
 
 export const bootstrapAdmin = call<Record<string, never>, { ok: true }>('bootstrapAdmin');
 
@@ -127,6 +133,9 @@ export const exportBusinessCodes = call<
 >('exportBusinessCodes');
 
 export const setBusinessNfc = call<{ businessId: string; nfcId: string | null }, { ok: true }>('setBusinessNfc');
+
+/** The owner's private sign-up address. Invites for the business go to it. */
+export const setBusinessLoginEmail = call<{ businessId: string; loginEmail: string | null }, { ok: true }>('setBusinessLoginEmail');
 
 export const adminGrantCompletion = call<
   { userId: string; businessId: string; reason: string },

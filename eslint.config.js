@@ -18,7 +18,7 @@ import globals from 'globals';
  */
 export default tseslint.config(
   {
-    ignores: ['dist/**', 'node_modules/**', 'functions/node_modules/**', 'dev-dist/**'],
+    ignores: ['dist/**', 'node_modules/**', 'functions/node_modules/**', 'dev-dist/**', '.artifacts/**'],
   },
 
   js.configs.recommended,

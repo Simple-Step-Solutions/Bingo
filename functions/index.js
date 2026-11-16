@@ -199,6 +199,7 @@ exports.provisionBusinessCode = businessCodes.provisionBusinessCode;
 exports.rotateAllCodes = businessCodes.rotateAllCodes;
 exports.exportBusinessCodes = businessCodes.exportBusinessCodes;
 exports.setBusinessNfc = businessCodes.setBusinessNfc;
+exports.setBusinessLoginEmail = businessCodes.setBusinessLoginEmail;
 
 // Invites, business claiming, admin bootstrap (Phase 2e)
 const invites = require('./invites');
@@ -208,6 +209,7 @@ exports.peekInvite = invites.peekInvite;
 exports.redeemInvite = invites.redeemInvite;
 exports.revokeInvite = invites.revokeInvite;
 exports.claimBusiness = invites.claimBusiness;
+exports.decideClaimRequest = invites.decideClaimRequest;
 exports.bootstrapAdmin = invites.bootstrapAdmin;
 
 // Role administration, raffle draw, win redemption, cheat review
