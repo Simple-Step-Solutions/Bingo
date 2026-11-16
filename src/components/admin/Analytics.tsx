@@ -6,6 +6,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { checkBingo } from '../../services/bingoService';
 import { applyLeafletDefaultIcons } from '../../lib/leafletIcons';
+import { whenOf } from '../../lib/time';
 
 const PlayerIcon = L.divIcon({
   className: 'custom-div-icon',
@@ -106,7 +107,8 @@ export const Analytics: React.FC<AnalyticsProps> = ({ users, completions, busine
 
   const topShoppingTime = useMemo(() => {
     if (completions.length === 0) return 'N/A';
-    const hours = completions.map(c => new Date(c.timestamp).getHours());
+    const hours = completions.map(c => whenOf(c)?.getHours()).filter((h): h is number => h !== undefined);
+    if (hours.length === 0) return 'N/A';
     const counts = hours.reduce((acc, h) => {
       acc[h] = (acc[h] || 0) + 1;
       return acc;

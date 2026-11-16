@@ -39,6 +39,7 @@ import { normalizeWebsite } from '../../lib/businessImport';
 import { QRModal } from '../QRModal';
 import { FreeSpaceLogos } from './FreeSpaceLogos';
 import { ClaimRequests } from './ClaimRequests';
+import { formatWhen } from '../../lib/time';
 
 interface ChamberManagerProps {
   businesses: Business[];
@@ -672,7 +673,7 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
                   <div>
                     <p className="font-bold text-sm">{entry.userName || entry.userEmail}</p>
                     <div className="flex items-center gap-3 mt-1">
-                      <p className="text-[10px] text-neutral-400 uppercase tracking-widest font-bold">{new Date(entry.timestamp).toLocaleString()}</p>
+                      <p className="text-[10px] text-neutral-400 uppercase tracking-widest font-bold">{formatWhen(entry)}</p>
                       <span className="text-[10px] bg-neutral-100 px-2 py-0.5 rounded-full text-neutral-600 font-bold uppercase tracking-widest">
                         {entry.completionsCount} Tasks
                       </span>
@@ -713,7 +714,7 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
                   <div>
                     <p className="font-bold text-sm">{winner.userName || winner.userEmail}</p>
                     <div className="flex items-center gap-3 mt-1">
-                      <p className="text-[10px] text-neutral-400 uppercase tracking-widest font-bold">{new Date(winner.timestamp).toLocaleString()}</p>
+                      <p className="text-[10px] text-neutral-400 uppercase tracking-widest font-bold">{formatWhen(winner)}</p>
                       <span className="text-[10px] bg-yellow-50 px-2 py-0.5 rounded-full text-yellow-700 font-bold uppercase tracking-widest">
                         Winner
                       </span>

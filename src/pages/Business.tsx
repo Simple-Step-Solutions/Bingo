@@ -7,6 +7,7 @@ import { useBusinessSecret } from '../services/secrets';
 import { Store, Users, CheckCircle2, Loader2, Download, MapPin, Printer, Hash, KeyRound } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { svgToDataUrl } from '../lib/utils';
+import { formatWhen, isToday, whenMs } from '../lib/time';
 
 interface BusinessDashboardProps {
   user: UserProfile;
@@ -235,7 +236,7 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ user }) =>
     </div>
   );
 
-  const todayCompletions = completions.filter(c => new Date(c.timestamp).toDateString() === new Date().toDateString());
+  const todayCompletions = completions.filter(c => isToday(c));
 
   return (
     <div className="max-w-4xl mx-auto">
@@ -286,7 +287,7 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ user }) =>
                 <p className="text-neutral-400 text-sm italic">No visitors yet.</p>
               </div>
             ) : (
-              completions.slice().reverse().slice(0, 10).map(c => (
+              completions.slice().sort((a, b) => whenMs(b) - whenMs(a)).slice(0, 10).map(c => (
                 <div key={c.id} className="flex items-center justify-between p-6 bg-neutral-50 rounded-3xl border border-neutral-100 group hover:border-neutral-900 transition-all">
                   <div className="flex items-center gap-4">
                     <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-neutral-400 group-hover:text-neutral-900 transition-colors shadow-sm">
@@ -295,7 +296,7 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({ user }) =>
                     <div>
                       <p className="font-bold text-sm">{c.userName || `Visitor #${c.userId.slice(-4).toUpperCase()}`}</p>
                       <p className="text-[10px] text-neutral-400 uppercase tracking-widest font-bold">
-                        {new Date(c.timestamp).toLocaleString()}
+                        {formatWhen(c)}
                       </p>
                     </div>
                   </div>
