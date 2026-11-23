@@ -90,6 +90,24 @@ export const createInvite = call<
   { token: string; expiresAt: string }
 >('createInvite');
 
+export interface InviteRecipient { id: string; name: string; email: string }
+export interface InviteSkip { id: string; name: string; reason: string }
+export interface InviteResult extends InviteRecipient { status: 'sent' | 'failed' | 'skipped'; error?: string }
+
+/**
+ * Launch invites by email (SES). The letter is read from settings/inviteLetter,
+ * so save it before calling test or send.
+ */
+export const sendInvites = call<
+  { mode: 'preview' | 'test' | 'send' },
+  {
+    subject?: string; letter?: string; saved?: boolean;
+    send?: InviteRecipient[]; skipped?: InviteSkip[];
+    to?: string;
+    results?: InviteResult[]; sent?: number; failed?: number;
+  }
+>('sendInvites');
+
 export const revokeInvite = call<{ inviteId: string }, { ok: true }>('revokeInvite');
 
 export const claimBusiness = call<

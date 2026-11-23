@@ -108,6 +108,35 @@ const claimRequestDoc = ({ uid, email, displayName, businessId, businessName, so
 });
 
 /**
+ * Write one invite and return its plaintext token, the only time it exists.
+ * Shared by createInvite and the emailed launch invites (inviteMail.js), so a
+ * mailed link is identical to one made by hand. Callers check the role.
+ */
+const issueInvite = async ({ role, businessId, businessName, emailHint, uid, profile }) => {
+  const token = newToken();
+  const expiresAt = new Date(Date.now() + INVITE_TTL_HOURS * 3600 * 1000);
+  const inviteId = tokenHash(token);
+
+  await db().collection('invites').doc(inviteId).set({
+    role,
+    businessId: businessId || null,
+    businessName: businessName || null,
+    // Stored lowercased because the comparison at redemption is case-insensitive.
+    emailHint: emailHint ? String(emailHint).trim().toLowerCase() : null,
+    createdBy: uid,
+    createdByEmail: (profile && profile.email) || '',
+    createdAt: FieldValue.serverTimestamp(),
+    expiresAt,
+    used: false,
+    revoked: false,
+  });
+
+  return { token, expiresAt, inviteId };
+};
+
+exports.issueInvite = issueInvite;
+
+/**
  * Issue an invite.
  *
  * Chamber invites are admin-only. A chamber account that can mint more chamber
@@ -142,22 +171,7 @@ exports.createInvite = onCall(callableOpts(), async (request) => {
     throw new HttpsError('invalid-argument', 'That email does not look right.');
   }
 
-  const token = newToken();
-  const expiresAt = new Date(Date.now() + INVITE_TTL_HOURS * 3600 * 1000);
-
-  await db().collection('invites').doc(tokenHash(token)).set({
-    role,
-    businessId: businessId || null,
-    businessName: businessName || null,
-    // Stored lowercased because the comparison at redemption is case-insensitive.
-    emailHint: emailHint ? String(emailHint).trim().toLowerCase() : null,
-    createdBy: uid,
-    createdByEmail: (profile && profile.email) || '',
-    createdAt: FieldValue.serverTimestamp(),
-    expiresAt,
-    used: false,
-    revoked: false,
-  });
+  const { token, expiresAt } = await issueInvite({ role, businessId, businessName, emailHint, uid, profile });
 
   await writeAudit({
     actorUid: uid,

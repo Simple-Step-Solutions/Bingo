@@ -212,6 +212,9 @@ exports.claimBusiness = invites.claimBusiness;
 exports.decideClaimRequest = invites.decideClaimRequest;
 exports.bootstrapAdmin = invites.bootstrapAdmin;
 
+// Launch invites by email, through Amazon SES
+exports.sendInvites = require('./inviteMail').sendInvites;
+
 // Role administration, raffle draw, win redemption, cheat review
 const admin = require('./admin');
 

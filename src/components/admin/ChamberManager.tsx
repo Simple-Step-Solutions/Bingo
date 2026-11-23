@@ -3,7 +3,7 @@ import { Business, Town, RaffleEntry, Winner, AppSettings, UserProfile } from '.
 import { doc, getDoc, setDoc, deleteDoc, addDoc, collection } from 'firebase/firestore';
 import { db, storage } from '../../firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { Store, Trash2, Plus, Nfc, QrCode, Search, Users, Ticket, Pencil, Trophy, Sparkles, Loader2, ChevronLeft, ChevronRight, Palette, ImagePlus, Download } from 'lucide-react';
+import { Store, Trash2, Plus, Nfc, QrCode, Search, Users, Ticket, Pencil, Trophy, Sparkles, Loader2, ChevronLeft, ChevronRight, Palette, ImagePlus, Download, Send } from 'lucide-react';
 import { provisionBusinessCode, setBusinessNfc, setBusinessLoginEmail, createInvite, exportBusinessCodes, errorMessage, isExpectedError } from '../../services/api';
 import { shuffle } from '../../services/bingoService';
 import { logAudit } from '../../services/auditService';
@@ -39,6 +39,7 @@ import { normalizeWebsite } from '../../lib/businessImport';
 import { QRModal } from '../QRModal';
 import { FreeSpaceLogos } from './FreeSpaceLogos';
 import { ClaimRequests } from './ClaimRequests';
+import { SendInvitesDialog } from './SendInvitesDialog';
 import { formatWhen } from '../../lib/time';
 
 interface ChamberManagerProps {
@@ -54,6 +55,7 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
   const [newBiz, setNewBiz] = useState({ ...EMPTY_BIZ });
   const [newTown, setNewTown] = useState('');
   const [exporting, setExporting] = useState(false);
+  const [sendInvitesOpen, setSendInvitesOpen] = useState(false);
   const [qrExport, setQrExport] = useState<string | null>(null);
   // Shown next to the button. saveError renders down in the raffle panel, out of sight from here.
   const [qrExportNote, setQrExportNote] = useState<{ text: string; error: boolean } | null>(null);
@@ -491,6 +493,15 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
           <CSVImport businesses={businesses} towns={towns} />
 
           <div className="mt-8 flex items-center gap-3">
+            <button
+              onClick={() => setSendInvitesOpen(true)}
+              disabled={businesses.length === 0}
+              className="shrink-0 flex items-center gap-2 px-4 py-3 bg-[#CC5500] text-white rounded-2xl text-xs font-bold uppercase tracking-widest disabled:opacity-40 hover:opacity-90 transition-all"
+              title="Email every business its sign-up link, with the launch letter and How-To attached"
+            >
+              <Send size={14} aria-hidden="true" />
+              Send Invites
+            </button>
             <button
               onClick={exportMailMerge}
               disabled={exporting || businesses.length === 0}
@@ -950,6 +961,8 @@ export const ChamberManager: React.FC<ChamberManagerProps> = ({ businesses, town
           </div>
         </div>
       </div>
+
+      <SendInvitesDialog isOpen={sendInvitesOpen} onClose={() => setSendInvitesOpen(false)} currentUserId={currentUser.uid} />
 
       {selectedQR && (
         <QRModal

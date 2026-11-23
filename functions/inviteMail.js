@@ -1,0 +1,209 @@
+const { onCall, HttpsError } = require('firebase-functions/v2/https');
+const { defineSecret } = require('firebase-functions/params');
+const logger = require('firebase-functions/logger');
+const { FieldValue } = require('firebase-admin/firestore');
+const fs = require('node:fs');
+const path = require('node:path');
+const nodemailer = require('nodemailer');
+const { SESv2Client, SendEmailCommand } = require('@aws-sdk/client-sesv2');
+
+const { db, callableOpts } = require('./lib/db');
+const { requireRole, writeAudit } = require('./lib/guards');
+const { issueInvite } = require('./invites');
+const {
+  DEFAULT_SUBJECT, DEFAULT_LETTER, letterProblem, renderLetter, pickRecipients,
+} = require('./lib/inviteLetter');
+
+/**
+ * The launch invites: the chamber's letter, each business's own sign-up link,
+ * and the How-To PDF, sent through Amazon SES.
+ *
+ * SES lives in AWS account 485867726406, us-east-1, sending as the verified
+ * domain bingo.simplestep.solutions (Easy DKIM, MAIL FROM bounce.bingo...).
+ * A subdomain, so nothing here touches mail for simplestep.solutions itself.
+ * The IAM user behind these keys may only call ses:SendEmail/SendRawEmail as
+ * that identity.
+ *
+ * Replies go to the chamber, not to us: Reply-To and CC are the chamber's
+ * info@ address, as agreed with Julia on the 11/18 call.
+ */
+
+const SES_ACCESS_KEY_ID = defineSecret('SES_ACCESS_KEY_ID');
+const SES_SECRET_ACCESS_KEY = defineSecret('SES_SECRET_ACCESS_KEY');
+
+const SES_REGION = 'us-east-1';
+const FROM = { name: 'Hudson Valley Gateway Chamber', address: 'invites@bingo.simplestep.solutions' };
+const CHAMBER_INBOX = 'info@hvgatewaychamber.com';
+const APP_URL = 'https://bingo.simplestepsolutions.com';
+const ATTACHMENT_NAME = 'HowToChamberBingo_2026.pdf';
+const LETTER_DOC = 'inviteLetter';
+
+// Read once per instance. Bundled with the function so a send never depends
+// on a Storage download working at that moment.
+let pdf;
+const howToPdf = () => {
+  if (!pdf) pdf = fs.readFileSync(path.join(__dirname, 'assets', ATTACHMENT_NAME));
+  return pdf;
+};
+
+const composer = nodemailer.createTransport({ streamTransport: true, buffer: true });
+
+let ses;
+const sesClient = () => {
+  if (!ses) {
+    ses = new SESv2Client({
+      region: SES_REGION,
+      credentials: {
+        accessKeyId: SES_ACCESS_KEY_ID.value(),
+        secretAccessKey: SES_SECRET_ACCESS_KEY.value(),
+      },
+    });
+  }
+  return ses;
+};
+
+/** Build the MIME message and hand it to SES. Returns the SES message id. */
+const sendOne = async ({ to, cc, subject, text, html }) => {
+  const { message } = await composer.sendMail({
+    from: FROM,
+    to,
+    cc: cc || undefined,
+    replyTo: CHAMBER_INBOX,
+    subject,
+    text,
+    html,
+    attachments: [{ filename: ATTACHMENT_NAME, content: howToPdf(), contentType: 'application/pdf' }],
+  });
+  const res = await sesClient().send(new SendEmailCommand({
+    FromEmailAddress: `${FROM.name} <${FROM.address}>`,
+    Destination: { ToAddresses: [to], CcAddresses: cc ? [cc] : [] },
+    Content: { Raw: { Data: message } },
+  }));
+  return res.MessageId || null;
+};
+
+const loadLetter = async () => {
+  const snap = await db().collection('settings').doc(LETTER_DOC).get();
+  const data = snap.exists ? snap.data() : {};
+  return {
+    subject: typeof data.subject === 'string' && data.subject.trim() ? data.subject : DEFAULT_SUBJECT,
+    letter: typeof data.letter === 'string' && data.letter.trim() ? data.letter : DEFAULT_LETTER,
+    saved: snap.exists,
+  };
+};
+
+const loadRecipients = async () => {
+  const [bizSnap, secretSnap, ownerSnap, sentSnap] = await Promise.all([
+    db().collection('businesses').get(),
+    db().collection('business_secrets').get(),
+    db().collection('users').where('role', '==', 'business').get(),
+    db().collection('invite_sends').where('status', '==', 'sent').get(),
+  ]);
+  const businesses = bizSnap.docs.map((d) => ({ id: d.id, name: d.data().name || d.id, email: d.data().email || '' }));
+  const loginEmails = Object.fromEntries(secretSnap.docs.map((d) => [d.id, d.data().loginEmail || '']));
+  const ownedIds = new Set(ownerSnap.docs.map((d) => d.data().businessId).filter(Boolean));
+  const sentIds = new Set(sentSnap.docs.map((d) => d.id));
+  return pickRecipients({ businesses, loginEmails, ownedIds, sentIds });
+};
+
+/**
+ * Claim a business for this send. A transaction, so two presses of the button
+ * (or two chamber staff at once) cannot both email the same business. A
+ * previous failure can be retried; a success or an in-flight send cannot.
+ */
+const claimSend = async (businessId, email, uid) => {
+  const ref = db().collection('invite_sends').doc(businessId);
+  return db().runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    if (snap.exists && snap.data().status !== 'failed') return false;
+    tx.set(ref, { businessId, email, status: 'sending', startedAt: FieldValue.serverTimestamp(), sentBy: uid });
+    return true;
+  });
+};
+
+/**
+ * One callable, three modes:
+ *   preview  who would get it, who is skipped and why, and the saved letter
+ *   test     the letter to the caller's own address, with a dummy link
+ *   send     the real thing, to every business preview listed
+ *
+ * The letter always comes from settings/inviteLetter, which the dialog saves
+ * before calling, so what the chamber previewed is exactly what goes out.
+ */
+exports.sendInvites = onCall(callableOpts({
+  secrets: [SES_ACCESS_KEY_ID, SES_SECRET_ACCESS_KEY],
+  timeoutSeconds: 540,
+  maxInstances: 2,
+}), async (request) => {
+  const { uid, role: actorRole, profile, auth } = await requireRole(request, 'chamber');
+  const mode = (request.data && request.data.mode) || 'preview';
+  if (!['preview', 'test', 'send'].includes(mode)) {
+    throw new HttpsError('invalid-argument', 'Unknown mode.');
+  }
+
+  const { subject, letter, saved } = await loadLetter();
+  const actorEmail = (profile && profile.email) || auth.token.email || '';
+
+  if (mode === 'preview') {
+    const { send, skipped } = await loadRecipients();
+    return { subject, letter, saved, send, skipped };
+  }
+
+  const problem = letterProblem({ subject, letter });
+  if (problem) throw new HttpsError('failed-precondition', problem);
+
+  if (mode === 'test') {
+    if (!auth.token.email) throw new HttpsError('failed-precondition', 'Your account has no email address to send a test to.');
+    const { text, html } = renderLetter({
+      letter,
+      link: `${APP_URL}/?invite=TEST-LINK-THIS-IS-NOT-REAL`,
+      businessName: 'Sample Business',
+    });
+    try {
+      await sendOne({ to: auth.token.email, subject: `[TEST] ${subject}`, text, html });
+    } catch (err) {
+      logger.error('Test invite failed', { err: err.message, name: err.name });
+      throw new HttpsError('internal', `The test email did not send: ${err.message}`);
+    }
+    await writeAudit({
+      actorUid: uid, actorEmail, actorRole, action: 'test_invite_email', targetUid: 'n/a',
+      details: { to: auth.token.email },
+    });
+    return { ok: true, to: auth.token.email };
+  }
+
+  // mode === 'send'
+  const { send, skipped } = await loadRecipients();
+  const results = [];
+  for (const r of send) {
+    if (!(await claimSend(r.id, r.email, uid))) {
+      results.push({ id: r.id, name: r.name, email: r.email, status: 'skipped', error: 'Already sent or sending' });
+      continue;
+    }
+    const ref = db().collection('invite_sends').doc(r.id);
+    try {
+      const { token, inviteId, expiresAt } = await issueInvite({
+        role: 'business', businessId: r.id, businessName: r.name, emailHint: r.email, uid, profile,
+      });
+      const { text, html } = renderLetter({ letter, link: `${APP_URL}/?invite=${token}`, businessName: r.name });
+      const messageId = await sendOne({ to: r.email, cc: CHAMBER_INBOX, subject, text, html });
+      await ref.set({
+        status: 'sent', sentAt: FieldValue.serverTimestamp(), messageId, inviteId, expiresAt,
+      }, { merge: true });
+      results.push({ id: r.id, name: r.name, email: r.email, status: 'sent' });
+    } catch (err) {
+      logger.error('Invite email failed', { businessId: r.id, err: err.message, name: err.name });
+      await ref.set({ status: 'failed', error: String(err.message || err).slice(0, 500), failedAt: FieldValue.serverTimestamp() }, { merge: true });
+      results.push({ id: r.id, name: r.name, email: r.email, status: 'failed', error: err.message });
+    }
+  }
+
+  const sentCount = results.filter((r) => r.status === 'sent').length;
+  const failedCount = results.filter((r) => r.status === 'failed').length;
+  await writeAudit({
+    actorUid: uid, actorEmail, actorRole, action: 'send_invite_emails', targetUid: 'n/a',
+    details: { sent: sentCount, failed: failedCount, skipped: skipped.length, subject },
+  });
+
+  return { results, sent: sentCount, failed: failedCount, skipped };
+});
