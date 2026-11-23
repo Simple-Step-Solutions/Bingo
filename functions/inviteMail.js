@@ -1,11 +1,11 @@
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
-const { defineSecret } = require('firebase-functions/params');
 const logger = require('firebase-functions/logger');
 const { FieldValue } = require('firebase-admin/firestore');
 const fs = require('node:fs');
 const path = require('node:path');
 const nodemailer = require('nodemailer');
 const { SESv2Client, SendEmailCommand } = require('@aws-sdk/client-sesv2');
+const { STSClient, AssumeRoleWithWebIdentityCommand } = require('@aws-sdk/client-sts');
 
 const { db, callableOpts } = require('./lib/db');
 const { requireRole, writeAudit } = require('./lib/guards');
@@ -21,15 +21,24 @@ const {
  * SES lives in AWS account 485867726406, us-east-1, sending as the verified
  * domain bingo.simplestep.solutions (Easy DKIM, MAIL FROM bounce.bingo...).
  * A subdomain, so nothing here touches mail for simplestep.solutions itself.
- * The IAM user behind these keys may only call ses:SendEmail/SendRawEmail as
- * that identity.
  *
  * Replies go to the chamber, not to us: Reply-To and CC are the chamber's
  * info@ address, as agreed with Julia on the 11/18 call.
  */
 
-const SES_ACCESS_KEY_ID = defineSecret('SES_ACCESS_KEY_ID');
-const SES_SECRET_ACCESS_KEY = defineSecret('SES_SECRET_ACCESS_KEY');
+/*
+ * No stored AWS keys. This function runs as its own service account, and AWS
+ * trusts Google as an identity provider: the function asks the metadata server
+ * for a Google ID token for that account and trades it with STS for one-hour
+ * credentials on the role below. The role's trust policy accepts only this
+ * account's unique ID with audience sts.amazonaws.com, and its permissions
+ * (and permissions boundary) allow nothing but sending as invites@.
+ */
+const MAILER_SA = 'bingo-invite-mailer@sss-hvgcc-bingo.iam.gserviceaccount.com';
+const SES_ROLE_ARN = 'arn:aws:iam::485867726406:role/chamber-bingo-ses-sender';
+const TOKEN_AUDIENCE = 'sts.amazonaws.com';
+const METADATA_TOKEN_URL = 'http://metadata.google.internal/computeMetadata/v1/instance/service-account/identity'
+  + `?audience=${encodeURIComponent(TOKEN_AUDIENCE)}&format=full`;
 
 const SES_REGION = 'us-east-1';
 const FROM = { name: 'Hudson Valley Gateway Chamber', address: 'invites@bingo.simplestep.solutions' };
@@ -48,19 +57,35 @@ const howToPdf = () => {
 
 const composer = nodemailer.createTransport({ streamTransport: true, buffer: true });
 
+const googleIdToken = async () => {
+  const res = await fetch(METADATA_TOKEN_URL, { headers: { 'Metadata-Flavor': 'Google' } });
+  if (!res.ok) throw new Error(`Metadata server refused an ID token (${res.status})`);
+  return res.text();
+};
+
+/**
+ * A credential provider. The SDK caches what it returns and calls it again
+ * shortly before the expiration, so a long-lived instance keeps working.
+ */
+const federatedCredentials = async () => {
+  const sts = new STSClient({ region: SES_REGION });
+  const { Credentials: c } = await sts.send(new AssumeRoleWithWebIdentityCommand({
+    RoleArn: SES_ROLE_ARN,
+    RoleSessionName: 'chamber-bingo-invites',
+    WebIdentityToken: await googleIdToken(),
+    DurationSeconds: 3600,
+  }));
+  return {
+    accessKeyId: c.AccessKeyId,
+    secretAccessKey: c.SecretAccessKey,
+    sessionToken: c.SessionToken,
+    expiration: c.Expiration,
+  };
+};
+
 let ses;
 const sesClient = () => {
-  if (!ses) {
-    ses = new SESv2Client({
-      region: SES_REGION,
-      // Trimmed: a secret piped in from a Windows clipboard carries a CRLF,
-      // and AWS rejects the signature with no hint that whitespace is why.
-      credentials: {
-        accessKeyId: SES_ACCESS_KEY_ID.value().trim(),
-        secretAccessKey: SES_SECRET_ACCESS_KEY.value().trim(),
-      },
-    });
-  }
+  if (!ses) ses = new SESv2Client({ region: SES_REGION, credentials: federatedCredentials });
   return ses;
 };
 
@@ -133,7 +158,7 @@ const claimSend = async (businessId, email, uid) => {
  * before calling, so what the chamber previewed is exactly what goes out.
  */
 exports.sendInvites = onCall(callableOpts({
-  secrets: [SES_ACCESS_KEY_ID, SES_SECRET_ACCESS_KEY],
+  serviceAccount: MAILER_SA,
   timeoutSeconds: 540,
   maxInstances: 2,
 }), async (request) => {
