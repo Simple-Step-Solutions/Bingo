@@ -241,10 +241,10 @@ function App() {
   // admin panel's Reset Town / Reset Everything clears their town. Without a
   // town no board is ever built and nothing let them pick one again, so they
   // get the town picker whenever their town is empty.
-  const isStaff = user.role === 'chamber' || user.role === 'admin';
+  const staffAccount = user.role === 'chamber' || user.role === 'admin';
   if (settings && (
     (user.role === 'player' && !user.onboardingComplete)
-    || (isStaff && !user.town)
+    || (staffAccount && !user.town)
   )) {
     return (
       <Onboarding
