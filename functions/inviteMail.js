@@ -37,10 +37,8 @@ const {
 const MAILER_SA = 'bingo-invite-mailer@sss-hvgcc-bingo.iam.gserviceaccount.com';
 const SES_ROLE_ARN = 'arn:aws:iam::485867726406:role/chamber-bingo-ses-sender';
 const TOKEN_AUDIENCE = 'sts.amazonaws.com';
-// "default" is the function's own runtime service account (MAILER_SA). Without
-// that path segment the metadata server answers 404.
-const METADATA_TOKEN_URL = 'http://metadata.google.internal/computeMetadata/v1/instance/service-account/default/identity'
-  + `?audience=${encodeURIComponent(TOKEN_AUDIENCE)}`;
+// "default" is the function's own runtime service account (MAILER_SA).
+const METADATA_ACCESS_TOKEN_URL = 'http://metadata.google.internal/computeMetadata/v1/instance/service-account/default/token';
 
 const SES_REGION = 'us-east-1';
 const FROM = { name: 'Hudson Valley Gateway Chamber', address: 'invites@bingo.simplestep.solutions' };
@@ -59,10 +57,33 @@ const howToPdf = () => {
 
 const composer = nodemailer.createTransport({ streamTransport: true, buffer: true });
 
+/**
+ * A Google ID token for MAILER_SA, audience sts.amazonaws.com.
+ *
+ * The metadata server's identity endpoint answered 404 in production, so this
+ * goes through the IAM Credentials API instead: the function's ordinary access
+ * token (the same one Firestore uses) asks generateIdToken for itself. The
+ * mailer account holds roles/iam.serviceAccountOpenIdTokenCreator on itself
+ * only, nothing project-wide.
+ */
 const googleIdToken = async () => {
-  const res = await fetch(METADATA_TOKEN_URL, { headers: { 'Metadata-Flavor': 'Google' } });
-  if (!res.ok) throw new Error(`Metadata server refused an ID token (${res.status})`);
-  return res.text();
+  const tokRes = await fetch(METADATA_ACCESS_TOKEN_URL, { headers: { 'Metadata-Flavor': 'Google' } });
+  if (!tokRes.ok) throw new Error(`Metadata server refused an access token (${tokRes.status})`);
+  const { access_token: accessToken } = await tokRes.json();
+
+  const idRes = await fetch(
+    `https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/${MAILER_SA}:generateIdToken`,
+    {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ audience: TOKEN_AUDIENCE, includeEmail: false }),
+    },
+  );
+  if (!idRes.ok) {
+    const detail = (await idRes.text()).slice(0, 300);
+    throw new Error(`IAM refused an ID token (${idRes.status}): ${detail}`);
+  }
+  return (await idRes.json()).token;
 };
 
 /**
