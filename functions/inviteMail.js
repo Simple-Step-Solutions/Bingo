@@ -37,8 +37,10 @@ const {
 const MAILER_SA = 'bingo-invite-mailer@sss-hvgcc-bingo.iam.gserviceaccount.com';
 const SES_ROLE_ARN = 'arn:aws:iam::485867726406:role/chamber-bingo-ses-sender';
 const TOKEN_AUDIENCE = 'sts.amazonaws.com';
-const METADATA_TOKEN_URL = 'http://metadata.google.internal/computeMetadata/v1/instance/service-account/identity'
-  + `?audience=${encodeURIComponent(TOKEN_AUDIENCE)}&format=full`;
+// "default" is the function's own runtime service account (MAILER_SA). Without
+// that path segment the metadata server answers 404.
+const METADATA_TOKEN_URL = 'http://metadata.google.internal/computeMetadata/v1/instance/service-account/default/identity'
+  + `?audience=${encodeURIComponent(TOKEN_AUDIENCE)}`;
 
 const SES_REGION = 'us-east-1';
 const FROM = { name: 'Hudson Valley Gateway Chamber', address: 'invites@bingo.simplestep.solutions' };
