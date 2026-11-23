@@ -181,11 +181,8 @@ exports.sendInvites = onCall(callableOpts({
 
   if (mode === 'test') {
     if (!auth.token.email) throw new HttpsError('failed-precondition', 'Your account has no email address to send a test to.');
-    const { text, html } = renderLetter({
-      letter,
-      link: `${APP_URL}/?invite=TEST-LINK-THIS-IS-NOT-REAL`,
-      businessName: 'Sample Business',
-    });
+    // No link: the sample marker shows where each business's link will sit.
+    const { text, html } = renderLetter({ letter, link: null, businessName: 'Sample Business' });
     try {
       await sendOne({ to: auth.token.email, subject: `[TEST] ${subject}`, text, html });
     } catch (err) {
