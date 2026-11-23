@@ -6,6 +6,7 @@ const path = require('node:path');
 const nodemailer = require('nodemailer');
 const { SESv2Client, SendEmailCommand } = require('@aws-sdk/client-sesv2');
 const { STSClient, AssumeRoleWithWebIdentityCommand } = require('@aws-sdk/client-sts');
+const { GoogleAuth } = require('google-auth-library');
 
 const { db, callableOpts } = require('./lib/db');
 const { requireRole, writeAudit } = require('./lib/guards');
@@ -37,8 +38,7 @@ const {
 const MAILER_SA = 'bingo-invite-mailer@sss-hvgcc-bingo.iam.gserviceaccount.com';
 const SES_ROLE_ARN = 'arn:aws:iam::485867726406:role/chamber-bingo-ses-sender';
 const TOKEN_AUDIENCE = 'sts.amazonaws.com';
-// "default" is the function's own runtime service account (MAILER_SA).
-const METADATA_ACCESS_TOKEN_URL = 'http://metadata.google.internal/computeMetadata/v1/instance/service-account/default/token';
+const googleAuth = new GoogleAuth({ scopes: ['https://www.googleapis.com/auth/cloud-platform'] });
 
 const SES_REGION = 'us-east-1';
 const FROM = { name: 'Hudson Valley Gateway Chamber', address: 'invites@bingo.simplestep.solutions' };
@@ -60,16 +60,23 @@ const composer = nodemailer.createTransport({ streamTransport: true, buffer: tru
 /**
  * A Google ID token for MAILER_SA, audience sts.amazonaws.com.
  *
- * The metadata server's identity endpoint answered 404 in production, so this
- * goes through the IAM Credentials API instead: the function's ordinary access
- * token (the same one Firestore uses) asks generateIdToken for itself. The
- * mailer account holds roles/iam.serviceAccountOpenIdTokenCreator on itself
- * only, nothing project-wide.
+ * Fallback: the IAM Credentials API's generateIdToken, called with the
+ * account's ordinary access token. The mailer account holds
+ * roles/iam.serviceAccountOpenIdTokenCreator on itself only.
  */
 const googleIdToken = async () => {
-  const tokRes = await fetch(METADATA_ACCESS_TOKEN_URL, { headers: { 'Metadata-Flavor': 'Google' } });
-  if (!tokRes.ok) throw new Error(`Metadata server refused an access token (${tokRes.status})`);
-  const { access_token: accessToken } = await tokRes.json();
+  // Google's own client first: it is what Firestore uses here, and it talks
+  // to the metadata server correctly. Hand-rolled fetch() calls to the
+  // metadata server got 404s in production.
+  try {
+    const client = await googleAuth.getIdTokenClient(TOKEN_AUDIENCE);
+    return await client.idTokenProvider.fetchIdToken(TOKEN_AUDIENCE);
+  } catch (err) {
+    logger.warn('Direct ID token failed, trying IAM Credentials', { err: err.message });
+  }
+
+  const accessToken = await googleAuth.getAccessToken();
+  if (!accessToken) throw new Error('No Google access token for the mailer account');
 
   const idRes = await fetch(
     `https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/${MAILER_SA}:generateIdToken`,
