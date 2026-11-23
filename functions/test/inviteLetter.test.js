@@ -49,6 +49,14 @@ test('a business name containing {link} cannot inject a second link', () => {
   assert.equal(text, `{link} ${LINK}`);
 });
 
+test('the test preview shows a marked sample instead of a link', () => {
+  const { text, html } = renderLetter({ letter: 'For {business}:\n{link}', link: null, businessName: 'Sample Business' });
+  assert.ok(text.startsWith('For Sample Business:\n[Sample:'));
+  assert.ok(!html.includes('<a '));
+  assert.ok(!text.includes('http'));
+  assert.ok(html.includes('appears here]'));
+});
+
 test('blank lines become paragraphs', () => {
   const { html } = renderLetter({ letter: 'One\n\nTwo\r\n\r\n{link}', link: LINK, businessName: 'X' });
   assert.equal((html.match(/<p /g) || []).length, 3);

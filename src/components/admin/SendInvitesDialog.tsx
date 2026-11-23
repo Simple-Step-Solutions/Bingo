@@ -202,6 +202,7 @@ export const SendInvitesDialog: React.FC<Props> = ({ isOpen, onClose, currentUse
               <button
                 onClick={() => run('test')}
                 disabled={busy !== null}
+                title="Emails this letter to you, with Sample Business as the name and a marked sample where the link goes. No real link, nothing sent to businesses."
                 className="px-4 py-3 bg-white border border-neutral-200 rounded-2xl text-xs font-bold uppercase tracking-widest disabled:opacity-40 hover:border-neutral-900 transition-all"
               >
                 {busy === 'test' ? 'Sending...' : 'Send Me a Test'}

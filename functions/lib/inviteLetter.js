@@ -63,17 +63,25 @@ const escapeHtml = (s) => String(s)
   .replace(/"/g, '&quot;')
   .replace(/'/g, '&#39;');
 
+const SAMPLE_LINK_TEXT = "[Sample: each business's personal sign-up link appears here]";
+
 /**
  * Fill in one business's letter. Returns the plain text and HTML versions.
  * The link is a URL we built, never chamber input, but it is escaped anyway.
+ *
+ * With no link (the "Send Me a Test" preview) the spot is shown as a marked
+ * sample instead of a link, so nobody clicks a dead invite.
  */
 const renderLetter = ({ letter, link, businessName }) => {
   const name = businessName || 'your business';
+  const linkText = link || SAMPLE_LINK_TEXT;
   // Split on {link} first, so a business name that happens to contain
   // "{link}" is printed as text rather than becoming a second link.
-  const text = letter.split(LINK).map((piece) => piece.split(BUSINESS).join(name)).join(link);
+  const text = letter.split(LINK).map((piece) => piece.split(BUSINESS).join(name)).join(linkText);
 
-  const anchor = `<a href="${escapeHtml(link)}" style="color:#1695B2;font-weight:bold">${escapeHtml(link)}</a>`;
+  const anchor = link
+    ? `<a href="${escapeHtml(link)}" style="color:#1695B2;font-weight:bold">${escapeHtml(link)}</a>`
+    : `<span style="background:#FFF3E0;color:#CC5500;font-weight:bold;padding:2px 6px;border-radius:4px">${escapeHtml(SAMPLE_LINK_TEXT)}</span>`;
   const paragraphs = letter
     .replace(/\r\n/g, '\n')
     .split(/\n\s*\n/)
