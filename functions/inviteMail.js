@@ -53,9 +53,11 @@ const sesClient = () => {
   if (!ses) {
     ses = new SESv2Client({
       region: SES_REGION,
+      // Trimmed: a secret piped in from a Windows clipboard carries a CRLF,
+      // and AWS rejects the signature with no hint that whitespace is why.
       credentials: {
-        accessKeyId: SES_ACCESS_KEY_ID.value(),
-        secretAccessKey: SES_SECRET_ACCESS_KEY.value(),
+        accessKeyId: SES_ACCESS_KEY_ID.value().trim(),
+        secretAccessKey: SES_SECRET_ACCESS_KEY.value().trim(),
       },
     });
   }
