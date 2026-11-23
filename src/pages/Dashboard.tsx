@@ -101,6 +101,18 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, settings
   }, [boardLoaded, serverBoard, user.town]);
 
   const freeSpaceLogo = useFreeSpaceLogo(user.town);
+
+  // Two looks for the squares: the shop photo behind the name (default), or the
+  // plain words. The choice is remembered on this device.
+  const [boardView, setBoardView] = useState<'photo' | 'words'>(() => {
+    try { return localStorage.getItem('boardView') === 'words' ? 'words' : 'photo'; } catch { return 'photo'; }
+  });
+  const chooseBoardView = (v: 'photo' | 'words') => {
+    setBoardView(v);
+    try { localStorage.setItem('boardView', v); } catch { /* private mode */ }
+  };
+  // Businesses whose photo failed to load. Those squares fall back to the words look.
+  const [brokenImages, setBrokenImages] = useState<Set<string>>(() => new Set());
   const size = serverBoard?.size || user.boardSize || settings?.boardSize || 3;
   const board = serverBoard?.cells || user.bingoBoard || [];
 
@@ -445,6 +457,25 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, settings
         </div>
       )}
 
+      <div className="shrink-0 mb-2 flex items-center justify-end gap-2">
+        <span id="board-view-label" className="text-[10px] font-bold uppercase tracking-widest text-neutral-500">Board view</span>
+        <div role="group" aria-labelledby="board-view-label" className="inline-flex rounded-full border border-neutral-200 bg-white p-0.5 shadow-sm">
+          {([['photo', 'Photos'], ['words', 'Words']] as const).map(([v, label]) => (
+            <button
+              key={v}
+              type="button"
+              aria-pressed={boardView === v}
+              onClick={() => chooseBoardView(v)}
+              className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] ${
+                boardView === v ? 'bg-[#1695B2] text-white' : 'text-neutral-600 hover:text-neutral-900'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Board */}
       {/*
         The board sizes itself against this wrapper, not against the viewport.
@@ -525,6 +556,44 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, settings
 
             const biz = businesses.find(b => b.id === bizId);
             const isDone = completions.some(c => c.businessId === bizId);
+            const showPhoto = boardView === 'photo' && !!biz?.image && !brokenImages.has(bizId);
+
+            if (showPhoto && biz) {
+              return (
+                <button
+                  key={idx}
+                  type="button"
+                  aria-pressed={isDone}
+                  aria-label={`${biz.name}, ${biz.town}. ${isDone ? 'Visited.' : 'Not visited yet.'} Open details.`}
+                  onClick={() => setSelectedBusiness(biz)}
+                  className={`rounded-xl md:rounded-3xl flex flex-col items-center justify-end text-center transition-all relative overflow-hidden group cursor-pointer p-1 md:p-3 bg-neutral-900 text-white shadow-md focus:outline-none focus-visible:ring-4 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-2 ${
+                    isDone ? 'ring-2 ring-orange-500' : ''
+                  }`}
+                >
+                  {/* Decorative: the square's aria-label already names the business. */}
+                  <img
+                    src={biz.image}
+                    alt=""
+                    loading="lazy"
+                    referrerPolicy="no-referrer"
+                    onError={() => setBrokenImages(prev => new Set(prev).add(bizId))}
+                    className="absolute inset-0 w-full h-full object-cover"
+                  />
+                  {/* Scrim so white text stays readable on any photo. Completed squares get a heavier one. */}
+                  <div
+                    aria-hidden="true"
+                    className={`absolute inset-0 ${isDone ? 'bg-neutral-900/60' : 'bg-gradient-to-t from-black/80 via-black/20 to-transparent'}`}
+                  />
+                  {isDone && (
+                    <CheckCircle2 className="relative z-10 text-orange-500 mb-1 w-5 h-5 md:w-8 md:h-8 shrink-0 drop-shadow" aria-hidden="true" />
+                  )}
+                  <p className="relative z-10 text-[9px] md:text-sm font-bold uppercase tracking-tighter leading-tight line-clamp-2 px-1 drop-shadow">{biz.name}</p>
+                  {!isDone && (
+                    <p className="relative z-10 text-[10px] text-white/80 font-medium uppercase tracking-widest mt-0.5 hidden sm:block">{biz.town}</p>
+                  )}
+                </button>
+              );
+            }
 
             return (
               <button
