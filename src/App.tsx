@@ -236,7 +236,16 @@ function App() {
   // deep link straight to /map never saw it, never picked a town, and ended up
   // with an empty board and no way to fix it. It is a route-independent gate
   // now: no route renders until a player has a town.
-  if (settings && user.role === 'player' && !user.onboardingComplete) {
+  //
+  // Chamber and admin accounts skip onboarding, but they play too, and the
+  // admin panel's Reset Town / Reset Everything clears their town. Without a
+  // town no board is ever built and nothing let them pick one again, so they
+  // get the town picker whenever their town is empty.
+  const staffAccount = user.role === 'chamber' || user.role === 'admin';
+  if (settings && (
+    (user.role === 'player' && !user.onboardingComplete)
+    || (staffAccount && !user.town)
+  )) {
     return (
       <Onboarding
         user={user}

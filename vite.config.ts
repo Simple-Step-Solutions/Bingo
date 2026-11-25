@@ -51,12 +51,14 @@ export default defineConfig(() => {
           // Without this, the SW intercepts /__/auth/handler and serves our app
           // instead of Firebase's auth handler, breaking OAuth popups.
           navigateFallbackDenylist: [/^\/__\//],
+          // No route for firestore.googleapis.com, on purpose. There used to be
+          // a NetworkFirst one, and Firestore keeps a Listen request open
+          // almost permanently (long polls of up to ~30s, back to back). With
+          // the service worker handling those, the old worker was never idle,
+          // so a new version sat "waiting" for as long as any tab was open and
+          // users kept running old code after every deploy. Firestore has its
+          // own offline handling; caching its traffic here never helped.
           runtimeCaching: [
-            {
-              urlPattern: /^https:\/\/firestore\.googleapis\.com\/.*/i,
-              handler: 'NetworkFirst',
-              options: { cacheName: 'firestore-cache' },
-            },
             {
               urlPattern: /^https:\/\/.*\.tile\.openstreetmap\.org\/.*/i,
               handler: 'CacheFirst',

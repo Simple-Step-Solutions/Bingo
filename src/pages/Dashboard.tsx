@@ -4,7 +4,7 @@ import { collection, onSnapshot, query, where, doc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { motion, AnimatePresence } from 'motion/react';
 import confetti from 'canvas-confetti';
-import { Trophy, CheckCircle2, MapPin, Store, RefreshCw, Loader2, ExternalLink, Ticket, QrCode, Radio, X, Navigation, Globe, Info, Star, Phone } from 'lucide-react';
+import { Trophy, Check, CheckCircle2, MapPin, Store, RefreshCw, Loader2, ExternalLink, Ticket, QrCode, Radio, X, Navigation, Globe, Info, Star, Phone } from 'lucide-react';
 import { checkBingo, boardIsIncomplete } from '../services/bingoService';
 import { Link } from 'react-router-dom';
 import { Html5Qrcode } from 'html5-qrcode';
@@ -566,31 +566,64 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, businesses, settings
                   aria-pressed={isDone}
                   aria-label={`${biz.name}, ${biz.town}. ${isDone ? 'Visited.' : 'Not visited yet.'} Open details.`}
                   onClick={() => setSelectedBusiness(biz)}
-                  className={`rounded-xl md:rounded-3xl flex flex-col items-center justify-end text-center transition-all relative overflow-hidden group cursor-pointer p-1 md:p-3 bg-neutral-900 text-white shadow-md focus:outline-none focus-visible:ring-4 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-2 ${
-                    isDone ? 'ring-2 ring-orange-500' : ''
+                  className={`isolate rounded-xl md:rounded-3xl flex flex-col items-center justify-center text-center relative overflow-hidden group cursor-pointer p-1.5 md:p-4 shadow-[0_6px_18px_-8px_rgba(12,59,71,0.55)] focus:outline-none focus-visible:ring-4 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-2 ${
+                    isDone ? 'bg-[#3D1A06]' : 'bg-[#0C3B47]'
                   }`}
                 >
-                  {/* Decorative: the square's aria-label already names the business. */}
+                  {/*
+                    A frosted shop window on a winter evening: the photo sits
+                    blurred and dimmed behind tinted glass so the name reads
+                    first, and the frost clears a little when the square is
+                    pointed at or focused. Decorative: the aria-label names it.
+                  */}
                   <img
                     src={biz.image}
                     alt=""
                     loading="lazy"
                     referrerPolicy="no-referrer"
                     onError={() => setBrokenImages(prev => new Set(prev).add(bizId))}
-                    className="absolute inset-0 w-full h-full object-cover"
+                    className="absolute inset-0 -z-10 w-full h-full object-cover scale-110 blur-[3px] opacity-70 saturate-[.9] motion-safe:transition-[filter,opacity,transform] motion-safe:duration-700 motion-safe:ease-out group-hover:blur-[1px] group-hover:opacity-85 group-hover:scale-105 group-focus-visible:blur-[1px] group-focus-visible:opacity-85"
                   />
-                  {/* Scrim so white text stays readable on any photo. Completed squares get a heavier one. */}
+                  {/* Glass tint: evergreen teal, or a warm ember glow once visited. */}
                   <div
                     aria-hidden="true"
-                    className={`absolute inset-0 ${isDone ? 'bg-neutral-900/60' : 'bg-gradient-to-t from-black/80 via-black/20 to-transparent'}`}
+                    className={`absolute inset-0 -z-10 bg-gradient-to-b ${
+                      isDone
+                        ? 'from-[#CC5500]/35 via-[#7A2E00]/45 to-[#2A1003]/80'
+                        : 'from-[#0C3B47]/10 via-[#0C3B47]/35 to-[#082A33]/80'
+                    }`}
+                  />
+                  {/* Frost sheen across the top pane. */}
+                  <div aria-hidden="true" className="absolute inset-x-0 top-0 h-1/2 -z-10 bg-gradient-to-b from-white/15 to-transparent" />
+                  {/* Gold hairline, echoing the board's printed frame. */}
+                  <div
+                    aria-hidden="true"
+                    className={`absolute inset-[3px] md:inset-1.5 rounded-[0.6rem] md:rounded-[1.25rem] border pointer-events-none ${isDone ? 'border-[#E2C25A]/80' : 'border-[#BC9C22]/55'}`}
                   />
                   {isDone && (
-                    <CheckCircle2 className="relative z-10 text-orange-500 mb-1 w-5 h-5 md:w-8 md:h-8 shrink-0 drop-shadow" aria-hidden="true" />
+                    // The visited seal: brand orange, ringed in gold.
+                    <span
+                      aria-hidden="true"
+                      className="absolute top-1 right-1 md:top-2.5 md:right-2.5 flex items-center justify-center w-4 h-4 md:w-7 md:h-7 rounded-full bg-[#CC5500] ring-1 md:ring-2 ring-[#E2C25A] shadow-[0_0_12px_rgba(226,194,90,0.6)]"
+                    >
+                      <Check className="w-2.5 h-2.5 md:w-4 md:h-4 text-white" strokeWidth={3} />
+                    </span>
                   )}
-                  <p className="relative z-10 text-[9px] md:text-sm font-bold uppercase tracking-tighter leading-tight line-clamp-2 px-1 drop-shadow">{biz.name}</p>
-                  {!isDone && (
-                    <p className="relative z-10 text-[10px] text-white/80 font-medium uppercase tracking-widest mt-0.5 hidden sm:block">{biz.town}</p>
-                  )}
+                  {/*
+                    Sized from the board itself (cqmin is the board's side, see
+                    the wrapper above), so names fit a 3x3 on a phone and a 5x5
+                    on a laptop alike, instead of jumping at a viewport breakpoint.
+                  */}
+                  <p
+                    className="font-serif font-semibold leading-[1.15] text-[#FFF8EC] line-clamp-3 break-words hyphens-auto px-1 md:px-2 [text-shadow:0_1px_8px_rgba(0,0,0,0.55)]"
+                    style={{ fontSize: `clamp(9px, ${(10 / size).toFixed(2)}cqmin, 1.05rem)` }}
+                  >
+                    {biz.name}
+                  </p>
+                  <span aria-hidden="true" className="hidden sm:block w-6 h-px bg-[#E2C25A]/70 my-1.5" />
+                  <p className={`hidden sm:block font-serif italic text-[11px] md:text-xs leading-none ${isDone ? 'text-[#F3D98A]' : 'text-white/75'}`}>
+                    {isDone ? 'Visited' : biz.town}
+                  </p>
                 </button>
               );
             }
