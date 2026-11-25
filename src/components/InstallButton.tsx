@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { Download } from 'lucide-react';
 import { InstallPrompt } from './InstallPrompt';
 import { promptInstall, useInstallState } from '../lib/installPrompt';
+import { currentBrowser } from '../lib/browserEnv';
+import { reportIssue } from '../lib/clientLog';
 
 interface Props {
   /**
@@ -29,9 +31,15 @@ export const InstallButton: React.FC<Props> = ({ variant = 'full', className = '
 
   const onClick = async () => {
     if (canPrompt) {
-      await promptInstall();
+      const accepted = await promptInstall();
+      if (!accepted) reportIssue('install_help', { reason: 'dismissed' });
       return;
     }
+    // Record why there was no one-tap install, so "it still shows the
+    // instructions" can be answered from the logs: iPhone (Apple allows no
+    // install button), an in-app browser, or Chrome not offering it yet.
+    const b = currentBrowser();
+    reportIssue('install_help', { reason: b.inApp ? 'in_app' : b.platform === 'ios' ? 'ios' : 'no_prompt' });
     setShowHelp(true);
   };
 
