@@ -215,6 +215,9 @@ exports.bootstrapAdmin = invites.bootstrapAdmin;
 // Launch invites by email, through Amazon SES
 exports.sendInvites = require('./inviteMail').sendInvites;
 
+// Problems the app can only see in the player's browser (sign-in, install).
+exports.logClientIssue = require('./clientLog').logClientIssue;
+
 // Role administration, raffle draw, win redemption, cheat review
 const admin = require('./admin');
 

@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import {
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   GoogleAuthProvider,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
@@ -12,14 +14,49 @@ import { auth } from '../firebase';
 import { ShieldCheck, Gamepad2, Store, LayoutGrid, Loader2, Mail, Lock, User, ChevronRight, ArrowLeft, Link2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { InstallButton } from '../components/InstallButton';
+import { OpenInBrowser } from '../components/OpenInBrowser';
+import { currentBrowser } from '../lib/browserEnv';
+import { reportIssue, errorParts, type IssueKind, type IssueDetails } from '../lib/clientLog';
+import { friendlyAuthError, shouldRetryWithRedirect } from '../lib/authErrors';
 
 interface AuthProps {
   onAuthSuccess: () => void;
 }
 
+interface ErrorInfo { ref: string; code?: string }
+
 export const Auth: React.FC<AuthProps> = () => {
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setErrorText] = useState<string | null>(null);
+  const [errorInfo, setErrorInfo] = useState<ErrorInfo | null>(null);
+  const [browser] = useState(currentBrowser);
+
+  /** Plain messages (validation) carry no reference. */
+  const setError = (text: string | null) => { setErrorText(text); setErrorInfo(null); };
+
+  /**
+   * A real failure: record it, then show the message with a reference and the
+   * error code, so a screenshot sent to the Chamber pins down the log entry.
+   */
+  const fail = (kind: IssueKind, err: unknown, text: string | null, extra: IssueDetails = {}) => {
+    const parts = errorParts(err);
+    console.error(`${kind} error:`, err);
+    const ref = reportIssue(kind, { ...parts, ...extra });
+    setErrorText(text);
+    setErrorInfo(text ? { ref, code: parts.code } : null);
+  };
+
+  const errorNote = error ? (
+    <div className="bg-red-50 text-red-600 p-4 rounded-2xl mb-6 text-left">
+      <p className="text-xs font-bold leading-relaxed">{error}</p>
+      {errorInfo && (
+        <p className="text-[10px] text-red-500/80 mt-2 leading-relaxed">
+          If this keeps happening, take a screenshot and send it to the Chamber.
+          <span className="block font-mono mt-1">Ref {errorInfo.ref}{errorInfo.code ? ` · ${errorInfo.code}` : ''}</span>
+        </p>
+      )}
+    </div>
+  ) : null;
   const [authMode, setAuthMode] = useState<'social' | 'email-signin' | 'email-signup' | 'forgot-password' | 'verify-email'>('social');
   const [resetSent, setResetSent] = useState(false);
   const [inviteToken, setInviteToken] = useState<string | null>(null);
@@ -44,15 +81,59 @@ export const Auth: React.FC<AuthProps> = () => {
     if (urlHint) setEmail(urlHint);
   }, []);
 
+  // Opened inside Facebook, Instagram and the like: record it once, so the logs
+  // show how many first visits land somewhere Google sign-in cannot work.
+  useEffect(() => {
+    if (browser.inApp) reportIssue('in_app_browser');
+  }, [browser.inApp]);
+
+  // A redirect sign-in (the fallback below) finishes on a fresh page load, and
+  // its failure only surfaces here. Without this it would fail silently.
+  useEffect(() => {
+    getRedirectResult(auth).catch(err => {
+      const { code } = errorParts(err);
+      fail('auth_google', err, friendlyAuthError(code), { method: 'redirect' });
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const signInWithGoogle = async () => {
-    setLoading(true);
     setError(null);
+
+    if (browser.inApp) {
+      // Google answers "disallowed_useragent" inside these. Do not send the
+      // player into a dead end; tell them what will work.
+      fail(
+        'auth_google',
+        { code: 'in-app-browser', message: `Google sign-in tried inside ${browser.inApp}` },
+        `Google does not allow signing in inside ${browser.inApp === 'app' ? 'this app' : browser.inApp}. Open this page in ${browser.platform === 'android' ? 'Chrome' : 'Safari'} (see above), or continue with email.`,
+        { method: 'blocked' },
+      );
+      return;
+    }
+
+    setLoading(true);
+    const provider = new GoogleAuthProvider();
     try {
-      const provider = new GoogleAuthProvider();
       await signInWithPopup(auth, provider);
-    } catch (err: any) {
-      console.error('Google Auth error:', err);
-      setError(err.message || 'Failed to sign in with Google.');
+    } catch (err) {
+      const { code } = errorParts(err);
+      if (shouldRetryWithRedirect(code)) {
+        // The popup could not open or could not report back (blocked pop-ups,
+        // some installed-app and private modes). A full-page redirect gets
+        // past all of those. Record the popup failure first so we can see how
+        // often this happens.
+        reportIssue('auth_google', { ...errorParts(err), method: 'popup' });
+        try {
+          await signInWithRedirect(auth, provider);
+          return; // The page is navigating away.
+        } catch (err2) {
+          fail('auth_google', err2, friendlyAuthError(errorParts(err2).code), { method: 'redirect' });
+          setLoading(false);
+          return;
+        }
+      }
+      fail('auth_google', err, friendlyAuthError(code), { method: 'popup' });
       setLoading(false);
     }
   };
@@ -64,9 +145,12 @@ export const Auth: React.FC<AuthProps> = () => {
     try {
       await signInWithEmailAndPassword(auth, email, password);
       // onAuthStateChanged in App.tsx handles navigation
-    } catch (err: any) {
-      console.error('Email sign in error:', err);
-      setError('Invalid email or password.');
+    } catch (err) {
+      const { code } = errorParts(err);
+      fail('auth_email', err,
+        code === 'auth/too-many-requests' ? 'Too many attempts. Wait a few minutes and try again.'
+          : code === 'auth/network-request-failed' ? 'Could not connect. Check your signal and try again.'
+          : 'Invalid email or password.');
     } finally {
       setLoading(false);
     }
@@ -83,8 +167,8 @@ export const Auth: React.FC<AuthProps> = () => {
     try {
       await sendPasswordResetEmail(auth, email);
       setResetSent(true);
-    } catch (err: any) {
-      setError(err.message || 'Failed to send reset email.');
+    } catch (err) {
+      fail('auth_email', err, errorParts(err).message || 'Failed to send reset email.');
     } finally {
       setLoading(false);
     }
@@ -103,9 +187,8 @@ export const Auth: React.FC<AuthProps> = () => {
       await updateProfile(result.user, { displayName });
       await sendEmailVerification(result.user);
       setAuthMode('verify-email');
-    } catch (err: any) {
-      console.error('Email sign up error:', err);
-      setError(err.message || 'Failed to create account.');
+    } catch (err) {
+      fail('auth_email', err, errorParts(err).message || 'Failed to create account.');
     } finally {
       setLoading(false);
     }
@@ -135,6 +218,14 @@ export const Auth: React.FC<AuthProps> = () => {
               </div>
             </div>
           )}
+          {browser.inApp && (
+            <OpenInBrowser
+              className="mb-6"
+              why={inviteToken
+                ? 'Google sign-in does not work in here, and your invite needs to open in a real browser.'
+                : 'Google sign-in and installing the app do not work in here.'}
+            />
+          )}
           <AnimatePresence mode="wait">
             {authMode === 'verify-email' ? (
               <motion.div
@@ -153,9 +244,7 @@ export const Auth: React.FC<AuthProps> = () => {
                   We sent a verification link to <span className="font-semibold text-neutral-700">{email}</span>. Click the link then come back and sign in.
                 </p>
 
-                {error && (
-                  <div className="bg-red-50 text-red-600 p-4 rounded-2xl text-[10px] font-bold uppercase tracking-widest mb-6">{error}</div>
-                )}
+                {errorNote}
 
                 <div className="space-y-4">
                   <button
@@ -164,8 +253,8 @@ export const Auth: React.FC<AuthProps> = () => {
                       try {
                         const currentUser = auth.currentUser;
                         if (currentUser) await sendEmailVerification(currentUser);
-                      } catch (err: any) {
-                        setError(err.message || 'Failed to resend verification email.');
+                      } catch (err) {
+                        fail('auth_email', err, errorParts(err).message || 'Failed to resend verification email.');
                       }
                     }}
                     className="w-full bg-[var(--color-primary)] text-white py-5 rounded-2xl font-bold text-sm transition-all shadow-lg flex items-center justify-center gap-3 active:scale-95"
@@ -199,9 +288,7 @@ export const Auth: React.FC<AuthProps> = () => {
                 <h2 className="font-serif italic text-3xl mb-2">Reset Password</h2>
                 <p className="text-neutral-500 mb-8 text-sm">Enter your email and we'll send you a reset link.</p>
 
-                {error && (
-                  <div className="bg-red-50 text-red-600 p-4 rounded-2xl text-[10px] font-bold uppercase tracking-widest mb-6">{error}</div>
-                )}
+                {errorNote}
 
                 {resetSent ? (
                   <div className="bg-green-50 text-green-700 p-6 rounded-2xl text-center">
@@ -244,11 +331,7 @@ export const Auth: React.FC<AuthProps> = () => {
                   Join the community and support local businesses while playing bingo!
                 </p>
 
-                {error && (
-                  <div className="bg-red-50 text-red-600 p-4 rounded-2xl text-[10px] font-bold uppercase tracking-widest mb-6">
-                    {error}
-                  </div>
-                )}
+                {errorNote}
 
                 <div className="space-y-4">
                   <button
@@ -303,11 +386,7 @@ export const Auth: React.FC<AuthProps> = () => {
                   {authMode === 'email-signin' ? 'Enter your details to continue playing.' : 'Join the community and start playing.'}
                 </p>
 
-                {error && (
-                  <div className="bg-red-50 text-red-600 p-4 rounded-2xl text-[10px] font-bold uppercase tracking-widest mb-6">
-                    {error}
-                  </div>
-                )}
+                {errorNote}
 
                 <form onSubmit={authMode === 'email-signin' ? handleEmailSignIn : handleEmailSignUp} className="space-y-4">
                   {authMode === 'email-signup' && (

@@ -1,5 +1,6 @@
 import { httpsCallable, FunctionsError } from 'firebase/functions';
 import { functions } from '../firebase';
+import { reportIssue, errorParts } from '../lib/clientLog';
 
 /**
  * Typed wrappers for the Cloud Functions callables.
@@ -11,7 +12,17 @@ import { functions } from '../firebase';
 
 const call = <Req, Res>(name: string) => {
   const fn = httpsCallable<Req, Res>(functions, name);
-  return async (data: Req): Promise<Res> => (await fn(data)).data;
+  return async (data: Req): Promise<Res> => {
+    try {
+      return (await fn(data)).data;
+    } catch (err) {
+      // Every refusal is recorded, expected ones included: "the invite will
+      // not go through" is exactly the kind of report that needs the reason.
+      // Only the function name and the error travel, never the request data.
+      reportIssue('callable', { fn: name, ...errorParts(err) });
+      throw err;
+    }
+  };
 };
 
 /**
