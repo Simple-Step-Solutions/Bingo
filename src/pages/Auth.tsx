@@ -17,19 +17,20 @@ import { InstallButton } from '../components/InstallButton';
 import { OpenInBrowser } from '../components/OpenInBrowser';
 import { currentBrowser } from '../lib/browserEnv';
 import { reportIssue, errorParts, type IssueKind, type IssueDetails } from '../lib/clientLog';
-import { friendlyAuthError, shouldRetryWithRedirect } from '../lib/authErrors';
+import { friendlyAuthError, shouldRetryWithRedirect, emailAuthError, type EmailAuthError } from '../lib/authErrors';
 
 interface AuthProps {
   onAuthSuccess: () => void;
 }
 
-interface ErrorInfo { ref: string; code?: string }
+interface ErrorInfo { ref: string; code?: string; switchTo?: EmailAuthError['switchTo'] }
 
 export const Auth: React.FC<AuthProps> = () => {
   const [loading, setLoading] = useState(false);
   const [error, setErrorText] = useState<string | null>(null);
   const [errorInfo, setErrorInfo] = useState<ErrorInfo | null>(null);
   const [browser] = useState(currentBrowser);
+  const [authMode, setAuthMode] = useState<'social' | 'email-signin' | 'email-signup' | 'forgot-password' | 'verify-email'>('social');
 
   /** Plain messages (validation) carry no reference. */
   const setError = (text: string | null) => { setErrorText(text); setErrorInfo(null); };
@@ -38,17 +39,32 @@ export const Auth: React.FC<AuthProps> = () => {
    * A real failure: record it, then show the message with a reference and the
    * error code, so a screenshot sent to the Chamber pins down the log entry.
    */
-  const fail = (kind: IssueKind, err: unknown, text: string | null, extra: IssueDetails = {}) => {
+  const fail = (kind: IssueKind, err: unknown, text: string | null, extra: IssueDetails = {}, switchTo?: EmailAuthError['switchTo']) => {
     const parts = errorParts(err);
     console.error(`${kind} error:`, err);
     const ref = reportIssue(kind, { ...parts, ...extra });
     setErrorText(text);
-    setErrorInfo(text ? { ref, code: parts.code } : null);
+    setErrorInfo(text ? { ref, code: parts.code, switchTo } : null);
+  };
+
+  /** Email and password failures, with a one-tap way to the other form. */
+  const failEmail = (err: unknown, mode: 'signin' | 'signup') => {
+    const { text, switchTo } = emailAuthError(errorParts(err).code, mode);
+    fail('auth_email', err, text, { method: mode }, switchTo);
   };
 
   const errorNote = error ? (
     <div className="bg-red-50 text-red-600 p-4 rounded-2xl mb-6 text-left">
       <p className="text-xs font-bold leading-relaxed">{error}</p>
+      {errorInfo?.switchTo && (
+        <button
+          type="button"
+          onClick={() => { setAuthMode(errorInfo.switchTo!); setError(null); }}
+          className="mt-3 w-full bg-white border border-red-200 text-[var(--color-primary)] py-3 rounded-xl font-bold text-xs active:scale-95 transition-all"
+        >
+          {errorInfo.switchTo === 'email-signup' ? 'Create an account' : 'Go to Sign In'}
+        </button>
+      )}
       {errorInfo && (
         <p className="text-[10px] text-red-500/80 mt-2 leading-relaxed">
           If this keeps happening, take a screenshot and send it to the Chamber.
@@ -57,7 +73,6 @@ export const Auth: React.FC<AuthProps> = () => {
       )}
     </div>
   ) : null;
-  const [authMode, setAuthMode] = useState<'social' | 'email-signin' | 'email-signup' | 'forgot-password' | 'verify-email'>('social');
   const [resetSent, setResetSent] = useState(false);
   const [inviteToken, setInviteToken] = useState<string | null>(null);
 
@@ -146,11 +161,7 @@ export const Auth: React.FC<AuthProps> = () => {
       await signInWithEmailAndPassword(auth, email, password);
       // onAuthStateChanged in App.tsx handles navigation
     } catch (err) {
-      const { code } = errorParts(err);
-      fail('auth_email', err,
-        code === 'auth/too-many-requests' ? 'Too many attempts. Wait a few minutes and try again.'
-          : code === 'auth/network-request-failed' ? 'Could not connect. Check your signal and try again.'
-          : 'Invalid email or password.');
+      failEmail(err, 'signin');
     } finally {
       setLoading(false);
     }
@@ -188,7 +199,7 @@ export const Auth: React.FC<AuthProps> = () => {
       await sendEmailVerification(result.user);
       setAuthMode('verify-email');
     } catch (err) {
-      fail('auth_email', err, errorParts(err).message || 'Failed to create account.');
+      failEmail(err, 'signup');
     } finally {
       setLoading(false);
     }
@@ -214,7 +225,11 @@ export const Auth: React.FC<AuthProps> = () => {
               </div>
               <div>
                 <p className="text-[10px] font-black uppercase tracking-widest text-[var(--color-primary)]">You've been invited</p>
-                <p className="text-xs text-neutral-600 mt-0.5">Sign in or create an account to accept your invitation.</p>
+                <p className="text-xs text-neutral-600 mt-0.5">
+                  {authMode === 'email-signin'
+                    ? 'Sign in to accept your invitation.'
+                    : 'Create your account to accept your invitation. Already have one? Sign in instead.'}
+                </p>
               </div>
             </div>
           )}
@@ -334,13 +349,23 @@ export const Auth: React.FC<AuthProps> = () => {
                 {errorNote}
 
                 <div className="space-y-4">
+                  {/* An invite goes to someone who has no account yet, so the
+                      email button opens Create Account, not Sign In. */}
                   <button
-                    onClick={() => setAuthMode('email-signin')}
+                    onClick={() => setAuthMode(inviteToken ? 'email-signup' : 'email-signin')}
                     className="w-full bg-neutral-900 text-white py-5 rounded-2xl font-bold text-sm transition-all shadow-lg flex items-center justify-center gap-3 active:scale-95"
                   >
                     <Mail size={18} />
-                    Continue with Email
+                    {inviteToken ? 'Create Account with Email' : 'Continue with Email'}
                   </button>
+                  {inviteToken && (
+                    <button
+                      onClick={() => setAuthMode('email-signin')}
+                      className="w-full text-[11px] font-bold text-[var(--color-primary)] uppercase tracking-widest"
+                    >
+                      Already have an account? Sign In
+                    </button>
+                  )}
 
                   <div className="relative py-2">
                     <div className="absolute inset-0 flex items-center">
@@ -445,7 +470,7 @@ export const Auth: React.FC<AuthProps> = () => {
                       setAuthMode(authMode === 'email-signin' ? 'email-signup' : 'email-signin');
                       setError(null);
                     }}
-                    className="w-full text-[10px] font-bold text-neutral-400 uppercase tracking-widest hover:text-neutral-900 transition-colors"
+                    className="w-full text-[11px] font-bold text-[var(--color-primary)] uppercase tracking-widest hover:text-neutral-900 transition-colors py-2"
                   >
                     {authMode === 'email-signin' ? "Don't have an account? Sign Up" : "Already have an account? Sign In"}
                   </button>

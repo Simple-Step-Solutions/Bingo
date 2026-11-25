@@ -17,7 +17,7 @@ const KINDS = new Set([
 ]);
 
 const PLATFORMS = new Set(['ios', 'android', 'other']);
-const METHODS = new Set(['popup', 'redirect', 'blocked']);
+const METHODS = new Set(['popup', 'redirect', 'blocked', 'signin', 'signup']);
 const REASONS = new Set(['ios', 'in_app', 'no_prompt', 'dismissed']);
 
 const EMAIL = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi;

@@ -55,3 +55,10 @@ test('long and odd values are trimmed rather than trusted', () => {
   assert.ok(out.fn.length <= 40);
   assert.deepStrictEqual(out.context, { inApp: 'y'.repeat(20) });
 });
+
+test('email failures record whether it was sign in or sign up', () => {
+  for (const method of ['signin', 'signup']) {
+    const out = sanitizeReport({ kind: 'auth_email', code: 'auth/invalid-credential', context: { method } });
+    assert.equal(out.context.method, method);
+  }
+});

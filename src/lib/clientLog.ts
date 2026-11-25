@@ -19,7 +19,7 @@ export interface IssueDetails {
   code?: string;
   message?: string;
   fn?: string;
-  method?: 'popup' | 'redirect' | 'blocked';
+  method?: 'popup' | 'redirect' | 'blocked' | 'signin' | 'signup';
   reason?: 'ios' | 'in_app' | 'no_prompt' | 'dismissed';
 }
 
