@@ -40,3 +40,44 @@ export const friendlyAuthError = (code: string | undefined): string | null => {
 
 export const shouldRetryWithRedirect = (code: string | undefined): boolean =>
   Boolean(code && REDIRECT_FIXES.has(code));
+
+export type EmailAuthMode = 'signin' | 'signup';
+
+export interface EmailAuthError {
+  text: string;
+  /** The other form, when that is almost certainly what the player needs. */
+  switchTo?: 'email-signin' | 'email-signup';
+}
+
+/**
+ * With email enumeration protection on, Firebase answers a sign-in for an email
+ * that has no account with the same auth/invalid-credential as a wrong
+ * password. During launch nearly every one of those is a new player who pressed
+ * Sign In, so the message leads with creating an account.
+ */
+const NO_MATCH = new Set(['auth/invalid-credential', 'auth/user-not-found', 'auth/wrong-password', 'auth/invalid-login-credentials']);
+
+export const emailAuthError = (code: string | undefined, mode: EmailAuthMode): EmailAuthError => {
+  if (mode === 'signin' && code && NO_MATCH.has(code)) {
+    return {
+      text: 'That email and password do not match an account. New to Chamber Bingo? Create an account first.',
+      switchTo: 'email-signup',
+    };
+  }
+  switch (code) {
+    case 'auth/email-already-in-use':
+      return { text: 'This email already has an account. Sign in instead.', switchTo: 'email-signin' };
+    case 'auth/weak-password':
+      return { text: 'Pick a password of at least 6 characters.' };
+    case 'auth/invalid-email':
+      return { text: 'That email address does not look right. Check it and try again.' };
+    case 'auth/too-many-requests':
+      return { text: 'Too many attempts. Wait a few minutes and try again.' };
+    case 'auth/network-request-failed':
+      return { text: 'Could not connect. Check your signal and try again.' };
+    case 'auth/user-disabled':
+      return { text: 'This account has been turned off. Contact the Chamber for help.' };
+    default:
+      return { text: mode === 'signup' ? 'Could not create your account. Please try again.' : 'Could not sign you in. Please try again.' };
+  }
+};
