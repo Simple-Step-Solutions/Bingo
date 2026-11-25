@@ -31,8 +31,12 @@ exports.logClientIssue = onCall(callableOpts({ maxInstances: 5 }), async (reques
   const report = sanitizeReport(request.data);
   if (!report) return { ok: false };
 
+  // The logger puts its first argument in jsonPayload.message, which would
+  // overwrite the report's own message. Keep the error text as errorMessage.
+  const { message, ...rest } = report;
   logger.warn('client_issue', {
-    ...report,
+    ...rest,
+    errorMessage: message,
     uid: (request.auth && request.auth.uid) || null,
     userAgent: fp.userAgent ? String(fp.userAgent).slice(0, 300) : null,
   });
